@@ -1,9 +1,9 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Initial canonical specification  
-**Product status:** Pre-implementation  
+**Document status:** Canonical specification with Phase 2 implementation record
+**Product status:** Phase 2 authoritative PostgreSQL foundation complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
-**Last updated:** 2026-09-23
+**Last updated:** 2026-09-24
 
 ## 1. Purpose and change policy
 
@@ -643,6 +643,8 @@ Implement framework-independent domain configuration/types and deterministic pur
 
 Design PostgreSQL persistence, transactional account/position/order models, append-only auditable financial history, idempotency keys, configuration versioning, and reconciliation. Prove simultaneous actions cannot overspend or exceed slots.
 
+**Status: COMPLETE.** The implemented scope and remaining boundaries are recorded in Section 23.
+
 ### Phase 3 — Execution-engine abstraction
 
 Define normalized market-state, quote, fill, fee, price-impact, and adapter-version contracts. Build deterministic fake/reference adapters for tests and replay infrastructure. Keep protocol math separate from competition logic.
@@ -710,7 +712,109 @@ The previously identified payout-curve, Reward Buffer source, payout-dust, order
 
 No other contradiction was identified in the supplied hourly/daily competition rules: every hour resets to 10 Paper SOL; every completed hourly gain or loss contributes to the UTC-day cumulative score; hourly rewards go to Top 10 after realistic force settlement; daily rewards go to Top 25 after UTC-day finalization.
 
-## 23. Required Codex workflow
+## 23. Phase 2 implementation record
+
+Phase 2 establishes PostgreSQL as the authoritative store for durable financial state. Redis remains limited to future caching, coordination, locks, queues, and other ephemeral responsibilities; it is not authoritative for balances, positions, fills, P&L, or ledger history.
+
+### 23.1 Existing architecture retained
+
+The implementation extends the Phase 1 Node.js/TypeScript monorepo, Drizzle ORM and `node-postgres` connection pool, caller-supplied text identifiers, UTC-aware timestamps, `app_meta`, forward-only SQL migration flow, and existing package boundaries. No parallel persistence architecture was introduced.
+
+### 23.2 Tables and migration
+
+Migration `packages/db/migrations/0001_flowery_sphinx.sql` adds these tables without changing `app_meta`:
+
+- `users`;
+- `competition_seasons`;
+- `season_accounts`;
+- `assets`;
+- `markets`;
+- `idempotency_records`;
+- `orders`;
+- `positions`;
+- `fills`;
+- `journal_transactions`;
+- `ledger_entries`.
+
+The migration is forward-only, applies cleanly to a fresh database and the existing Phase 1 database, and is safe when the migration command is run again. Authoritative foreign keys use `ON DELETE RESTRICT ON UPDATE RESTRICT`; no cascade can erase financial history. Database triggers reject updates or deletes of fills, journal headers, and ledger entries. Lifecycle/finalization state is used instead of destructive deletion.
+
+### 23.3 Canonical units and accounting
+
+- Paper SOL uses exact integer lamports in PostgreSQL `bigint` and TypeScript `bigint`; 1 SOL is 1,000,000,000 lamports.
+- Token quantities use integer base units, with display precision stored in `assets.decimals`.
+- Execution prices use `numeric(38,18)` and validated decimal strings at the service boundary.
+- JavaScript `Number` is not authoritative for balances, quantities, fees, cost basis, prices, or P&L.
+
+Phase 2 uses double-entry journals. Each balance-changing operation creates one immutable `journal_transactions` row and at least two immutable `ledger_entries` rows. A deferred database constraint trigger requires positive entries, matching season-account identity, at least two entries, and equal debit and credit totals at commit. Service-level validation applies the same balance check before insertion.
+
+The ledger accounts are `CASH`, `POSITION_COST`, `STARTING_CAPITAL`, `TOP_UP_CAPITAL`, `TRADING_PNL`, and `TRADING_FEES`. Materialized cash, cumulative top-up, realized-PnL, quantity, and cost-basis fields support safe transactional reads but must reconcile to immutable ledger/fill history.
+
+The accounting invariant is:
+
+```text
+cash + open position cost
+= starting capital + top-up capital + gross realized trading PnL - realized sell fees
+```
+
+### 23.4 Season accounts, starting allocation, and top-ups
+
+`competition_seasons` are durable UTC calendar-month accounting containers with versioned rules and lifecycle state. They support future monthly finalization/reset history; their existence does not create a monthly real-SOL reward competition, which remains excluded by Section 20. A unique constraint enforces one season account per user and season. New seasons create new rows and never overwrite historical seasons.
+
+Initializing a season account applies exactly **10,000,000,000 lamports (10 Paper SOL)** once through a balanced `STARTING_ALLOCATION` journal. Initialization is idempotent, and simultaneous initializers converge on one account and one allocation.
+
+The Phase 2 ledger supports paper top-ups after capital loss. A top-up increases cash and `cumulative_top_up_lamports`, debits `CASH`, and credits the separate `TOP_UP_CAPITAL` account. It never rewrites fills, realized P&L, or historical performance, so future ranking can exclude all injected capital. This durable season-account capability does not authorize an intra-hour top-up: the active hourly rule in Sections 3.1 and 4.1 remains no top-ups during a round.
+
+### 23.5 Orders, fills, positions, and deterministic cost basis
+
+Orders record requested intent separately from fills. A buy requests quote lamports; a sell requests token base units. Orders retain account, market, side, UTC request time, lifecycle state, and idempotency identity. One order may have multiple fills, but aggregate fills cannot exceed its request and completed/rejected/cancelled orders cannot accept new fills.
+
+Fills are immutable execution history with a unique execution identity, base units, quote lamports, decimal execution price, fee lamports, direction, market, cost removed, realized P&L, and UTC execution time. Positions materialize one aggregate holding per season account and market while preserving fills as the execution source of truth.
+
+V1 uses weighted-average aggregate cost basis:
+
+```text
+buy acquisition cost = quote lamports + buy fee lamports
+partial-sell cost removed = floor(old cost × sold quantity / old quantity)
+final-sell cost removed = all remaining cost
+net sell proceeds = quote lamports - sell fee lamports
+fill realized PnL = net sell proceeds - cost removed
+```
+
+Partial-sell division leaves all integer remainder with the open position. The final sell removes the exact remaining quantity and cost, so no cost-basis value disappears. Buy fees are capitalized into position cost; sell fees are recorded separately in `TRADING_FEES`. Both reduce realized performance exactly once.
+
+### 23.6 Idempotency, transaction boundaries, and concurrency
+
+`idempotency_records` has a PostgreSQL uniqueness constraint on `(operation_class, idempotency_key)` and stores a SHA-256 request fingerprint plus original result identity. The same operation/key/payload waits for or returns the original result. Conflicting payload reuse fails safely. Implemented operation classes cover season-account initialization, paper top-up, order submission, and fill application; the model is ready for later settlement, finalization/reset, and reward operations.
+
+Each financial mutation is one database transaction. Fill application atomically coordinates the order lock, account lock, position lock/create, fill insert, materialized cash/P&L and position update, ledger journal, order status, and idempotency completion. Top-ups lock the account before changing state. Consistent row-lock ordering serializes competing debits and credits, while PostgreSQL uniqueness serializes duplicates. Any error rolls back all partial work.
+
+Proven guarantees include:
+
+- simultaneous debits cannot overspend or create money;
+- duplicate initialization cannot create a second 10 SOL allocation;
+- duplicate credits, orders, and fills cannot apply twice;
+- simultaneous valid credits are not lost;
+- conflicting idempotency reuse is rejected;
+- same-position mutations serialize without corrupting quantity or cost;
+- ledger and materialized state remain consistent after failure or concurrency.
+
+### 23.7 Reconciliation and Phase 2 validation
+
+`reconcileAccountLedger` compares materialized cash and open position cost with ledger balances, position quantity with signed fill history, initial and top-up capital with their ledger accounts, realized P&L with gross trading P&L less sell fees, and every journal's debit/credit equality.
+
+The deterministic real-PostgreSQL scenario initializes 10 SOL, performs two buys with fees, partially sells, realizes P&L, applies a separately measured 3 SOL top-up, sells the remainder, and closes the position. It reconciles to 14 SOL cash, 1 SOL realized P&L, zero open quantity/cost, and a balanced ledger with no unexplained value.
+
+The suite now has **199 passing tests**: the 186-test Phase 1 baseline plus 13 real-PostgreSQL Phase 2 tests. The new tests cover fresh/repeated migration, constraints, exact allocation, UTC seasons, season isolation/history, initialization/top-up/order/fill idempotency, immutable and balanced journals, multiple fills, positions, weighted cost basis, partial/final sells, fee/PnL accounting, insufficient-balance concurrency, simultaneous valid fills into one position, forced rollback, deletion restriction, and full reconciliation. Migration `0001_flowery_sphinx.sql` was also applied twice successfully to the existing Phase 1 PostgreSQL database.
+
+Detailed schema and accounting documentation is in `docs/PHASE_2_LEDGER_AND_SCHEMA.md`.
+
+### 23.8 Known limitations and exact recommended Phase 3
+
+Phase 2 does not implement execution pricing, protocol math, slippage, live market state, the 20% buy cap, the unique-token/hour rule, hourly round linkage, force settlement, leaderboard scoring, rewards, custody, or real trading. Schema lifecycle states exist beyond the currently exposed domain operations. Caller-supplied identifiers remain the repository convention.
+
+The exact recommended Phase 3 task is: define normalized immutable market-state, quote, fill, fee, price-impact, and adapter-version contracts; implement deterministic fake/reference execution adapters and replay fixtures; connect successful simulated results only through the Phase 2 `createOrder` and `applyFill` transaction APIs; then add authoritative transactional enforcement of the configurable 20% buy cap and five-unique-token-per-UTC-hour rule using the persisted account/order/fill history. Do not add live Solana trading or real payouts.
+
+## 24. Required Codex workflow
 
 Future Codex prompts should begin with:
 

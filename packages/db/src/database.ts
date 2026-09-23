@@ -7,6 +7,7 @@ import * as schema from './schema.js';
 
 export interface DatabaseService {
   readonly client: NodePgDatabase<typeof schema>;
+  readonly pool: Pool;
   healthCheck(): Promise<boolean>;
   close(): Promise<void>;
 }
@@ -20,6 +21,7 @@ export function createDatabase(databaseUrl: string): DatabaseService {
 
   return {
     client,
+    pool,
     async healthCheck() {
       try {
         await client.execute(sql`select 1`);
