@@ -1,0 +1,721 @@
+# Paperfund: Canonical Product and Engineering Specification
+
+**Document status:** Initial canonical specification  
+**Product status:** Pre-implementation  
+**Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
+**Last updated:** 2026-09-23
+
+## 1. Purpose and change policy
+
+Paperfund is a free-to-enter, server-authoritative Solana paper-trading competition funded by verified creator-fee revenue. It is intended primarily as a browser extension or overlay on existing Solana trading terminals, supported by a website for leaderboards, history, prize pools, rules, payouts, and account views. It is not a full custom trading terminal and it does not execute real-money user trades.
+
+Future work must read this document completely before making changes. Product rules must not be changed by implementation convenience. If a task conflicts with this document, work must stop and the conflict must be reported unless the task explicitly authorizes a specification change.
+
+Terminology used in this document:
+
+- **MUST / MUST NOT**: required behavior.
+- **SHOULD / SHOULD NOT**: preferred behavior; deviations require a documented reason.
+- **CONFIGURABLE**: the value or policy must be centralized, versioned, and changeable without scattering constants through the code. Rule changes normally apply only to future rounds.
+- **TBD**: no product decision has been approved. Implementations must not invent one.
+- **Paper SOL**: simulated competition accounting units denominated in SOL; not real SOL and not withdrawable.
+- **Real SOL**: on-chain SOL used for competition rewards.
+
+## 2. Product principles
+
+1. **Execution realism is foundational.** Paper trades must model real market mechanics as accurately as practical. They must not fill at a chart price when real execution would incur price impact, slippage, protocol fees, creator fees, route effects, or bonding-curve/AMM mechanics.
+2. **Determinism over artificial realism.** Execution is derived deterministically from authoritative recorded market state. Do not add random slippage or fake random delays.
+3. **Server authority.** Clients request actions; the backend owns validation, balances, fills, positions, P&L, ranks, prize pools, token-slot use, settlement, and rewards.
+4. **Auditability.** Every financial state transition and the market state behind every fill must be explainable and replayable.
+5. **Clear simulation labeling.** The extension and website must clearly identify all paper trades and Paper SOL as simulated.
+6. **Separation of concerns.** Competition rules, protocol execution math, terminal integrations, accounting, and payout signing are separate layers.
+7. **Financial solvency.** Never promise or allocate funds that do not exist. Player reward money and Platform Treasury money must remain separate.
+8. **Controlled delivery.** Build in small, verified phases rather than attempting the entire product at once.
+
+When forced to choose between fast but financially fake behavior and slower, deterministic, realistic behavior, choose deterministic realistic behavior. The trust target is: a simulated result should be realistically close to the result of placing the same real-SOL trade under the same market conditions.
+
+## 3. Competition model
+
+### 3.1 Hourly competition
+
+Each eligible competition account begins every hourly round with exactly **10 Paper SOL**. There are no top-ups during a round. Gains and losses do not carry into the next round; only the completed result is retained for history, statistics, and Daily Championship scoring.
+
+During the open period, users trade supported Solana memecoin markets using the paper account. At the hourly cutoff:
+
+1. The authoritative round state atomically transitions from `OPEN` to `CLOSING`; no new order may enter the round after this transition.
+2. Open positions are force-sold through the same realistic execution engine used for normal sells.
+3. Price impact, slippage, and all applicable fees are applied.
+4. All balances are converted to Paper SOL.
+5. Final settled balance and hourly P&L are stored.
+6. The hourly leaderboard is finalized.
+7. A configurable reward-finalization grace period allows late-discovered creator-fee events to be attributed by their authoritative on-chain event time/slot.
+8. After the grace period, reward accounting and the hourly prize pool are frozen and allocated to the Top 10.
+9. Payout processing begins.
+10. The next hourly round starts immediately at the cutoff with a fresh 10 Paper SOL account; it does not wait for prior-round settlement or reward finalization.
+
+Hourly P&L is:
+
+```text
+hourly_pnl = final_settled_paper_sol - 10 Paper SOL
+```
+
+Examples: a final balance of 14.2 produces +4.2 Paper SOL P&L; 3.7 produces -6.3 Paper SOL P&L.
+
+If a user exhausts their Paper SOL balance, they wait for the next hourly reset. Live ranks and portfolio values are provisional until force settlement completes.
+
+### 3.2 Daily Championship
+
+The Daily Championship runs over one UTC calendar day. An hourly round belongs to the UTC Daily Championship whose `[00:00:00, 24:00:00)` window contains the hourly round's authoritative **start time**. Settlement completion time, reward finalization time, payout time, indexer discovery time, and the user's local timezone do not affect this attribution.
+
+Examples:
+
+- the hourly round from `2026-09-23T23:00:00Z` to `2026-09-24T00:00:00Z` belongs to the `2026-09-23` UTC Daily Championship, even if settlement or later processing completes after midnight;
+- the hourly round from `2026-09-24T00:00:00Z` to `2026-09-24T01:00:00Z` belongs to the `2026-09-24` UTC Daily Championship.
+
+Every finalized hourly result from a round attributed to that UTC day contributes to the user's cumulative daily score. Positive, negative, and zero-P&L results all count, and every unique hourly round may be counted at most once for a user.
+
+```text
+daily_score = sum(all completed hourly P&L in the current UTC day)
+```
+
+The cumulative score remains exact Paper SOL P&L. There is no best-three-hours filter, positive-score floor, or loss protection. More activity creates more opportunity and more downside; that is intentional. The Top 25 are paid after the UTC day finalizes. There is no monthly cash competition in the current product scope.
+
+### 3.3 Authoritative time model
+
+All competition authority uses UTC. Frontends may display local time but must not use it to decide state.
+
+- Hourly example: 15:00:00 UTC opens; 16:00:00 UTC closes.
+- Daily period: 00:00:00 UTC opens; 23:59:59.999 UTC is the last active instant; 00:00:00 UTC on the next day finalizes the previous day.
+- At an hourly close, the system rejects new orders, enters settlement, and opens the next round immediately according to persisted state-machine transitions. The completed round's reward accounting freezes and payouts begin only after its reward-finalization grace period ends.
+
+Round behavior must not be derived only from wall-clock time. Persist transitions and use idempotent workers. An order may enter an hourly round only while the authoritative server-side round state is `OPEN`. Once the round atomically transitions from `OPEN` to `CLOSING`, no new order may enter that round. Browser timestamps are never authoritative. Order admission and the state transition must use transactional state/locking or an equivalent serializable mechanism so an order cannot race the cutoff. Any order transaction that does not authoritatively establish admission while the state is `OPEN` must be rejected from that round.
+
+## 4. Trading rules
+
+### 4.1 Starting balance
+
+- Starting balance per hourly round: **10 Paper SOL** (**CONFIGURABLE and versioned**, with 10 as the launch value).
+- No intra-round top-ups.
+- Previous round balances never roll over.
+
+### 4.2 Unique-token entry limit
+
+- Launch limit: **5 unique token entries per hourly round** (**CONFIGURABLE and versioned**).
+- A slot is consumed only after the first successful, non-zero buy fill for that token in the current round.
+- Selling and rebuying the same token does not consume another slot.
+- Failed, rejected, and zero-fill buy attempts do not consume a slot.
+- Slot allocation must be transactional so simultaneous buys cannot exceed the limit.
+- The UI must show usage, for example `Token slots: 3 / 5 used`.
+
+### 4.3 Maximum buy rule
+
+Immediately before each buy, the authoritative backend calculates:
+
+```text
+portfolio_equity_before_buy = Paper SOL cash
+                            + current value of all token positions
+
+max_buy_value = portfolio_equity_before_buy × 0.20
+```
+
+The launch maximum-buy ratio is **20%** (**CONFIGURABLE and versioned**). The valuation source used in pre-trade equity must be authoritative; its exact market-state freshness policy is **TBD**.
+
+The rule applies only when buying. A valid position that later appreciates beyond 20% of portfolio equity is not force-reduced. Validation and balance mutation must be atomic or equivalently concurrency-safe so simultaneous orders cannot bypass the rule.
+
+### 4.4 Accounts and authentication
+
+- Preferred authentication: Solana wallet nonce signing.
+- Never collect wallet private keys.
+- V1 policy: one wallet equals one competition account.
+- Users may operate multiple wallets/accounts.
+- V1 has no aggressive Sybil restrictions, mandatory KYC, wallet-age rule, device fingerprint requirement, or token-holding requirement.
+- Legal/compliance review may require future changes; such changes must be explicitly approved and versioned.
+
+## 5. Execution and valuation
+
+### 5.1 Realistic execution requirements
+
+Paper trades must not automatically fill at a displayed chart price. Depending on protocol and route, quotes and fills may account for:
+
+- bonding-curve state;
+- AMM reserves and invariant math;
+- pool state and quote asset;
+- protocol and creator fees;
+- trade direction and size;
+- price impact and deterministic slippage implied by the market/route;
+- token-specific mechanics;
+- migration state;
+- route composition.
+
+Do not add random slippage or artificial random latency. Liquidity is an execution input, not a reason for arbitrary V1 minimum-liquidity bans. A large trade into a shallow curve or pool must receive the worse average execution that the real mechanics imply.
+
+If market state is missing, stale beyond the approved policy, internally inconsistent, or unsupported by the relevant adapter, reject or defer the trade. Never invent a market price. The exact stale-data thresholds and defer/reject policy are **CONFIGURABLE/TBD**.
+
+### 5.2 Mark value versus executable value
+
+The product must distinguish clearly between:
+
+- **mark/display value**, used for understandable live display; and
+- **executable value**, the output realistically obtainable by simulating liquidation of a specific position against authoritative state.
+
+Settlement, final ranking, and liquidation use simulated executable value. A displayed portfolio value must never be assumed fully realizable without price impact and fees. Interfaces should label which valuation is shown and explain meaningful differences.
+
+### 5.3 Force settlement
+
+At close, all open positions are sold through the same adapter and execution logic as user-initiated sells. Settlement applies actual simulated price impact, deterministic route effects, slippage, and fees, then records final Paper SOL.
+
+Settlement must be retryable and idempotent. A retry must not double-sell a position or double-credit cash. The exact market-state selection policy for settlement at cutoff, including behavior during RPC or data outages and protocol migration, is **TBD**.
+
+### 5.4 Market-state evidence
+
+Every execution must reference an immutable or reproducibly serialized market-state record sufficient to answer, “Why did this user receive this fill?” At minimum record:
+
+- protocol and adapter version;
+- market/pool/curve identifier and token mint;
+- observation timestamp and chain slot/block context;
+- reserves or other relevant protocol state;
+- fee parameters and route;
+- requested input and simulated output;
+- price impact and applicable fees;
+- buy/sell direction and execution timestamp;
+- migration state when relevant.
+
+Where available, retain creator/deployer information and liquidity events to support later investigation.
+
+## 6. Leaderboards and scoring
+
+### 6.1 Hourly leaderboard
+
+The hourly leaderboard should show rank, user or display wallet, current equity, current P&L, time remaining, current prize pool, and optionally current positions. During the round it is provisional. Final rank is determined only after settlement. The Top 10 receive real SOL.
+
+Hourly tie-breaking is **TBD**. Do not infer a rule from timestamps, wallet address, trade count, or any other field.
+
+Provisional winner membership may be known when a complete tie group fits inside the Top 10, but final reward-amount allocation must not occur while any tie exists among winning ranks because the rank percentages differ. A tie entirely outside the winning ranks does not block payout allocation. Until a tie-breaking policy is explicitly approved, the system must return an unresolved-tie failure rather than assign unequal rank shares arbitrarily.
+
+### 6.2 Daily leaderboard
+
+The daily leaderboard ranks users by cumulative Paper SOL P&L across all completed hourly results in the active UTC day. The Top 25 receive real SOL after daily finalization.
+
+Daily tie-breaking is **TBD**. Implementations may detect and represent ties, but they must not choose winners from a tie that crosses the winner cutoff until a tie-breaking policy is explicitly approved.
+
+Even when a complete tie group fits inside the Top 25, final reward-amount allocation must not occur while that tie remains among winning ranks because the rank percentages differ. A tie entirely outside the winning ranks does not block payout allocation. No implementation may invent a tie-breaker.
+
+Daily attribution is resolved: an hourly result belongs to the UTC Daily Championship containing its hourly round's authoritative start time, regardless of when settlement, reward finalization, payout, or indexer discovery occurs.
+
+## 7. Creator-fee economics
+
+### 7.1 Allocation modes
+
+Only verified actual creator-fee revenue from the platform token funds the model. Estimated volume is not revenue.
+
+The platform supports two mutually exclusive, versioned allocation modes. Each mode allocates exactly 100% of total verified creator fees.
+
+**Normal Mode:**
+
+- 63% to the current Hourly Reward System.
+- 27% to the Daily Championship.
+- 10% to the Platform Treasury.
+- Total: 100%.
+
+**Buffer Accumulation Mode:**
+
+- 58% to the current Hourly Reward System.
+- 5% to the Reward Buffer.
+- 27% to the Daily Championship.
+- 10% to the Platform Treasury.
+- Total: 100%.
+
+The explicit Reward Buffer contribution is deducted from the normal 63% hourly allocation. It is not added on top of the existing 100%. This source is appropriate because the Reward Buffer primarily supports future hourly rewards. The contribution percentage and Buffer Accumulation Mode enabled/disabled state are **CONFIGURABLE and versioned**. With the proposed 5% contribution enabled, the current hourly allocation is 58%; if the configured contribution changes, the current hourly percentage must change by the same amount so the complete allocation remains exactly 100%.
+
+When Buffer Accumulation Mode is disabled, accounting returns to 63% hourly, 27% daily, and 10% platform. Existing Reward Buffer funds remain available to the dynamic hourly payout system even while new explicit contributions are disabled.
+
+In both modes, 90% of total fees remains within the Player Reward System and 10% goes to the Platform Treasury. Normal Mode is equivalent to the original internal player split of 70% hourly and 30% daily. Buffer Accumulation Mode redirects five percentage points of total fees from the current hourly allocation into the player-owned Reward Buffer.
+
+The Platform Treasury may pay operating costs including RPC, indexing, servers, databases, queues, monitoring, security, payout transaction costs, development, maintenance, support, and legal/accounting. Platform funds and player reward funds must be held and accounted for separately.
+
+### 7.2 Same-hour funding
+
+Verified creator fees generated during an hourly competition fund that same hourly competition; they are not deferred to the next hour. Attribution uses the event's authoritative on-chain event time/slot, not the time the platform's indexer discovers it. The displayed hourly prize pool grows as verified, deduplicated events arrive and freezes after the reward-finalization grace period, subject to the dynamic payout and buffer rules in Section 9.
+
+For example, a fee generated at 15:59:58 UTC belongs to the 15:00–16:00 UTC competition even when discovered shortly after 16:00. A short `REWARD_FINALIZATION_GRACE_PERIOD` begins at the trading cutoff. Its initial proposed value is **60 seconds**, and it is **CONFIGURABLE and versioned**. During this period, the completed trading round is closed, settlement may proceed, the next hourly trading round starts immediately, and late-discovered on-chain fee events belonging to the completed hour may still finalize. The completed hour's real-SOL prize must not be broadcast until the grace period ends and reward accounting is frozen.
+
+Once reward accounting is frozen, later data corrections must not silently change an already frozen or paid prize. They must enter an explicit reconciliation/error process with audit records. The precise reconciliation remedies remain **TBD**. Events must never be double counted or arbitrarily reassigned to another competition.
+
+### 7.3 Daily pool
+
+The daily allocation accumulates over the UTC day and is displayed live. At 00:00 UTC the previous pool freezes, the Top 25 finalize, payouts begin, and the next pool begins. The Daily Championship should primarily reflect actual daily revenue; no daily buffer support is approved for V1.
+
+## 8. Payout curves and rounding
+
+Payout curves must be centralized, versioned, validated configuration. Calculations use integer/fixed-point arithmetic and must define deterministic rounding and dust handling before real payouts.
+
+### 8.1 Approved hourly Top 10 curve
+
+| Rank | Approved share |
+|---:|---:|
+| 1 | 25.00% |
+| 2 | 19.20% |
+| 3 | 14.74% |
+| 4 | 11.32% |
+| 5 | 8.69% |
+| 6 | 6.67% |
+| 7 | 5.12% |
+| 8 | 3.93% |
+| 9 | 3.02% |
+| 10 | 2.31% |
+
+The approved hourly Top 10 curve sums to exactly **100.00%**. Ranks 1–9 are unchanged; rank 10 is 2.31%.
+
+### 8.2 Approved daily Top 25 curve
+
+| Rank | Approved share | Rank | Approved share |
+|---:|---:|---:|---:|
+| 1 | 15.000% | 14 | 1.893% |
+| 2 | 12.792% | 15 | 1.614% |
+| 3 | 10.909% | 16 | 1.377% |
+| 4 | 9.303% | 17 | 1.174% |
+| 5 | 7.934% | 18 | 1.001% |
+| 6 | 6.766% | 19 | 0.854% |
+| 7 | 5.770% | 20 | 0.728% |
+| 8 | 4.921% | 21 | 0.621% |
+| 9 | 4.196% | 22 | 0.530% |
+| 10 | 3.579% | 23 | 0.452% |
+| 11 | 3.052% | 24 | 0.385% |
+| 12 | 2.603% | 25 | 0.326% |
+| 13 | 2.220% |  |  |
+
+The approved Daily Top 25 curve sums to exactly **100.000%**. Ranks 1–24 are unchanged; rank 25 is 0.326%.
+
+### 8.3 Integer payout and dust policy
+
+All real-SOL reward calculations must ultimately use lamports/integer base units. After calculating rank allocations, any unavoidable integer remainder from division is assigned to rank 1. The complete prize pool must therefore be distributed exactly: no SOL may disappear through percentage rounding. Configuration validation must confirm that each payout curve's declared percentages total exactly 100% at its declared precision before the curve can be used.
+
+## 9. Reward Buffer and dynamic hourly rewards
+
+### 9.1 Ownership and purpose
+
+The Reward Buffer belongs exclusively to player rewards and is never Platform Treasury money. It smooths extreme hourly revenue variation and provides limited protection as reward income weakens. It must never be silently transferred to the Platform Treasury.
+
+The buffer may not go negative, and the platform must never promise funds it does not possess. Strong hours may remain much larger than weak hours; the mechanism does not target equal payouts.
+
+### 9.2 Dynamic formula
+
+The current conceptual formula is:
+
+```text
+P = B + λ(H - B)
+```
+
+Where:
+
+- `P` is the target actual hourly payout;
+- `B` is the recent baseline hourly reward level;
+- `H` is the current hour's natural hourly reward allocation after the creator-fee split;
+- `λ` is the volatility-preservation factor.
+
+Initial values, all **CONFIGURABLE and versioned**:
+
+- `λ = 0.60`;
+- baseline is the arithmetic mean of the previous completed natural hourly reward allocations;
+- baseline window is 12 completed hours by default.
+
+A natural hourly reward allocation is the hourly reward amount after creator-fee mode splitting and before any dynamic-curve smoothing. The current in-progress hour, actual smoothed payouts, Daily Championship allocation, Platform Treasury allocation, and Reward Buffer contributions are not baseline inputs.
+
+The dynamic curve activates only when the full configured baseline window exists. With the default window, 0–11 previous completed hours produce `INSUFFICIENT_BASELINE_HISTORY`: the current natural hourly reward is paid unchanged and the existing Reward Buffer is not used for smoothing. Explicit Reward Buffer accumulation may still occur in Buffer Accumulation Mode. Once at least 12 previous completed natural hourly allocations exist, the system uses the most recent 12, calculates their arithmetic mean rounded down to whole lamports, and applies the dynamic curve. V1 does not use partial-window averaging.
+
+The system must not attempt to preserve launch-day rewards indefinitely; the rolling baseline must adapt to actual completed revenue conditions.
+
+The dynamic curve always operates on the current hourly allocation after the creator-fee split. In Normal Mode, `H` starts from the 63% current hourly allocation. In Buffer Accumulation Mode with the proposed 5% contribution, creator fees first split into 58% current hourly allocation, 5% explicit Reward Buffer contribution, 27% daily, and 10% platform; the dynamic curve then operates on the 58% current hourly allocation.
+
+If `H > P` because the current hour is unusually strong, the positive difference between natural hourly allocation and actual payout goes to the Reward Buffer. If `P > H` because the current hour is unusually weak, the difference comes from the Reward Buffer and is limited to the available balance. Therefore:
+
+```text
+if P <= H:
+    actual_payout = P
+    dynamic_excess_to_buffer = H - P
+    buffer_support = 0
+
+if P > H:
+    buffer_support = min(P - H, available_buffer)
+    actual_payout = H + buffer_support
+    dynamic_excess_to_buffer = 0
+```
+
+All calculations must be deterministic and transparent. The Reward Buffer may never become negative. The explicit Buffer Accumulation Mode contribution and excess retained by the dynamic curve may both add to the same player-owned Reward Buffer.
+
+### 9.3 Extra launch/high-revenue reserve accumulation
+
+The architecture must support an explicit Reward Buffer contribution during strong or early revenue periods:
+
+- proposed contribution: 5% of total creator fees (**CONFIGURABLE**);
+- accumulation enabled/disabled (**CONFIGURABLE**);
+- reserve target (**CONFIGURABLE; value TBD**);
+- optional launch-phase flag (**CONFIGURABLE**);
+- exact activation/deactivation policy (**TBD**).
+
+These funds remain player reward funds. The proposal exists because smoothing alone may not accumulate enough reserve for later weak periods. As defined in Section 7.1, the explicit contribution is deducted from the current hourly allocation: at the proposed 5% setting, Buffer Accumulation Mode allocates 58% current hourly, 5% buffer, 27% daily, and 10% platform. It is never an additional allocation above 100%.
+
+### 9.4 Daily interaction
+
+Daily revenue naturally aggregates over 24 hours. Do not implement daily buffer support or complex daily smoothing unless explicitly approved later. Any future daily reserve support must be configurable and preserve player-fund ownership.
+
+## 10. Architecture
+
+### 10.1 Preferred stack
+
+- TypeScript and Node.js.
+- PostgreSQL as authoritative persistent storage.
+- Redis for cache, distributed locks, queues, rate limits, and live ephemeral state only.
+- Background workers for settlement, ingestion, finalization, and payout lifecycle tasks.
+- Browser extension/overlay plus web dashboard.
+
+Technology selections within these categories are **TBD** until the repository-foundation phase. PostgreSQL—not Redis—is the durable source of truth.
+
+### 10.2 Server-authoritative boundary
+
+Never trust client-provided balances, prices, P&L, rank, fills, token-slot counts, prize pools, or reward amounts. The client may submit authenticated intents and display server results. All rule checks and state transitions happen on the backend in concurrency-safe transactions or equivalent deterministic workflows.
+
+### 10.3 Protocol adapters
+
+The platform must support multiple Solana market types without baking one AMM or TOKEN/SOL assumption into generic competition logic.
+
+A `ProtocolAdapter` is responsible for:
+
+- identifying supported markets;
+- loading and validating market state;
+- quoting and simulating buys and sells;
+- protocol-specific price impact and fees;
+- token-specific and migration behavior;
+- returning normalized, auditable execution results.
+
+Potential venues include Pump-style bonding curves, migrated AMMs, Bags, Bonk-related launch systems, Moonshot-style systems, Heaven, and other relevant Solana venues. The exact Day-1 list is **TBD**. Adapter versions must be recorded with executions and broken adapters must be independently disableable.
+
+### 10.4 Terminal adapters
+
+A `TerminalAdapter` detects the current token/market in a supported browser terminal, attaches the overlay, reacts to page navigation, and maps page context to internal market identifiers. It must not contain authoritative financial math. Exact Day-1 terminal support is **TBD**.
+
+### 10.5 Browser overlay
+
+The preferred user experience is a browser extension or overlay on existing Solana terminals. It should eventually display:
+
+- wallet/authentication status;
+- round identity and countdown;
+- Paper SOL cash, positions, and P&L;
+- token slots used and maximum permitted buy;
+- hourly and daily ranks;
+- live hourly and daily prize pools;
+- buy/sell controls;
+- execution quote/fill detail;
+- unambiguous simulated-trading labels.
+
+### 10.6 Website
+
+The website should include a dashboard, hourly and daily leaderboards, profile/history, prize-pool views, trade history, rules/documentation, and payout history.
+
+Historical statistics may include rounds played, hourly wins, Top 3 and Top 10 finishes, daily wins, Daily Top 25 finishes, total real SOL won, best hourly/daily results, and historical paper P&L.
+
+## 11. Domain state and financial records
+
+### 11.1 Hourly state machine
+
+Persist at least these conceptual states:
+
+```text
+SCHEDULED → OPEN → CLOSING → SETTLING → FINALIZED → PAYING → PAID
+```
+
+Allowed failure/retry states and transition rules are **TBD**, but transitions must be persisted, guarded, logged, and idempotent. Do not derive the state solely from current time.
+
+### 11.2 Daily state machine
+
+Persist at least:
+
+```text
+OPEN → CLOSING → FINALIZING → FINALIZED → PAYING → PAID
+```
+
+Allowed failure/retry states are **TBD** and follow the same persistence and audit requirements.
+
+### 11.3 Ledger
+
+Every financial state transition must be auditable, including:
+
+- round starting credit;
+- paper buy debit and token credit;
+- token sell debit and Paper SOL credit;
+- protocol/creator fee effects;
+- force settlement;
+- fee-revenue allocation;
+- Reward Buffer contribution or support;
+- prize and payout calculation.
+
+Materialized balances may be maintained for performance, but they must reconcile to authoritative history. Ledger-entry identity and idempotency keys must prevent duplicate application.
+
+### 11.4 Financial precision
+
+Authoritative financial accounting must not use JavaScript `Number`. Use integer base units, `BigInt`, and explicit fixed-point decimal representations as appropriate for Paper SOL, token amounts, prices, fees, P&L, allocation ratios, buffer accounting, and payouts.
+
+Real-SOL payout allocations must ultimately use lamports/integer base units. After rank shares are calculated, any unavoidable integer remainder is assigned to rank 1 so the full prize pool is distributed exactly. Other operation-specific fixed-point scales and intermediate rounding directions remain **TBD** where not otherwise specified. Validation must reject percentage configurations that do not meet the approved exact total.
+
+## 12. Creator-fee ingestion
+
+Every creator-fee event must be:
+
+1. discovered;
+2. verified on authoritative chain data;
+3. deduplicated using stable event identity;
+4. attributed to its correct UTC hour;
+5. attributed to its correct UTC day;
+6. split into the approved player/platform/hourly/daily/buffer buckets;
+7. reflected in live prize accounting.
+
+The same event must never be counted twice. Attribution is based on authoritative on-chain event time/slot rather than indexer discovery time. A configurable, versioned `REWARD_FINALIZATION_GRACE_PERIOD`, initially proposed as 60 seconds, follows each hourly trading cutoff. During it, the old round remains closed, settlement may proceed, the next round trades immediately, and late-discovered events for the completed hour may still finalize. No real-SOL prize for that hour may be broadcast until the grace period ends and reward accounting freezes.
+
+After reward accounting freezes, later corrections enter an explicit reconciliation/error process and may not silently alter an already-paid prize. Reorg/finality policy, exact source programs/accounts, confirmation depth, and reconciliation remedies are **TBD/CONFIGURABLE**. Estimated trading volume must never substitute for verified fee revenue.
+
+## 13. Real-SOL payout lifecycle
+
+Recommended lifecycle:
+
+```text
+CALCULATED → FROZEN → VALIDATED → APPROVED → SIGNED → BROADCAST → VERIFIED
+```
+
+Payouts require unique IDs, idempotent jobs, duplicate-broadcast prevention, persisted transaction signatures, confirmation monitoring, retry policies, explicit failure states, and audit logs.
+
+Payout private keys must use secure key management and must never appear in browser/extension code, source control, logs, or ordinary application configuration. Signing architecture, approval policy, custody model, confirmation policy, retry limits, and recovery procedures are **TBD**. Real payouts must not launch before security and legal/compliance review.
+
+## 14. Manipulation and investigation posture
+
+Do not over-engineer V1 anti-manipulation. The unique-token cap, maximum-buy rule, realistic execution, and forced settlement already constrain common paper-trading abuse. Expected rewards may also make costly real-market manipulation irrational, but this is not assumed as a guarantee.
+
+Collect sufficient evidence for later investigation: mint, protocol, pool/curve, reserves, price, size, impact, fees, timestamps, recorded state, creator/deployer data where available, and liquidity events where available. Do not introduce arbitrary token-age bans without explicit approval.
+
+## 15. Centralized versioned configuration
+
+At minimum, centralize and version:
+
+| Setting | Initial/proposed value | Status |
+|---|---:|---|
+| Starting Paper SOL | 10 | CONFIGURABLE; launch value approved |
+| Max unique tokens per hourly round | 5 | CONFIGURABLE; launch value approved |
+| Max buy ratio | 0.20 | CONFIGURABLE; launch value approved |
+| Hourly winners | 10 | CONFIGURABLE; approved |
+| Daily winners | 25 | CONFIGURABLE; approved |
+| Player reward share | 90% of total fees | CONFIGURABLE; base split approved |
+| Platform share | 10% of total fees | CONFIGURABLE; base split approved |
+| Normal Mode allocation | 63% hourly / 27% daily / 10% platform | CONFIGURABLE; approved; totals 100% |
+| Buffer Accumulation Mode allocation | 58% hourly / 5% buffer / 27% daily / 10% platform | CONFIGURABLE; approved at proposed 5% contribution; totals 100% |
+| Hourly payout curve | Approved Top 10 table | CONFIGURABLE; totals 100.00% |
+| Daily payout curve | Approved Top 25 table | CONFIGURABLE; totals 100.000% |
+| Dynamic lambda | 0.60 | CONFIGURABLE; proposed |
+| Baseline window | 12 completed hours | CONFIGURABLE; approved default; full window required |
+| Reward Buffer balance | Runtime ledger-derived | CONFIGURABLE accounting source |
+| Extra reserve contribution | 5% of total fees, deducted from hourly share | CONFIGURABLE; proposed |
+| Buffer Accumulation Mode | enabled/disabled | CONFIGURABLE |
+| Reserve target | no value approved | CONFIGURABLE; TBD |
+| Launch-phase flag/policy | no exact policy approved | CONFIGURABLE; TBD |
+| Reward finalization grace period | 60 seconds | CONFIGURABLE; proposed |
+| Hourly round duration | 1 hour | CONFIGURABLE; approved competition cadence |
+| Daily timezone | UTC | authoritative and approved |
+
+Configuration must be immutable for a round once the round is open. Store the configuration version used by every round, execution, settlement, fee allocation, leaderboard finalization, and reward calculation. Rule changes normally affect only future rounds.
+
+## 16. Important edge cases
+
+The design and tests must explicitly cover:
+
+- a trade at the exact cutoff, admitted only if its transaction authoritatively observes/locks the round in `OPEN` before the atomic `OPEN` to `CLOSING` transition;
+- an in-flight order racing close, rejected unless admission was transactionally established while the round was `OPEN`;
+- simultaneous buys and balance reservation;
+- simultaneous first buys competing for the final token slot;
+- protocol migration between quote and execution;
+- unavailable or stale market data;
+- zero or near-zero output;
+- payout rounding dust, assigned to rank 1 in lamports;
+- a late creator-fee event during the grace period and a correction after reward freeze;
+- duplicate fee events and payout jobs;
+- RPC/indexer outage;
+- settlement retry and partial settlement recovery;
+- hourly or daily leaderboard ties (**policy TBD**);
+- an hourly round crossing the UTC-day boundary, attributed to the UTC day containing its authoritative start time (**policy resolved**);
+- Reward Buffer exhaustion;
+- configuration change near a round boundary;
+- chain reorganization/finality changes (**policy TBD**).
+
+No edge case may be resolved by fabricating a price, double-applying a transition, or spending unavailable funds.
+
+## 17. Testing strategy
+
+Testing is mandatory and is part of each phase's completion criteria.
+
+### Unit tests
+
+- starting/reset balance, token slots, and 20% validator;
+- P&L and daily cumulative scoring;
+- approved payout-curve validation;
+- fee allocation and fixed-point rounding;
+- dynamic reward formula and buffer solvency/accounting;
+- state-machine guards;
+- protocol-specific execution math.
+
+### Integration tests
+
+- database transactions and ledger reconciliation;
+- orders, positions, and executions;
+- hourly settlement and daily finalization;
+- fee discovery, verification, deduplication, and allocation;
+- buffer updates and payout creation;
+- worker retries and idempotency.
+
+### Concurrency tests
+
+- simultaneous buys against cash and the 20% rule;
+- simultaneous final token-slot acquisition;
+- late order racing settlement;
+- duplicate fee event ingestion;
+- duplicate payout job/broadcast prevention.
+
+### Replay tests
+
+Recorded market states must reproduce deterministic quotes and fills for each adapter version.
+
+### End-to-end tests
+
+Wallet login, round participation, trades, settlement, leaderboard finalization, reward calculation, and eventually shadow/real payout flows.
+
+## 18. Admin, audit, and observability
+
+Admin tooling should eventually inspect current round/day, users/accounts, orders, executions, market states, settlement, fee events, Reward Buffer, prize pools, winners, payouts, failed jobs, and audit logs.
+
+Emergency controls must support pausing trades, settlement, or payouts and disabling a broken protocol adapter. All admin actions require authentication, authorization, and audit logs. Exact roles and approval requirements are **TBD**.
+
+Monitor at least trade volume, execution failure rate, RPC errors, latency, active users, settlement duration, creator-fee ingestion delay, Reward Buffer balance, hourly/daily prizes, payout failures, queue backlog, and adapter errors. Alert thresholds are **CONFIGURABLE/TBD**.
+
+## 19. Legal, compliance, and security
+
+Obtain qualified legal/compliance review for relevant jurisdictions before a public token launch or public distribution of real-SOL rewards. Engineering documentation must not make definitive legal claims. Public rules, eligibility, geographic restrictions, tax reporting, sanctions screening, contest classification, and any resulting KYC obligations are **TBD pending qualified advice**.
+
+Security review is required before real-money payout activation. Never expose payout keys or user secrets. Authentication messages must prevent replay and domain confusion; exact nonce lifetime and signing-message format are **TBD/CONFIGURABLE**.
+
+## 20. V1 scope
+
+### Included
+
+- wallet authentication;
+- hourly engine and 10 Paper SOL reset;
+- token slots and maximum-buy enforcement;
+- realistic execution and protocol adapters;
+- orders, positions, settlement, and ledger;
+- hourly and daily leaderboards;
+- cumulative Daily Championship;
+- verified creator-fee accounting and live prize pools;
+- Reward Buffer and dynamic hourly payout logic;
+- hourly and daily rewards;
+- real-SOL payout lifecycle;
+- history;
+- browser overlay and website;
+- admin/audit tooling.
+
+### Excluded unless explicitly added
+
+- full custom trading terminal;
+- copy trading or real-money user trade execution;
+- managed prop accounts or profit sharing;
+- ELO, divisions, teams, or social feed;
+- native mobile applications;
+- AI trading advice;
+- heavy KYC or aggressive anti-Sybil controls;
+- monthly reward competition.
+
+## 21. Controlled build plan
+
+Each phase should have a narrow task definition, tests, and review. Do not proceed past unresolved rules that materially affect that phase.
+
+### Phase 0 — Repository foundation
+
+Establish the TypeScript/Node monorepo or repository layout, formatting/linting/testing conventions, CI, environment/configuration patterns, package boundaries, and architecture decision records. Do not add financial behavior beyond structural scaffolding.
+
+### Phase 1 — Pure competition engine
+
+Implement framework-independent domain configuration/types and deterministic pure rules: hourly account reset, token-slot consumption, maximum-buy validation, hourly P&L, daily score accumulation, and state-machine concepts. Cover boundary and property tests without database or live-chain coupling.
+
+### Phase 2 — Database and authoritative ledger
+
+Design PostgreSQL persistence, transactional account/position/order models, append-only auditable financial history, idempotency keys, configuration versioning, and reconciliation. Prove simultaneous actions cannot overspend or exceed slots.
+
+### Phase 3 — Execution-engine abstraction
+
+Define normalized market-state, quote, fill, fee, price-impact, and adapter-version contracts. Build deterministic fake/reference adapters for tests and replay infrastructure. Keep protocol math separate from competition logic.
+
+### Phase 4 — First real Solana protocol adapter
+
+Select the first protocol (**TBD**) and implement authoritative state loading plus buy/sell simulation validated against real protocol behavior. Record replay fixtures and handle migration/staleness explicitly.
+
+### Phase 5 — Complete hourly vertical slice
+
+Connect authentication, round state, trading, ledger, positions, live provisional ranking, close, force settlement, and final leaderboard using paper-only rewards. Validate idempotency, cutoff races, and outage recovery.
+
+### Phase 6 — Daily Championship
+
+Persist every completed hourly result, accumulate gains and losses using the approved round-start UTC attribution rule, run daily finalization, expose live/final leaderboards, and cover midnight behavior. Resolve the daily tie-breaking policy before production finalization.
+
+### Phase 7 — Creator-fee tracking
+
+Discover, verify, deduplicate, and attribute actual fee events by authoritative on-chain event time/slot; implement the two exact 100% allocation modes, the reward-finalization grace period, separated accounting, reconciliation routing, and live pool updates. Resolve chain finality and reconciliation remedies before production activation.
+
+### Phase 8 — Reward Buffer and dynamic payout logic
+
+Implement the versioned lambda and approved baseline formula, buffer ledger, solvency cap, explicit reserve accumulation configuration, transparent calculation records, and exhaustion/recovery tests. Do not implement daily smoothing without approval.
+
+### Phase 9 — Shadow payout system
+
+Run complete payout calculation and lifecycle records without broadcasting real SOL. Validate the approved curves, lamport allocation, rank-1 remainder policy, available balances, approvals, retries, and duplicate prevention.
+
+### Phase 10 — Website
+
+Build the dashboard, hourly/daily leaderboards, profile/history, prize pools, rules, trades, and payout history against authoritative APIs. Clearly distinguish provisional, finalized, mark, and executable values.
+
+### Phase 11 — Browser extension and first terminal integration
+
+Implement the secure overlay shell and first `TerminalAdapter` (**terminal TBD**), navigation/token detection, trading controls, status, balances, positions, ranks, prize pools, and execution details. Keep all financial authority on the server.
+
+### Phase 12 — Real-SOL payouts
+
+After legal, security, solvency, curve, rounding, custody, and operational approvals, enable secure signing/broadcast/verification with idempotency, monitoring, pause controls, and audited recovery procedures.
+
+### Phase 13 — Additional protocols and terminals
+
+Add adapters incrementally with protocol-specific math validation, replay fixtures, observability, independent feature flags, and safe disable controls.
+
+## 22. Open decisions and known contradictions
+
+The following are intentionally unresolved and must not be invented:
+
+1. **Leaderboard ties:** hourly and daily tie-breaking are TBD.
+2. **Reserve policy:** target and launch/high-revenue activation/deactivation policy are TBD.
+3. **Settlement data:** exact cutoff market-state and outage/recovery policy is TBD.
+4. **Fee ingestion:** chain finality/reorg policy and post-freeze reconciliation remedies are TBD.
+5. **Supported integrations:** Day-1 protocol(s) and terminal(s) are TBD.
+6. **Market-data freshness:** thresholds and reject/defer policy are configurable but TBD.
+7. **Payout operations:** custody, approvals, confirmation, retry, and failure-recovery policies are TBD.
+8. **Legal eligibility:** jurisdictional and compliance rules await qualified review.
+
+**Resolved decision — Daily attribution:** Hourly results are attributed to the UTC Daily Championship containing the hourly round's authoritative start time.
+
+**Resolved decision — Dynamic baseline activation:** The baseline is the floor of the arithmetic mean of the most recent full configured window of completed natural hourly reward allocations; the default window is 12 hours and partial windows do not activate smoothing.
+
+**Resolved decision — Payout ties:** Tie-breaking remains TBD, so any tie among winning ranks blocks final reward-amount allocation; ties entirely outside the winning ranks do not block allocation.
+
+The previously identified payout-curve, Reward Buffer source, payout-dust, order-cutoff, late-fee attribution, and Daily Championship attribution ambiguities are resolved by Sections 3, 6, 7, 8, 9, 11, and 12. Leaderboard tie-breaking remains explicitly TBD.
+
+No other contradiction was identified in the supplied hourly/daily competition rules: every hour resets to 10 Paper SOL; every completed hourly gain or loss contributes to the UTC-day cumulative score; hourly rewards go to Top 10 after realistic force settlement; daily rewards go to Top 25 after UTC-day finalization.
+
+## 23. Required Codex workflow
+
+Future Codex prompts should begin with:
+
+> Read PROJECT_CONTEXT.md completely before doing any work. Treat it as the canonical product and engineering specification. Do not change product rules unless this prompt explicitly overrides them. If this task conflicts with PROJECT_CONTEXT.md, stop and report the conflict before modifying code.
+
+Tasks should remain small and controlled. A preferred early sequence is repository foundation; domain configuration/types; starting account/token slots/20% validator; positions/fake executions/ledger; hourly state machine/settlement; daily score; reward economics/curves; Reward Buffer formula; protocol adapter abstraction; and only then live Solana integration.
+
+Application implementation must not begin until this context document has been reviewed.
