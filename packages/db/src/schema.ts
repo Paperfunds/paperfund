@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -28,65 +29,65 @@ export const users = pgTable('users', {
   createdAt,
 });
 
-export const competitionSeasons = pgTable(
-  'competition_seasons',
+export const hourlyRounds = pgTable(
+  'hourly_rounds',
   {
     id: text('id').primaryKey(),
-    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
-    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
-    status: text('status').notNull().default('SCHEDULED'),
-    initialAllocationLamports: bigint('initial_allocation_lamports', { mode: 'bigint' }).notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull().unique(),
+    endsAtExclusive: timestamp('ends_at_exclusive', { withTimezone: true }).notNull().unique(),
+    state: text('state').notNull().default('SCHEDULED'),
+    startingPaperSolLamports: bigint('starting_paper_sol_lamports', { mode: 'bigint' }).notNull(),
+    maxUniqueTokens: integer('max_unique_tokens').notNull(),
+    maxBuyRatioBps: integer('max_buy_ratio_bps').notNull(),
+    rewardFinalizationGracePeriodSeconds: integer(
+      'reward_finalization_grace_period_seconds',
+    ).notNull(),
     rulesVersion: text('rules_version').notNull(),
     createdAt,
     finalizedAt: timestamp('finalized_at', { withTimezone: true }),
   },
   (table) => [
-    check('competition_seasons_time_order', sql`${table.startsAt} < ${table.endsAt}`),
     check(
-      'competition_seasons_status_valid',
-      sql`${table.status} in ('SCHEDULED', 'OPEN', 'FINALIZING', 'FINALIZED')`,
+      'hourly_rounds_exact_window',
+      sql`${table.startsAt} = date_trunc('hour', ${table.startsAt}) and ${table.endsAtExclusive} = ${table.startsAt} + interval '1 hour'`,
     ),
     check(
-      'competition_seasons_initial_allocation_positive',
-      sql`${table.initialAllocationLamports} > 0`,
+      'hourly_rounds_state_valid',
+      sql`${table.state} in ('SCHEDULED', 'OPEN', 'CLOSING', 'SETTLING', 'FINALIZED', 'PAYING', 'PAID')`,
+    ),
+    check('hourly_rounds_starting_balance_positive', sql`${table.startingPaperSolLamports} > 0`),
+    check('hourly_rounds_token_limit_positive', sql`${table.maxUniqueTokens} > 0`),
+    check(
+      'hourly_rounds_buy_ratio_valid',
+      sql`${table.maxBuyRatioBps} > 0 and ${table.maxBuyRatioBps} <= 10000`,
+    ),
+    check(
+      'hourly_rounds_grace_period_nonnegative',
+      sql`${table.rewardFinalizationGracePeriodSeconds} >= 0`,
     ),
   ],
 );
 
-export const seasonAccounts = pgTable(
-  'season_accounts',
+export const dailyCompetitions = pgTable(
+  'daily_competitions',
   {
     id: text('id').primaryKey(),
-    userId: text('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
-    seasonId: text('season_id')
-      .notNull()
-      .references(() => competitionSeasons.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
-    status: text('status').notNull().default('ACTIVE'),
-    initialAllocationLamports: bigint('initial_allocation_lamports', { mode: 'bigint' }).notNull(),
-    cumulativeTopUpLamports: bigint('cumulative_top_up_lamports', { mode: 'bigint' })
-      .notNull()
-      .default(sql`0`),
-    cashBalanceLamports: bigint('cash_balance_lamports', { mode: 'bigint' })
-      .notNull()
-      .default(sql`0`),
-    realizedPnlLamports: bigint('realized_pnl_lamports', { mode: 'bigint' })
-      .notNull()
-      .default(sql`0`),
+    utcDate: date('utc_date').notNull().unique(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull().unique(),
+    endsAtExclusive: timestamp('ends_at_exclusive', { withTimezone: true }).notNull().unique(),
+    state: text('state').notNull().default('OPEN'),
     createdAt,
     finalizedAt: timestamp('finalized_at', { withTimezone: true }),
   },
   (table) => [
-    unique('season_accounts_user_season_unique').on(table.userId, table.seasonId),
-    index('season_accounts_season_idx').on(table.seasonId),
-    check('season_accounts_status_valid', sql`${table.status} in ('ACTIVE', 'FINALIZED')`),
     check(
-      'season_accounts_initial_allocation_nonnegative',
-      sql`${table.initialAllocationLamports} >= 0`,
+      'daily_competitions_exact_utc_window',
+      sql`${table.startsAt} = date_trunc('day', ${table.startsAt} at time zone 'UTC') at time zone 'UTC' and ${table.endsAtExclusive} = ${table.startsAt} + interval '1 day' and ${table.utcDate} = (${table.startsAt} at time zone 'UTC')::date`,
     ),
-    check('season_accounts_top_up_nonnegative', sql`${table.cumulativeTopUpLamports} >= 0`),
-    check('season_accounts_cash_nonnegative', sql`${table.cashBalanceLamports} >= 0`),
+    check(
+      'daily_competitions_state_valid',
+      sql`${table.state} in ('OPEN', 'CLOSING', 'FINALIZING', 'FINALIZED', 'PAYING', 'PAID')`,
+    ),
   ],
 );
 
@@ -125,6 +126,62 @@ export const markets = pgTable(
   ],
 );
 
+export const competitionAccounts = pgTable(
+  'competition_accounts',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    hourlyRoundId: text('hourly_round_id')
+      .notNull()
+      .references(() => hourlyRounds.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    startingPaperSolLamports: bigint('starting_paper_sol_lamports', { mode: 'bigint' }).notNull(),
+    paperSolBalanceLamports: bigint('paper_sol_balance_lamports', { mode: 'bigint' }).notNull(),
+    realizedPnlLamports: bigint('realized_pnl_lamports', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    finalSettledBalanceLamports: bigint('final_settled_balance_lamports', { mode: 'bigint' }),
+    hourlyPnlLamports: bigint('hourly_pnl_lamports', { mode: 'bigint' }),
+    createdAt,
+    finalizedAt: timestamp('finalized_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('competition_accounts_user_round_unique').on(table.userId, table.hourlyRoundId),
+    index('competition_accounts_round_idx').on(table.hourlyRoundId),
+    check(
+      'competition_accounts_starting_balance_positive',
+      sql`${table.startingPaperSolLamports} > 0`,
+    ),
+    check('competition_accounts_balance_nonnegative', sql`${table.paperSolBalanceLamports} >= 0`),
+    check(
+      'competition_accounts_finalization_consistent',
+      sql`(${table.finalSettledBalanceLamports} is null and ${table.hourlyPnlLamports} is null and ${table.finalizedAt} is null) or (${table.finalSettledBalanceLamports} is not null and ${table.hourlyPnlLamports} = ${table.finalSettledBalanceLamports} - ${table.startingPaperSolLamports} and ${table.finalizedAt} is not null)`,
+    ),
+  ],
+);
+
+export const competitionTokenSlots = pgTable(
+  'competition_token_slots',
+  {
+    id: text('id').primaryKey(),
+    competitionAccountId: text('competition_account_id')
+      .notNull()
+      .references(() => competitionAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    assetId: text('asset_id')
+      .notNull()
+      .references(() => assets.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    firstSuccessfulBuyAt: timestamp('first_successful_buy_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    unique('competition_token_slots_account_asset_unique').on(
+      table.competitionAccountId,
+      table.assetId,
+    ),
+    index('competition_token_slots_account_idx').on(table.competitionAccountId),
+  ],
+);
+
 export const idempotencyRecords = pgTable(
   'idempotency_records',
   {
@@ -133,7 +190,7 @@ export const idempotencyRecords = pgTable(
     idempotencyKey: text('idempotency_key').notNull(),
     requestHash: text('request_hash').notNull(),
     status: text('status').notNull().default('PENDING'),
-    seasonAccountId: text('season_account_id').references(() => seasonAccounts.id, {
+    competitionAccountId: text('competition_account_id').references(() => competitionAccounts.id, {
       onDelete: 'restrict',
       onUpdate: 'restrict',
     }),
@@ -156,9 +213,9 @@ export const orders = pgTable(
   'orders',
   {
     id: text('id').primaryKey(),
-    seasonAccountId: text('season_account_id')
+    competitionAccountId: text('competition_account_id')
       .notNull()
-      .references(() => seasonAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+      .references(() => competitionAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
     marketId: text('market_id')
       .notNull()
       .references(() => markets.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
@@ -176,7 +233,7 @@ export const orders = pgTable(
     rejectionReason: text('rejection_reason'),
   },
   (table) => [
-    index('orders_account_time_idx').on(table.seasonAccountId, table.requestedAt),
+    index('orders_account_time_idx').on(table.competitionAccountId, table.requestedAt),
     check('orders_side_valid', sql`${table.side} in ('BUY', 'SELL')`),
     check(
       'orders_status_valid',
@@ -193,9 +250,9 @@ export const positions = pgTable(
   'positions',
   {
     id: text('id').primaryKey(),
-    seasonAccountId: text('season_account_id')
+    competitionAccountId: text('competition_account_id')
       .notNull()
-      .references(() => seasonAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+      .references(() => competitionAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
     marketId: text('market_id')
       .notNull()
       .references(() => markets.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
@@ -217,7 +274,7 @@ export const positions = pgTable(
     closedAt: timestamp('closed_at', { withTimezone: true }),
   },
   (table) => [
-    unique('positions_account_market_unique').on(table.seasonAccountId, table.marketId),
+    unique('positions_account_market_unique').on(table.competitionAccountId, table.marketId),
     check('positions_quantity_nonnegative', sql`${table.remainingBaseUnits} >= 0`),
     check('positions_cost_nonnegative', sql`${table.costBasisLamports} >= 0`),
     check('positions_status_valid', sql`${table.status} in ('OPEN', 'CLOSED')`),
@@ -270,13 +327,103 @@ export const fills = pgTable(
   ],
 );
 
+export const hourlyResults = pgTable(
+  'hourly_results',
+  {
+    id: text('id').primaryKey(),
+    hourlyRoundId: text('hourly_round_id')
+      .notNull()
+      .references(() => hourlyRounds.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    competitionAccountId: text('competition_account_id')
+      .notNull()
+      .unique()
+      .references(() => competitionAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    finalSettledBalanceLamports: bigint('final_settled_balance_lamports', {
+      mode: 'bigint',
+    }).notNull(),
+    startingPaperSolLamports: bigint('starting_paper_sol_lamports', { mode: 'bigint' }).notNull(),
+    hourlyPnlLamports: bigint('hourly_pnl_lamports', { mode: 'bigint' }).notNull(),
+    idempotencyRecordId: text('idempotency_record_id')
+      .notNull()
+      .unique()
+      .references(() => idempotencyRecords.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    finalizedAt: timestamp('finalized_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    unique('hourly_results_round_account_unique').on(
+      table.hourlyRoundId,
+      table.competitionAccountId,
+    ),
+    index('hourly_results_round_idx').on(table.hourlyRoundId),
+    check(
+      'hourly_results_pnl_exact',
+      sql`${table.hourlyPnlLamports} = ${table.finalSettledBalanceLamports} - ${table.startingPaperSolLamports}`,
+    ),
+    check(
+      'hourly_results_final_balance_nonnegative',
+      sql`${table.finalSettledBalanceLamports} >= 0`,
+    ),
+  ],
+);
+
+export const dailyResults = pgTable(
+  'daily_results',
+  {
+    id: text('id').primaryKey(),
+    dailyCompetitionId: text('daily_competition_id')
+      .notNull()
+      .references(() => dailyCompetitions.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    cumulativePnlLamports: bigint('cumulative_pnl_lamports', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    completedHourlyRoundCount: integer('completed_hourly_round_count').notNull().default(0),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    unique('daily_results_competition_user_unique').on(table.dailyCompetitionId, table.userId),
+    check(
+      'daily_results_completed_count_nonnegative',
+      sql`${table.completedHourlyRoundCount} >= 0`,
+    ),
+  ],
+);
+
+export const dailyResultHourlyResults = pgTable(
+  'daily_result_hourly_results',
+  {
+    id: text('id').primaryKey(),
+    dailyResultId: text('daily_result_id')
+      .notNull()
+      .references(() => dailyResults.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    hourlyResultId: text('hourly_result_id')
+      .notNull()
+      .unique()
+      .references(() => hourlyResults.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    idempotencyRecordId: text('idempotency_record_id')
+      .notNull()
+      .unique()
+      .references(() => idempotencyRecords.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    contributedAt: timestamp('contributed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('daily_result_hourly_results_pair_unique').on(table.dailyResultId, table.hourlyResultId),
+  ],
+);
+
 export const journalTransactions = pgTable(
   'journal_transactions',
   {
     id: text('id').primaryKey(),
-    seasonAccountId: text('season_account_id')
+    competitionAccountId: text('competition_account_id')
       .notNull()
-      .references(() => seasonAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+      .references(() => competitionAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
     operationType: text('operation_type').notNull(),
     sourceEntityType: text('source_entity_type').notNull(),
     sourceEntityId: text('source_entity_id').notNull(),
@@ -288,7 +435,7 @@ export const journalTransactions = pgTable(
     createdAt,
   },
   (table) => [
-    index('journal_transactions_account_time_idx').on(table.seasonAccountId, table.createdAt),
+    index('journal_transactions_account_time_idx').on(table.competitionAccountId, table.createdAt),
   ],
 );
 
@@ -299,20 +446,20 @@ export const ledgerEntries = pgTable(
     journalTransactionId: text('journal_transaction_id')
       .notNull()
       .references(() => journalTransactions.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
-    seasonAccountId: text('season_account_id')
+    competitionAccountId: text('competition_account_id')
       .notNull()
-      .references(() => seasonAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+      .references(() => competitionAccounts.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
     accountCode: text('account_code').notNull(),
     direction: text('direction').notNull(),
     amountLamports: bigint('amount_lamports', { mode: 'bigint' }).notNull(),
     createdAt,
   },
   (table) => [
-    index('ledger_entries_account_time_idx').on(table.seasonAccountId, table.createdAt),
+    index('ledger_entries_account_time_idx').on(table.competitionAccountId, table.createdAt),
     index('ledger_entries_journal_idx').on(table.journalTransactionId),
     check(
       'ledger_entries_account_code_valid',
-      sql`${table.accountCode} in ('CASH', 'POSITION_COST', 'STARTING_CAPITAL', 'TOP_UP_CAPITAL', 'TRADING_PNL', 'TRADING_FEES')`,
+      sql`${table.accountCode} in ('CASH', 'POSITION_COST', 'HOURLY_STARTING_CAPITAL', 'TRADING_PNL', 'TRADING_FEES')`,
     ),
     check('ledger_entries_direction_valid', sql`${table.direction} in ('DEBIT', 'CREDIT')`),
     check('ledger_entries_amount_positive', sql`${table.amountLamports} > 0`),

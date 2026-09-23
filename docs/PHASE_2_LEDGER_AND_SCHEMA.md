@@ -1,156 +1,148 @@
-# Phase 2: Authoritative Ledger and Trading Schema
+# Phase 2: Authoritative Hourly Ledger and Competition Schema
 
-## Scope and existing architecture
+## Scope and correction history
 
-Phase 1 already provided a Node.js/TypeScript monorepo, Drizzle ORM with `node-postgres`, forward-only SQL migrations, caller-supplied text identifiers, UTC-aware timestamps, an `app_meta` table, and PostgreSQL/Redis readiness infrastructure. Phase 2 extends that architecture; it does not introduce a second persistence stack. Redis retains no authoritative financial responsibility.
+PostgreSQL is the authoritative source for competition accounts, balances, orders, fills, positions, hourly results, daily aggregation, and ledger history. Redis has no authoritative financial role.
 
-This phase supplies durable state and narrow transactional APIs. It does not implement price discovery, slippage, portfolio marking, competition ranking, payouts, custody, or live Solana execution.
+The original Phase 2 implementation incorrectly modeled monthly seasons and paper-capital top-ups. Because the repository is pre-production and contains no user financial data, migration `0001` was cleanly regenerated from the retained Phase 0 migration. The corrected model has no monthly competition account, monthly reset, top-up API, top-up field, or `TOP_UP_CAPITAL` ledger code. This replacement is intentionally a development-history correction and is not a production migration pattern.
 
-## Authoritative model
+## Authoritative tables
 
-PostgreSQL is the source of truth. The model adds:
+| Table                         | Purpose                                                             |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `users`                       | Durable participant identity and unique wallet address              |
+| `hourly_rounds`               | Non-overlapping UTC hour windows and immutable rule snapshots       |
+| `daily_competitions`          | One canonical UTC-day window per date                               |
+| `competition_accounts`        | One fresh financial account per user and hourly round               |
+| `competition_token_slots`     | Immutable first-successful-buy token usage for an hourly account    |
+| `assets`                      | Durable mint identity and token decimals                            |
+| `markets`                     | Venue-independent base/quote market identity                        |
+| `idempotency_records`         | Operation/key uniqueness, request hash, and original result         |
+| `orders`                      | Requested buy/sell intent and lifecycle                             |
+| `fills`                       | Immutable simulated execution history                               |
+| `positions`                   | Materialized weighted-average holding per hourly account and market |
+| `journal_transactions`        | Immutable balance-change headers                                    |
+| `ledger_entries`              | Immutable exact-lamport debit/credit lines                          |
+| `hourly_results`              | One immutable settled result per hourly account                     |
+| `daily_results`               | Materialized cumulative UTC-day P&L per user                        |
+| `daily_result_hourly_results` | Immutable proof of each hourly contribution                         |
 
-| Table                  | Purpose                                                             |
-| ---------------------- | ------------------------------------------------------------------- |
-| `users`                | Durable participant identity and unique wallet address              |
-| `competition_seasons`  | Versioned UTC monthly accounting/competition containers             |
-| `season_accounts`      | One materialized financial account per user and season              |
-| `assets`               | Mint identity, decimals, optional display metadata, source metadata |
-| `markets`              | Venue-independent base/quote market identity                        |
-| `idempotency_records`  | Operation class, key, request hash, completion, and result identity |
-| `orders`               | Requested buy/sell intent and lifecycle                             |
-| `fills`                | Immutable simulated executions; one order may have many fills       |
-| `positions`            | Materialized weighted-average position state per account and market |
-| `journal_transactions` | Immutable headers for balance-changing operations                   |
-| `ledger_entries`       | Immutable debit/credit lines in exact lamports                      |
-
-`app_meta` remains unchanged.
+`app_meta` remains the retained Phase 0 table.
 
 ```mermaid
 erDiagram
-  USERS ||--o{ SEASON_ACCOUNTS : participates
-  COMPETITION_SEASONS ||--o{ SEASON_ACCOUNTS : contains
-  SEASON_ACCOUNTS ||--o{ ORDERS : submits
-  MARKETS ||--o{ ORDERS : targets
+  USERS ||--o{ COMPETITION_ACCOUNTS : enters
+  HOURLY_ROUNDS ||--o{ COMPETITION_ACCOUNTS : creates
+  COMPETITION_ACCOUNTS ||--o{ COMPETITION_TOKEN_SLOTS : consumes
+  COMPETITION_ACCOUNTS ||--o{ ORDERS : submits
   ORDERS ||--o{ FILLS : produces
-  SEASON_ACCOUNTS ||--o{ POSITIONS : owns
-  MARKETS ||--o{ POSITIONS : aggregates
-  ASSETS ||--o{ MARKETS : identifies
-  IDEMPOTENCY_RECORDS ||--o| ORDERS : protects
-  IDEMPOTENCY_RECORDS ||--o| FILLS : protects
-  IDEMPOTENCY_RECORDS ||--o| JOURNAL_TRANSACTIONS : protects
+  COMPETITION_ACCOUNTS ||--o{ POSITIONS : owns
+  COMPETITION_ACCOUNTS ||--o| HOURLY_RESULTS : finalizes
+  DAILY_COMPETITIONS ||--o{ DAILY_RESULTS : contains
+  HOURLY_RESULTS ||--o| DAILY_RESULT_HOURLY_RESULTS : contributes
+  DAILY_RESULTS ||--o{ DAILY_RESULT_HOURLY_RESULTS : aggregates
   JOURNAL_TRANSACTIONS ||--|{ LEDGER_ENTRIES : balances
 ```
 
-## Canonical units and precision
+## Hourly and daily boundaries
 
-- SOL and all paper-SOL values use signed PostgreSQL `bigint` lamports and TypeScript `bigint`. One SOL is exactly 1,000,000,000 lamports.
-- Token quantities use integer base units (`bigint`). `assets.decimals` records how to display them.
-- Execution prices use `numeric(38,18)` and cross the service boundary as validated decimal strings.
-- JavaScript `number` is never authoritative for balances, quantities, fees, cost basis, or PnL.
-- All event timestamps use PostgreSQL `timestamp with time zone`; monthly boundaries are constructed and validated as exact UTC calendar boundaries.
+Every `hourly_rounds` row is exactly one UTC-aligned hour. A GiST exclusion constraint rejects overlapping windows. The row snapshots starting Paper SOL, maximum unique tokens, maximum buy ratio in basis points, reward-finalization grace seconds, and rule version so an open round never depends on later global configuration changes.
 
-## Double-entry ledger
+Every user may have at most one `competition_accounts` row for a round. Initialization copies the round's configured starting balance—10,000,000,000 lamports by default—into a new account and balanced starting-credit journal. Accounts do not carry cash, positions, token slots, or losses into another hour. There is no operation that replenishes a losing hourly account; the user waits for the next round and receives a separate fresh account.
 
-Every balance-changing operation creates one immutable `journal_transactions` row and at least two immutable `ledger_entries` rows. Entries use these account codes:
+`daily_competitions` enforce exact UTC calendar-day windows and unique UTC dates. Finalized hourly results are attributed only by their hourly round's authoritative start time. Settlement completion and result insertion after midnight do not change attribution.
 
-- `CASH`: paper SOL held by the season account.
-- `POSITION_COST`: lamport cost carried by open positions.
-- `STARTING_CAPITAL`: the season's initial injected capital.
-- `TOP_UP_CAPITAL`: later injected paper capital, kept separate from performance.
-- `TRADING_PNL`: gross realized trading gain or loss.
-- `TRADING_FEES`: realized sell-side fee expense.
+`daily_results` holds the cumulative sum and completed-hour count. Each immutable `daily_result_hourly_results` row links one hourly result to one daily result. A unique hourly-result constraint and database identity trigger prevent double counting or attribution to the wrong user/day.
 
-The database installs deferred constraint triggers. At commit, every affected journal must have at least two rows, positive amounts, the same season account as its journal header, and equal debit and credit totals. Database triggers reject updates or deletes of journal headers, ledger entries, and fills. All authoritative foreign keys use `ON DELETE RESTRICT ON UPDATE RESTRICT`.
+## Canonical units and accounting
 
-Materialized balances and positions exist for transactional reads, but the ledger remains independently reconcilable. The core equation is:
+- Paper SOL is stored as signed PostgreSQL `bigint` lamports and TypeScript `bigint`; 1 SOL is exactly 1,000,000,000 lamports.
+- Token quantities use integer base units. `assets.decimals` is display metadata.
+- Execution prices use `numeric(38,18)` and validated decimal strings.
+- JavaScript `number` is never authoritative for money, token quantities, fees, cost basis, or P&L.
 
-```text
-cash + open position cost
-= starting capital + top-up capital + gross realized trading PnL - realized sell fees
-```
+Each balance-changing operation creates an immutable journal and at least two immutable entries. Deferred database triggers verify at commit that entries use the journal's competition account, contain positive amounts, and have equal debit and credit totals. Account codes are:
 
-The reconciliation API also verifies:
+- `CASH`;
+- `POSITION_COST`;
+- `HOURLY_STARTING_CAPITAL`;
+- `TRADING_PNL`;
+- `TRADING_FEES`.
+
+The invariant for an active or finalized hourly account is:
 
 ```text
-materialized cash = ledger CASH balance
-materialized open cost = ledger POSITION_COST balance
-materialized quantity = buys in fills - sells in fills
-materialized realized PnL = gross realized trading PnL - realized sell fees
-every journal debits = every journal credits
+paper SOL cash + open position cost
+= hourly starting capital + gross realized trading PnL - realized sell fees
 ```
 
-Buy fees are capitalized into the acquired position's cost. Sell fees are recorded as `TRADING_FEES`. Consequently, all fees reduce eventual realized PnL without being counted twice.
+The starting journal is `HOURLY_STARTING_CREDIT`. Buys exchange `CASH` for `POSITION_COST`; buy fees are included in acquisition cost. Sells return net proceeds to `CASH`, remove `POSITION_COST`, record gross `TRADING_PNL`, and record sell fees in `TRADING_FEES`. Later forced-settlement fills can use the same sell accounting and immutable fill history.
 
-## Season accounts, allocations, and top-ups
+## Orders, fills, positions, and token slots
 
-A unique constraint enforces one `season_accounts` row per `(user_id, season_id)`. Initialization creates a new historical season row instead of resetting or rewriting an earlier season. Each initialized account receives exactly 10,000,000,000 lamports through a balanced `STARTING_ALLOCATION` journal. Both the uniqueness constraint and idempotency record prevent duplicate capital.
+Orders and positions reference an hourly `competition_account_id`. Orders record intent; fills record execution. One order may have multiple fills, but aggregate fills cannot exceed the requested quote value or base quantity. Completed, cancelled, rejected, and finalized-account orders cannot accept new fills.
 
-Top-ups debit `CASH` and credit `TOP_UP_CAPITAL`. They increase `cumulative_top_up_lamports` but never change historical fills or realized PnL. Future leaderboard calculations can therefore exclude injected capital. Simultaneous top-ups lock the account row and serialize safely.
-
-## Orders, fills, positions, and cost basis
-
-An order stores intent: account, market, side, requested quote value for buys or requested base quantity for sells, timestamps, status, and idempotency identity. A fill stores execution: base units, quote lamports, decimal price, fees, execution identity, cost removed, realized PnL, and authoritative execution time. Aggregate fills may not exceed the order request; completed, rejected, and cancelled orders reject new fills.
-
-One materialized position exists per account and market. Repeated buys add quantity and total acquisition cost. The V1 method is weighted-average aggregate cost basis:
+Positions use the identity of competition account plus market; the market carries the protocol/venue and base asset identity. Repeated buys use weighted-average aggregate cost:
 
 ```text
 buy acquisition cost = quote lamports + buy fee lamports
-new quantity = old quantity + bought base units
-new cost = old cost + acquisition cost
-
-partial-sell cost removed = floor(old cost * sold quantity / old quantity)
+partial-sell cost removed = floor(old cost × sold quantity / old quantity)
 final-sell cost removed = all remaining cost
-net proceeds = quote lamports - sell fee lamports
-fill realized PnL = net proceeds - cost removed
+fill realized PnL = quote lamports - sell fee lamports - cost removed
 ```
 
-Flooring partial cost removal preserves integer lamports; all residual cost remains with the open position. A final close removes the exact remainder, guaranteeing no cost-basis dust disappears. A closed position has zero quantity and zero cost, while historical fills remain unchanged.
+Partial division leaves integer remainder with the open position; the final sell removes the exact remainder. Closed positions remain as zero-quantity, zero-cost historical materializations while fills remain the execution source of truth.
 
-## Idempotency
+A first successful buy inserts one immutable token-slot row keyed by hourly account and asset mint identity. Selling never removes the slot. The account row lock serializes first-entry races and compares persisted usage with the round's snapshotted maximum. Symbols are never identity.
 
-The unique `(operation_class, idempotency_key)` constraint is the final duplicate barrier. A SHA-256 hash of the canonical request payload detects conflicting reuse. The same key and request waits on and returns the original result; the same key with another payload raises `IDEMPOTENCY_CONFLICT`. PostgreSQL, rather than process memory, coordinates simultaneous requests.
+## Results and reconciliation
 
-Implemented operation classes are season-account initialization, paper top-up, order submission, and fill application. The table and conventions are ready for settlement, reset/finalization, and reward application operations in later phases.
+`finalizeHourlyResult` requires every position to be closed and the submitted final balance to equal authoritative cash. It persists:
 
-## Transactions and locking
+```text
+hourly PnL = final settled balance - snapshotted starting balance
+```
 
-Each mutation uses one PostgreSQL transaction:
+The account finalization fields and immutable hourly result must agree; a database trigger enforces their round, user, starting balance, final balance, and P&L identity.
 
-- Initialization claims idempotency, establishes unique account state, writes the 10 SOL journal, and completes idempotency atomically.
-- Top-up locks the season account, claims idempotency, updates both materialized capital fields, writes the journal, and completes idempotency.
-- Order submission claims idempotency and inserts intent atomically.
-- Fill application locks the order and season account, locks or creates the position, verifies cumulative fill limits and available capital/quantity, inserts the fill, updates the position and account, writes the journal, updates order status, and completes idempotency.
+`reconcileAccountLedger` proves materialized cash equals ledger cash, open cost equals ledger position cost, signed fill quantity equals position quantity, realized P&L equals gross trading P&L less sell fees, starting capital equals the round-account snapshot, and every journal balances.
 
-Failures roll the complete transaction back. Account row locks serialize competing debits and credits. Order locks serialize duplicate or partial fill application. Position updates occur only while the owning account is locked, giving one consistent lock order and preventing money creation, double application, overspending, and lost updates.
+## Idempotency, transactions, and locking
 
-## Constraints and deletion policy
+The unique `(operation_class, idempotency_key)` constraint is the duplicate barrier. Canonical SHA-256 request fingerprints detect conflicting reuse. Same-key/same-payload calls return the original result; conflicting payloads fail.
 
-Primary keys, unique execution IDs, unique mint identities, unique venue/provider markets, one account per user/season, one position per account/market, and unique idempotency relations protect identity. Checks protect positive quantities and amounts, nonnegative balances and fees, valid states/sides, order request shape, distinct market assets, asset decimals, timestamps, and open/closed position consistency.
+Implemented operation classes cover hourly-account initialization, order submission, fill application, hourly-result finalization, and daily-result contribution. There is no top-up operation.
 
-Authoritative history is preservation-first. Foreign-key cascades are not used. Parent deletion is restricted when financial children exist. Fills, journals, and ledger rows are additionally trigger-immutable. Lifecycle status/finalization transitions are the intended alternative to deletion.
+Financial mutations are single PostgreSQL transactions. Initialization coordinates idempotency, the one-user/round constraint, the fresh balance, and starting journal. Order admission locks the authoritative round state and accepts intent only while it is `OPEN`. Fill application locks order then account, token slots, and position before updating the fill, cash, P&L, journal, order state, and idempotency result. Result finalization and daily contribution similarly lock their authoritative aggregates. Any failure rolls back every partial mutation.
 
-## Reconciliation and tests
+## Deletion and immutability
 
-The real-PostgreSQL integration suite creates an isolated temporary database, migrates it twice, and removes the database after the suite. It exercises database constraints and actual lock/uniqueness behavior rather than mocks. The deterministic reconciliation scenario performs two buys, buy fees, a partial sell, sell fees, a paper top-up, and a final close. It proves a final cash balance of 14 SOL, separately measurable 3 SOL injected capital, 1 SOL realized PnL, zero remaining quantity/cost, exact fill-derived quantity, and a fully balanced ledger.
+All authoritative foreign keys use `ON DELETE RESTRICT ON UPDATE RESTRICT`. Database triggers reject updates or deletes of token slots, fills, hourly results, daily contribution links, journal headers, and ledger entries. Daily result totals and live account/position/order state are materialized transactional state; history rows remain the reconstructable evidence.
 
-Concurrency coverage includes simultaneous debits, duplicate top-ups, different concurrent top-ups, simultaneous initialization, duplicate order submission, duplicate fill application, two different fills into one position, and forced rollback after a partial mutation.
+## Test coverage
 
-## Later-phase integration
+Real-PostgreSQL tests create an isolated database, apply Phase 0 then corrected Phase 2, migrate again, and drop only that isolated database. They cover:
 
-- **20% buy cap:** a later transaction must lock/read the season account and relevant positions, obtain one authoritative market snapshot, compute marked portfolio value, compare requested buy value to the configured cap, and then create/apply execution without changing the lock order.
-- **Unique-token/hour limit:** orders and fills retain account, market/token, side, and UTC timestamps, allowing deterministic distinct-token counting. The configurable limit belongs in versioned rules, not a schema check.
-- **Monthly reset/finalization:** later orchestration may finalize the current season, settle open positions, preserve every historical row, create the next UTC season, and initialize a fresh 10 SOL account. It must not rewrite old seasons.
-- **Competition accounting:** starting and top-up capital are separate from trading PnL, so ranking logic can measure performance without treating injected capital as skill.
+- separate fresh 10 SOL accounts for consecutive hours;
+- no balance carry and no top-up API/account code;
+- duplicate hourly initialization;
+- exact/non-overlapping hour and UTC-day constraints;
+- token-slot uniqueness and first-entry limit races;
+- order/fill/position hourly ownership;
+- duplicate orders and fills;
+- concurrent overspending and distinct same-position fills;
+- rollback, immutable history, and deferred journal balance;
+- weighted-average partial/final sells and ledger reconciliation;
+- exact immutable hourly results;
+- cumulative negative and zero daily results without double counting;
+- 23:00–00:00 attribution to the UTC date containing 23:00.
 
-## Known limitations
+The complete repository suite contains 200 passing tests: 186 retained Phase 1 tests and 14 corrected Phase 2 PostgreSQL tests.
 
-- Execution pricing, slippage, liquidity, bonding curves, AMMs, and live Solana data are intentionally absent.
-- The service supports buy and sell fills but does not expose standalone administrative correction, position-close, season-finalization, settlement, or reward APIs yet.
-- Buy-cap valuation, unique-token/hour enforcement, hourly competition linkage, leaderboard scoring, and payouts belong to later phases.
-- Lifecycle transitions beyond the implemented order flow are represented by schema states but not yet exposed as domain operations.
-- Caller-supplied identifiers remain the repository convention; globally distributed ID generation is not part of this phase.
+## Deferred work
 
-## Recommended Phase 3
+Phase 2 does not implement protocol pricing, bonding curves, AMMs, slippage, market-state capture, forced-settlement orchestration, rankings, rewards, chain watchers, payouts, custody, or real trading. The persisted 20% ratio supports later enforcement, but marked portfolio valuation and the maximum-new-buy transaction remain Phase 3 work. Creator-fee, prize-pool, Reward Buffer, and payout tables are deferred to their planned phases rather than being overbuilt here.
 
-Build the execution-engine abstraction around deterministic market snapshots and protocol adapters. Define a pure execution quote/result contract, add a pump.fun-compatible simulator behind that contract without live trading, enforce fee/slippage/partial-fill outputs, and connect successful results exclusively through `createOrder` and `applyFill`. In the same transaction boundary, add the authoritative 20% buy-cap calculation and configurable five-unique-token-per-UTC-hour enforcement, with real PostgreSQL concurrency tests.
+## Recommended next task
+
+Build only the Phase 3 execution-engine abstraction: normalized immutable market-state, quote, fill, fee, price-impact, and adapter-version contracts; deterministic fake/reference adapters and replay fixtures; and authoritative transactional enforcement of the configured 20% maximum new buy using the Phase 2 hourly account. Do not add live Solana trading, creator-fee ingestion, or payouts.
