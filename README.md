@@ -6,10 +6,12 @@ The current development baseline includes:
 
 - the Phase 0 repository and infrastructure foundation;
 - the Phase 1A–1F pure competition and reward-economics domain engine;
-- 186 passing tests;
+- the corrected Phase 2 authoritative hourly PostgreSQL ledger;
+- the Phase 3A deterministic execution boundary and transactional reference BUY;
 - validated local PostgreSQL and Redis development infrastructure.
 
-Phase 2 persistence is the next implementation phase and has not started.
+See [Phase 2 ledger and schema](./docs/PHASE_2_LEDGER_AND_SCHEMA.md) and
+[Phase 3A execution engine](./docs/PHASE_3_EXECUTION_ENGINE.md) for implementation details.
 
 ## Prerequisites
 

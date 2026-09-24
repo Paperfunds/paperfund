@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@paperfund/config": "*",
+    "@paperfund/core": "*",
+    "@paperfund/execution": "*",
     "dotenv": "^18.0.3",
     "drizzle-orm": "^0.45.3",
     "pg": "^8.23.0"

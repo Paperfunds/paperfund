@@ -285,6 +285,72 @@ export const positions = pgTable(
   ],
 );
 
+export const marketStateEvidence = pgTable(
+  'market_state_evidence',
+  {
+    id: text('id').primaryKey(),
+    protocolId: text('protocol_id').notNull(),
+    marketId: text('market_id')
+      .notNull()
+      .references(() => markets.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+    chainSlot: bigint('chain_slot', { mode: 'bigint' }),
+    chainBlockId: text('chain_block_id'),
+    adapterVersion: text('adapter_version').notNull(),
+    normalizationVersion: text('normalization_version').notNull(),
+    normalizedState: jsonb('normalized_state').notNull(),
+    rawSource: jsonb('raw_source'),
+    stateFingerprint: text('state_fingerprint').notNull().unique(),
+    createdAt,
+  },
+  (table) => [
+    index('market_state_evidence_market_time_idx').on(table.marketId, table.observedAt),
+    check('market_state_evidence_protocol_nonempty', sql`length(${table.protocolId}) > 0`),
+    check('market_state_evidence_adapter_nonempty', sql`length(${table.adapterVersion}) > 0`),
+    check(
+      'market_state_evidence_normalization_nonempty',
+      sql`length(${table.normalizationVersion}) > 0`,
+    ),
+  ],
+);
+
+export const orderMarketStateEvidence = pgTable(
+  'order_market_state_evidence',
+  {
+    id: text('id').primaryKey(),
+    orderId: text('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    evidenceId: text('evidence_id')
+      .notNull()
+      .references(() => marketStateEvidence.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    purpose: text('purpose').notNull(),
+    positionId: text('position_id').references(() => positions.id, {
+      onDelete: 'restrict',
+      onUpdate: 'restrict',
+    }),
+    executableValueLamports: bigint('executable_value_lamports', { mode: 'bigint' }),
+    createdAt,
+  },
+  (table) => [
+    unique('order_market_state_evidence_usage_unique').on(
+      table.orderId,
+      table.evidenceId,
+      table.purpose,
+      table.positionId,
+    ),
+    index('order_market_state_evidence_order_idx').on(table.orderId),
+    check(
+      'order_market_state_evidence_purpose_valid',
+      sql`${table.purpose} in ('BUY_EXECUTION', 'POSITION_EXIT_VALUATION')`,
+    ),
+    check(
+      'order_market_state_evidence_value_nonnegative',
+      sql`${table.executableValueLamports} is null or ${table.executableValueLamports} >= 0`,
+    ),
+  ],
+);
+
 export const fills = pgTable(
   'fills',
   {
@@ -303,6 +369,14 @@ export const fills = pgTable(
     feeLamports: bigint('fee_lamports', { mode: 'bigint' })
       .notNull()
       .default(sql`0`),
+    actualInputLamports: bigint('actual_input_lamports', { mode: 'bigint' }),
+    feeBreakdown: jsonb('fee_breakdown'),
+    protocolId: text('protocol_id'),
+    adapterVersion: text('adapter_version'),
+    marketStateEvidenceId: text('market_state_evidence_id').references(
+      () => marketStateEvidence.id,
+      { onDelete: 'restrict', onUpdate: 'restrict' },
+    ),
     costBasisLamportsRemoved: bigint('cost_basis_lamports_removed', { mode: 'bigint' })
       .notNull()
       .default(sql`0`),
@@ -323,6 +397,10 @@ export const fills = pgTable(
     check('fills_quote_positive', sql`${table.quoteLamports} > 0`),
     check('fills_price_positive', sql`${table.executionPrice} > 0`),
     check('fills_fee_nonnegative', sql`${table.feeLamports} >= 0`),
+    check(
+      'fills_actual_input_positive',
+      sql`${table.actualInputLamports} is null or ${table.actualInputLamports} > 0`,
+    ),
     check('fills_cost_removed_nonnegative', sql`${table.costBasisLamportsRemoved} >= 0`),
   ],
 );

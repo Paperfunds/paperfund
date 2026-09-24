@@ -2,6 +2,24 @@ import { createHash } from 'node:crypto';
 
 import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
 
+import {
+  basisPoints,
+  identifier,
+  paperSolBaseUnits,
+  tokenBaseUnits,
+  utcInstant,
+  validateBuyAmount,
+} from '@paperfund/core';
+import {
+  createMarketStateEvidence,
+  ExecutionEngineError,
+  type ExecutionRouter,
+  type JsonObject,
+  type MarketIdentity,
+  type MarketStateEvidence,
+  type SimulatedExecution,
+} from '@paperfund/execution';
+
 import type { DatabaseService } from './database.js';
 
 export const DEFAULT_STARTING_PAPER_SOL_LAMPORTS = 10_000_000_000n;
@@ -14,6 +32,14 @@ export type FinancialErrorCode =
   | 'INSUFFICIENT_POSITION'
   | 'ORDER_MISMATCH'
   | 'ROUND_NOT_OPEN'
+  | 'OUTSIDE_ROUND_WINDOW'
+  | 'INSUFFICIENT_PAPER_SOL'
+  | 'MAX_BUY_RATIO_EXCEEDED'
+  | 'TOKEN_SLOT_LIMIT_REACHED'
+  | 'UNSUPPORTED_PROTOCOL'
+  | 'MARKET_STATE_UNAVAILABLE'
+  | 'POSITION_VALUATION_FAILED'
+  | 'INVALID_EXECUTION_RESULT'
   | 'TOKEN_LIMIT_EXCEEDED'
   | 'FINALIZATION_CONFLICT'
   | 'DAILY_ATTRIBUTION_MISMATCH';
@@ -1337,4 +1363,610 @@ export async function reconcileAccountLedger(
       cash + positionCost === startingCapital + grossTradingPnl - tradingFees &&
       balancedJournalCount === journalCount,
   };
+}
+
+export interface AuthoritativePaperBuyResult {
+  readonly orderId: string;
+  readonly fillId: string;
+  readonly executionId: string;
+  readonly competitionAccountId: string;
+  readonly marketId: string;
+  readonly protocolId: string;
+  readonly marketStateEvidenceId: string;
+  readonly marketStateFingerprint: string;
+  readonly requestedPaperSolLamports: bigint;
+  readonly actualPaperSolInputLamports: bigint;
+  readonly actualTokenOutputBaseUnits: bigint;
+  readonly feeLamports: bigint;
+  readonly adapterVersion: string;
+  readonly paperSolBalanceLamports: bigint;
+  readonly position: PositionState;
+  readonly executedAt: Date;
+}
+
+interface AuthoritativeMarketRow extends QueryResultRow {
+  id: string;
+  venue: string;
+  base_asset_id: string;
+  mint_address: string;
+}
+
+interface AuthoritativePositionRow extends PositionRow {
+  venue: string;
+  mint_address: string;
+}
+
+function deterministicEntityId(kind: string, idempotencyKey: string): string {
+  return `${kind}:${createHash('sha256').update(idempotencyKey).digest('hex')}`;
+}
+
+function executionPrice(numerator: bigint, denominator: bigint): string {
+  const scale = 10n ** 18n;
+  const scaled = (numerator * scale) / denominator;
+  if (scaled <= 0n) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'Execution price is below supported precision.',
+    );
+  }
+  const whole = scaled / scale;
+  const fraction = (scaled % scale).toString().padStart(18, '0');
+  return `${whole.toString()}.${fraction}`;
+}
+
+function normalizedFeeBreakdown(execution: SimulatedExecution): JsonObject {
+  return {
+    fees: execution.quote.fees.map((item) => ({
+      category: item.category,
+      asset: item.amount.asset,
+      amount: item.amount.amount.toString(),
+      ...(item.amount.asset === 'TOKEN' ? { tokenMint: item.amount.tokenMint } : {}),
+    })),
+  };
+}
+
+function paperSolFeeTotal(execution: SimulatedExecution): bigint {
+  return execution.quote.fees.reduce(
+    (total, item) => (item.amount.asset === 'PAPER_SOL' ? total + item.amount.amount : total),
+    0n,
+  );
+}
+
+function validateAuthoritativeExecution(input: {
+  readonly execution: SimulatedExecution;
+  readonly orderId: string;
+  readonly executionId: string;
+  readonly identity: MarketIdentity;
+  readonly requestedPaperSolLamports: bigint;
+  readonly availablePaperSolLamports: bigint;
+  readonly evidence: MarketStateEvidence;
+  readonly adapterVersion: string;
+}): void {
+  const execution = input.execution;
+  if (
+    execution.id !== input.executionId ||
+    execution.orderId !== input.orderId ||
+    execution.quote.orderId !== input.orderId ||
+    execution.quote.protocolId !== input.identity.protocolId ||
+    execution.quote.marketId !== input.identity.marketId ||
+    execution.quote.adapterVersion !== input.adapterVersion ||
+    execution.quote.marketStateFingerprint !== input.evidence.fingerprint ||
+    execution.quote.normalizationVersion !== input.evidence.normalizationVersion ||
+    input.evidence.identity.protocolId !== input.identity.protocolId ||
+    input.evidence.identity.marketId !== input.identity.marketId ||
+    input.evidence.identity.tokenMint !== input.identity.tokenMint ||
+    input.evidence.adapterVersion !== input.adapterVersion ||
+    execution.actualInput.asset !== 'PAPER_SOL' ||
+    execution.actualOutput.asset !== 'TOKEN' ||
+    execution.actualOutput.tokenMint !== input.identity.tokenMint ||
+    execution.actualInput.amount <= 0n ||
+    execution.actualOutput.amount <= 0n ||
+    execution.actualInput.amount > input.requestedPaperSolLamports ||
+    execution.actualInput.amount > input.availablePaperSolLamports
+  ) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'The adapter returned an invalid or mismatched execution result.',
+    );
+  }
+  const fees = paperSolFeeTotal(execution);
+  if (fees < 0n || fees >= execution.actualInput.amount) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'The execution fee breakdown is inconsistent with total input.',
+    );
+  }
+}
+
+async function persistMarketStateEvidence(
+  client: PoolClient,
+  evidence: MarketStateEvidence,
+): Promise<string> {
+  const id = `market-state:${evidence.fingerprint}`;
+  const rawSource = evidence.rawSource ?? null;
+  if (rawSource && Buffer.byteLength(JSON.stringify(rawSource), 'utf8') > 65_536) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'Raw market-state evidence exceeds the 64 KiB safety limit.',
+    );
+  }
+  await client.query(
+    `insert into market_state_evidence
+      (id, protocol_id, market_id, observed_at, chain_slot, chain_block_id,
+       adapter_version, normalization_version, normalized_state, raw_source, state_fingerprint)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11)
+     on conflict (state_fingerprint) do nothing`,
+    [
+      id,
+      evidence.identity.protocolId,
+      evidence.identity.marketId,
+      new Date(evidence.observedAt),
+      evidence.chainSlot,
+      evidence.chainBlockId,
+      evidence.adapterVersion,
+      evidence.normalizationVersion,
+      JSON.stringify(evidence.normalizedState),
+      rawSource === null ? null : JSON.stringify(rawSource),
+      evidence.fingerprint,
+    ],
+  );
+  const persisted = firstRow(
+    await client.query<{ id: string; protocol_id: string; market_id: string }>(
+      `select id, protocol_id, market_id from market_state_evidence where state_fingerprint = $1`,
+      [evidence.fingerprint],
+    ),
+    'Market-state evidence',
+  );
+  if (
+    persisted.protocol_id !== evidence.identity.protocolId ||
+    persisted.market_id !== evidence.identity.marketId
+  ) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'The persisted evidence fingerprint has a conflicting identity.',
+    );
+  }
+  return persisted.id;
+}
+
+async function getAuthoritativePaperBuyResult(
+  client: PoolClient,
+  fillId: string,
+): Promise<AuthoritativePaperBuyResult> {
+  const row = firstRow(
+    await client.query<{
+      fill_id: string;
+      order_id: string;
+      execution_id: string;
+      competition_account_id: string;
+      market_id: string;
+      protocol_id: string;
+      market_state_evidence_id: string;
+      state_fingerprint: string;
+      requested_quote_lamports: string;
+      actual_input_lamports: string;
+      base_quantity: string;
+      fee_lamports: string;
+      adapter_version: string;
+      paper_sol_balance_lamports: string;
+      position_id: string;
+      executed_at: Date;
+    }>(
+      `select f.id as fill_id, f.order_id, f.execution_id, o.competition_account_id,
+              f.market_id, f.protocol_id, f.market_state_evidence_id, e.state_fingerprint,
+              o.requested_quote_lamports, f.actual_input_lamports, f.base_quantity,
+              f.fee_lamports, f.adapter_version, a.paper_sol_balance_lamports,
+              p.id as position_id, f.executed_at
+       from fills f
+       join orders o on o.id = f.order_id
+       join competition_accounts a on a.id = o.competition_account_id
+       join positions p on p.competition_account_id = o.competition_account_id
+                       and p.market_id = f.market_id
+       join market_state_evidence e on e.id = f.market_state_evidence_id
+       where f.id = $1`,
+      [fillId],
+    ),
+    'Authoritative paper buy',
+  );
+  return {
+    orderId: row.order_id,
+    fillId: row.fill_id,
+    executionId: row.execution_id,
+    competitionAccountId: row.competition_account_id,
+    marketId: row.market_id,
+    protocolId: row.protocol_id,
+    marketStateEvidenceId: row.market_state_evidence_id,
+    marketStateFingerprint: row.state_fingerprint,
+    requestedPaperSolLamports: BigInt(row.requested_quote_lamports),
+    actualPaperSolInputLamports: BigInt(row.actual_input_lamports),
+    actualTokenOutputBaseUnits: BigInt(row.base_quantity),
+    feeLamports: BigInt(row.fee_lamports),
+    adapterVersion: row.adapter_version,
+    paperSolBalanceLamports: BigInt(row.paper_sol_balance_lamports),
+    position: await getPositionWithClient(client, row.position_id),
+    executedAt: row.executed_at,
+  };
+}
+
+function translateExecutionError(error: unknown, valuation: boolean): never {
+  if (error instanceof FinancialServiceError) throw error;
+  if (error instanceof ExecutionEngineError) {
+    if (valuation) {
+      throw new FinancialServiceError('POSITION_VALUATION_FAILED', error.message);
+    }
+    if (error.code === 'UNSUPPORTED_PROTOCOL') {
+      throw new FinancialServiceError('UNSUPPORTED_PROTOCOL', error.message);
+    }
+    if (error.code === 'MARKET_STATE_UNAVAILABLE') {
+      throw new FinancialServiceError('MARKET_STATE_UNAVAILABLE', error.message);
+    }
+    throw new FinancialServiceError('INVALID_EXECUTION_RESULT', error.message);
+  }
+  throw new FinancialServiceError(
+    valuation ? 'POSITION_VALUATION_FAILED' : 'MARKET_STATE_UNAVAILABLE',
+    valuation
+      ? 'An open position could not be authoritatively valued.'
+      : 'Authoritative market state is unavailable.',
+  );
+}
+
+/**
+ * Lock order: idempotency record, hourly round (SHARE), competition account (UPDATE), then all
+ * open positions (UPDATE). The account lock serializes cash, 20% equity, slot, and position writes.
+ */
+export async function executePaperBuy(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    readonly competitionAccountId: string;
+    readonly marketId: string;
+    readonly requestedPaperSolLamports: bigint;
+    readonly idempotencyKey: string;
+    readonly authoritativeTimestamp: Date;
+  },
+): Promise<AuthoritativePaperBuyResult> {
+  assertPositive(input.requestedPaperSolLamports, 'Requested Paper SOL');
+  if (Number.isNaN(input.authoritativeTimestamp.getTime())) {
+    throw new FinancialServiceError('INVALID_FINANCIAL_INPUT', 'Timestamp is invalid.');
+  }
+  const requestHash = fingerprint({
+    competitionAccountId: input.competitionAccountId,
+    marketId: input.marketId,
+    requestedPaperSolLamports: input.requestedPaperSolLamports,
+    authoritativeTimestamp: input.authoritativeTimestamp,
+  });
+  const orderId = deterministicEntityId('authoritative-buy-order', input.idempotencyKey);
+  const fillId = deterministicEntityId('authoritative-buy-fill', input.idempotencyKey);
+  const executionId = deterministicEntityId('authoritative-buy-execution', input.idempotencyKey);
+
+  return runFinancialTransaction(database, async (client) => {
+    const claimed = await claimIdempotency(client, {
+      operationClass: 'AUTHORITATIVE_PAPER_BUY',
+      idempotencyKey: input.idempotencyKey,
+      requestHash,
+      competitionAccountId: input.competitionAccountId,
+    });
+    if (claimed.replay) {
+      return getAuthoritativePaperBuyResult(client, claimed.record.result_entity_id!);
+    }
+
+    const accountIdentity = firstRow(
+      await client.query<{ hourly_round_id: string }>(
+        'select hourly_round_id from competition_accounts where id = $1',
+        [input.competitionAccountId],
+      ),
+      'Competition account',
+    );
+    const round = firstRow(
+      await client.query<{
+        state: string;
+        starts_at: Date;
+        ends_at_exclusive: Date;
+        max_unique_tokens: number;
+        max_buy_ratio_bps: number;
+      }>(
+        `select state, starts_at, ends_at_exclusive, max_unique_tokens, max_buy_ratio_bps
+         from hourly_rounds where id = $1 for share`,
+        [accountIdentity.hourly_round_id],
+      ),
+      'Hourly round',
+    );
+    if (round.state !== 'OPEN') {
+      throw new FinancialServiceError('ROUND_NOT_OPEN', 'The hourly round is not open.');
+    }
+    if (
+      input.authoritativeTimestamp < round.starts_at ||
+      input.authoritativeTimestamp >= round.ends_at_exclusive
+    ) {
+      throw new FinancialServiceError(
+        'OUTSIDE_ROUND_WINDOW',
+        'The authoritative timestamp is outside the hourly round window.',
+      );
+    }
+
+    const account = await getAccountStateWithClient(client, input.competitionAccountId, true);
+    if (account.finalSettledBalanceLamports !== null) {
+      throw new FinancialServiceError('ROUND_NOT_OPEN', 'The competition account is finalized.');
+    }
+    const targetMarket = firstRow(
+      await client.query<AuthoritativeMarketRow>(
+        `select m.id, m.venue, m.base_asset_id, a.mint_address
+         from markets m join assets a on a.id = m.base_asset_id where m.id = $1`,
+        [input.marketId],
+      ),
+      'Market',
+    );
+    const positions = (
+      await client.query<AuthoritativePositionRow>(
+        `select p.id, p.competition_account_id, p.market_id, p.asset_id,
+                p.remaining_base_units, p.cost_basis_lamports, p.realized_pnl_lamports,
+                p.status, m.venue, a.mint_address
+         from positions p
+         join markets m on m.id = p.market_id
+         join assets a on a.id = p.asset_id
+         where p.competition_account_id = $1 and p.status = 'OPEN'
+         order by p.id for update of p`,
+        [input.competitionAccountId],
+      )
+    ).rows;
+
+    const valuations: {
+      row: AuthoritativePositionRow;
+      value: bigint;
+      evidence: MarketStateEvidence;
+    }[] = [];
+    for (const position of positions) {
+      const identity: MarketIdentity = {
+        protocolId: identifier(position.venue, 'ProtocolId'),
+        marketId: identifier(position.market_id, 'MarketId'),
+        tokenMint: identifier(position.mint_address, 'TokenMint'),
+      };
+      try {
+        const adapter = router.resolve(identity.protocolId);
+        const state = await adapter.loadMarketState(identity);
+        const evidence = createMarketStateEvidence(state);
+        if (
+          evidence.identity.protocolId !== identity.protocolId ||
+          evidence.identity.marketId !== identity.marketId ||
+          evidence.identity.tokenMint !== identity.tokenMint ||
+          evidence.adapterVersion !== adapter.adapterVersion
+        ) {
+          throw new ExecutionEngineError(
+            'INVALID_MARKET_STATE',
+            'Loaded valuation state does not match its requested market.',
+          );
+        }
+        const valuation = await adapter.valuePositionForExit(
+          { identity, tokenQuantity: tokenBaseUnits(BigInt(position.remaining_base_units)) },
+          state,
+        );
+        if (
+          valuation.identity.marketId !== identity.marketId ||
+          valuation.identity.protocolId !== identity.protocolId ||
+          valuation.identity.tokenMint !== identity.tokenMint ||
+          valuation.marketStateFingerprint !== evidence.fingerprint ||
+          valuation.adapterVersion !== adapter.adapterVersion ||
+          valuation.paperSolValue < 0n
+        ) {
+          throw new ExecutionEngineError(
+            'INVALID_EXECUTION_RESULT',
+            'Position valuation does not match its market state.',
+          );
+        }
+        valuations.push({ row: position, value: valuation.paperSolValue, evidence });
+      } catch (error) {
+        translateExecutionError(error, true);
+      }
+    }
+
+    const buyValidation = validateBuyAmount({
+      requestedBuyAmount: paperSolBaseUnits(input.requestedPaperSolLamports),
+      availablePaperSolCash: paperSolBaseUnits(account.paperSolBalanceLamports),
+      authoritativePositionValues: valuations.map(({ value }) => paperSolBaseUnits(value)),
+      maxBuyRatioBps: basisPoints(BigInt(round.max_buy_ratio_bps)),
+    });
+    if (!buyValidation.ok) {
+      if (buyValidation.reason === 'INSUFFICIENT_PAPER_SOL') {
+        throw new FinancialServiceError(
+          'INSUFFICIENT_PAPER_SOL',
+          'Available Paper SOL is insufficient.',
+        );
+      }
+      if (buyValidation.reason === 'MAX_BUY_RATIO_EXCEEDED') {
+        throw new FinancialServiceError(
+          'MAX_BUY_RATIO_EXCEEDED',
+          'The requested buy exceeds the round maximum-buy ratio.',
+        );
+      }
+      throw new FinancialServiceError('INVALID_FINANCIAL_INPUT', 'Buy amount must be positive.');
+    }
+
+    const slotCapacity = firstRow(
+      await client.query<{ used: number; existing: number }>(
+        `select count(*)::int as used,
+                count(*) filter (where asset_id = $2)::int as existing
+         from competition_token_slots where competition_account_id = $1`,
+        [input.competitionAccountId, targetMarket.base_asset_id],
+      ),
+      'Token-slot capacity',
+    );
+    if (slotCapacity.existing === 0 && slotCapacity.used >= round.max_unique_tokens) {
+      throw new FinancialServiceError(
+        'TOKEN_SLOT_LIMIT_REACHED',
+        'The hourly unique-token limit has been reached.',
+      );
+    }
+
+    const targetIdentity: MarketIdentity = {
+      protocolId: identifier(targetMarket.venue, 'ProtocolId'),
+      marketId: identifier(targetMarket.id, 'MarketId'),
+      tokenMint: identifier(targetMarket.mint_address, 'TokenMint'),
+    };
+    let execution: SimulatedExecution;
+    let buyEvidence: MarketStateEvidence;
+    let adapterVersion: string;
+    try {
+      const adapter = router.resolve(targetIdentity.protocolId);
+      const state = await adapter.loadMarketState(targetIdentity);
+      buyEvidence = createMarketStateEvidence(state);
+      adapterVersion = adapter.adapterVersion;
+      execution = await adapter.simulateBuy(
+        {
+          orderId: identifier(orderId, 'OrderId'),
+          executionId: identifier(executionId, 'ExecutionId'),
+          identity: targetIdentity,
+          requestedPaperSol: paperSolBaseUnits(input.requestedPaperSolLamports),
+          executedAt: utcInstant(input.authoritativeTimestamp),
+        },
+        state,
+      );
+    } catch (error) {
+      translateExecutionError(error, false);
+    }
+    validateAuthoritativeExecution({
+      execution: execution!,
+      orderId,
+      executionId,
+      identity: targetIdentity,
+      requestedPaperSolLamports: input.requestedPaperSolLamports,
+      availablePaperSolLamports: account.paperSolBalanceLamports,
+      evidence: buyEvidence!,
+      adapterVersion: adapterVersion!,
+    });
+    const actualInput = execution!.actualInput.amount;
+    const tokenOutput = execution!.actualOutput.amount;
+    const feeLamports = paperSolFeeTotal(execution!);
+    const quoteLamports = actualInput - feeLamports;
+
+    await client.query(
+      `insert into orders
+        (id, competition_account_id, market_id, side, requested_quote_lamports,
+         status, idempotency_record_id, requested_at)
+       values ($1, $2, $3, 'BUY', $4, 'COMPLETED', $5, $6)`,
+      [
+        orderId,
+        input.competitionAccountId,
+        input.marketId,
+        input.requestedPaperSolLamports,
+        claimed.record.id,
+        input.authoritativeTimestamp,
+      ],
+    );
+    for (const valuation of valuations) {
+      const evidenceId = await persistMarketStateEvidence(client, valuation.evidence);
+      await client.query(
+        `insert into order_market_state_evidence
+          (id, order_id, evidence_id, purpose, position_id, executable_value_lamports)
+         values ($1, $2, $3, 'POSITION_EXIT_VALUATION', $4, $5)`,
+        [
+          `${orderId}:valuation:${valuation.row.id}`,
+          orderId,
+          evidenceId,
+          valuation.row.id,
+          valuation.value,
+        ],
+      );
+    }
+    const buyEvidenceId = await persistMarketStateEvidence(client, buyEvidence!);
+    await client.query(
+      `insert into order_market_state_evidence
+        (id, order_id, evidence_id, purpose)
+       values ($1, $2, $3, 'BUY_EXECUTION')`,
+      [`${orderId}:buy-execution`, orderId, buyEvidenceId],
+    );
+
+    const existingPosition = positions.find(({ market_id }) => market_id === input.marketId);
+    const positionId =
+      existingPosition?.id ?? `position:${input.competitionAccountId}:${input.marketId}`;
+    if (existingPosition) {
+      await client.query(
+        `update positions
+         set remaining_base_units = remaining_base_units + $2,
+             cost_basis_lamports = cost_basis_lamports + $3,
+             status = 'OPEN', closed_at = null, updated_at = $4
+         where id = $1`,
+        [positionId, tokenOutput, actualInput, input.authoritativeTimestamp],
+      );
+    } else {
+      await client.query(
+        `insert into positions
+          (id, competition_account_id, market_id, asset_id, remaining_base_units,
+           cost_basis_lamports, status, opened_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6, 'OPEN', $7, $7)`,
+        [
+          positionId,
+          input.competitionAccountId,
+          input.marketId,
+          targetMarket.base_asset_id,
+          tokenOutput,
+          actualInput,
+          input.authoritativeTimestamp,
+        ],
+      );
+    }
+    await client.query(
+      `insert into fills
+        (id, order_id, market_id, execution_id, side, base_quantity, quote_lamports,
+         execution_price, fee_lamports, actual_input_lamports, fee_breakdown,
+         protocol_id, adapter_version, market_state_evidence_id,
+         cost_basis_lamports_removed, realized_pnl_lamports, idempotency_record_id, executed_at)
+       values ($1, $2, $3, $4, 'BUY', $5, $6, $7, $8, $9, $10::jsonb,
+               $11, $12, $13, 0, 0, $14, $15)`,
+      [
+        fillId,
+        orderId,
+        input.marketId,
+        executionId,
+        tokenOutput,
+        quoteLamports,
+        executionPrice(actualInput, tokenOutput),
+        feeLamports,
+        actualInput,
+        JSON.stringify(normalizedFeeBreakdown(execution!)),
+        targetIdentity.protocolId,
+        adapterVersion!,
+        buyEvidenceId,
+        claimed.record.id,
+        input.authoritativeTimestamp,
+      ],
+    );
+    if (slotCapacity.existing === 0) {
+      await client.query(
+        `insert into competition_token_slots
+          (id, competition_account_id, asset_id, first_successful_buy_at)
+         values ($1, $2, $3, $4)`,
+        [
+          `slot:${input.competitionAccountId}:${targetMarket.base_asset_id}`,
+          input.competitionAccountId,
+          targetMarket.base_asset_id,
+          input.authoritativeTimestamp,
+        ],
+      );
+    }
+    await client.query(
+      `update competition_accounts
+       set paper_sol_balance_lamports = paper_sol_balance_lamports - $2 where id = $1`,
+      [input.competitionAccountId, actualInput],
+    );
+    await insertJournal(client, {
+      id: `journal:authoritative-buy:${fillId}`,
+      competitionAccountId: input.competitionAccountId,
+      operationType: 'AUTHORITATIVE_SIMULATED_BUY',
+      sourceEntityType: 'FILL',
+      sourceEntityId: fillId,
+      idempotencyRecordId: claimed.record.id,
+      entries: [
+        { accountCode: 'POSITION_COST', direction: 'DEBIT', amountLamports: actualInput },
+        { accountCode: 'CASH', direction: 'CREDIT', amountLamports: actualInput },
+      ],
+    });
+    await completeIdempotency(
+      client,
+      claimed.record.id,
+      'AUTHORITATIVE_BUY_FILL',
+      fillId,
+      input.competitionAccountId,
+    );
+    return getAuthoritativePaperBuyResult(client, fillId);
+  });
 }
