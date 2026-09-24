@@ -222,6 +222,7 @@ export const orders = pgTable(
     side: text('side').notNull(),
     requestedBaseUnits: bigint('requested_base_units', { mode: 'bigint' }),
     requestedQuoteLamports: bigint('requested_quote_lamports', { mode: 'bigint' }),
+    executionContext: text('execution_context').notNull().default('NORMAL_USER'),
     status: text('status').notNull().default('PENDING'),
     idempotencyRecordId: text('idempotency_record_id')
       .notNull()
@@ -235,6 +236,10 @@ export const orders = pgTable(
   (table) => [
     index('orders_account_time_idx').on(table.competitionAccountId, table.requestedAt),
     check('orders_side_valid', sql`${table.side} in ('BUY', 'SELL')`),
+    check(
+      'orders_execution_context_valid',
+      sql`${table.executionContext} in ('NORMAL_USER', 'FORCED_HOURLY_SETTLEMENT')`,
+    ),
     check(
       'orders_status_valid',
       sql`${table.status} in ('PENDING', 'PARTIALLY_FILLED', 'COMPLETED', 'REJECTED', 'CANCELLED')`,
@@ -342,7 +347,7 @@ export const orderMarketStateEvidence = pgTable(
     index('order_market_state_evidence_order_idx').on(table.orderId),
     check(
       'order_market_state_evidence_purpose_valid',
-      sql`${table.purpose} in ('BUY_EXECUTION', 'POSITION_EXIT_VALUATION')`,
+      sql`${table.purpose} in ('BUY_EXECUTION', 'SELL_EXECUTION', 'POSITION_EXIT_VALUATION')`,
     ),
     check(
       'order_market_state_evidence_value_nonnegative',
@@ -370,6 +375,7 @@ export const fills = pgTable(
       .notNull()
       .default(sql`0`),
     actualInputLamports: bigint('actual_input_lamports', { mode: 'bigint' }),
+    actualOutputLamports: bigint('actual_output_lamports', { mode: 'bigint' }),
     feeBreakdown: jsonb('fee_breakdown'),
     protocolId: text('protocol_id'),
     adapterVersion: text('adapter_version'),
@@ -400,6 +406,10 @@ export const fills = pgTable(
     check(
       'fills_actual_input_positive',
       sql`${table.actualInputLamports} is null or ${table.actualInputLamports} > 0`,
+    ),
+    check(
+      'fills_actual_output_positive',
+      sql`${table.actualOutputLamports} is null or ${table.actualOutputLamports} > 0`,
     ),
     check('fills_cost_removed_nonnegative', sql`${table.costBasisLamportsRemoved} >= 0`),
   ],

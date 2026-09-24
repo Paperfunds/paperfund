@@ -193,7 +193,7 @@ afterAll(async () => {
 }, 30_000);
 
 describe('corrected hourly/daily PostgreSQL financial foundation', () => {
-  it('migrates the canonical baseline through the Phase 3A forward migration twice', async () => {
+  it('migrates the canonical baseline through the Phase 3C forward migration twice', async () => {
     const rows = await database.pool.query<{ table_name: string }>(
       `select table_name from information_schema.tables
        where table_schema = 'public' order by table_name`,
@@ -227,7 +227,7 @@ describe('corrected hourly/daily PostgreSQL financial foundation', () => {
     const migrations = await database.pool.query<{ count: string }>(
       'select count(*)::text as count from drizzle.__drizzle_migrations',
     );
-    expect(migrations.rows[0]?.count).toBe('3');
+    expect(migrations.rows[0]?.count).toBe('4');
   });
 
   it('enforces exact non-overlapping hourly rounds and exact UTC daily windows', async () => {

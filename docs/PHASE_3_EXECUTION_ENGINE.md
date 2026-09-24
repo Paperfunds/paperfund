@@ -1,4 +1,4 @@
-# Phase 3A: Deterministic Execution Engine and Authoritative BUY
+# Phase 3: Deterministic Execution, Authoritative Trading, and Hourly Settlement
 
 ## Scope
 
@@ -236,3 +236,100 @@ replaced with a newly recorded active identity. Token-2022 transfer-fee tokens a
 invented transfer model; Pump's current curve output custody transfer is assumed to match the
 program's supported mint configuration, and future token-extension-specific behavior requires a
 separate verified adapter revision.
+
+## Phase 3C: Authoritative SELL and hourly forced settlement
+
+### Authoritative SELL lifecycle
+
+`executePaperSell` accepts an exact positive token base-unit quantity. Before opening its financial
+transaction it resolves the market identity, loads one explicit authoritative state, creates its
+fingerprint, and simulates the SELL. The transaction then claims idempotency, locks the round against
+a state transition, locks the account and canonical position, revalidates inventory and round
+authority, and atomically persists the completed order, `SELL_EXECUTION` evidence link, immutable
+fill, position mutation, cash/P&L mutation, balanced journal, and completed idempotency result.
+
+Normal SELL requires persisted round state `OPEN` and an authoritative server timestamp in the exact
+`[starts_at, ends_at_exclusive)` interval. At the exclusive cutoff it rejects. Clients never supply
+execution output, fees, price, cost basis, or P&L.
+
+SELL `actualInput` is the exact token quantity removed. `actualOutput` and
+`actual_output_lamports` are the exact net Paper SOL credited after fees. `quote_lamports` retains
+gross proceeds for the existing Phase 2 ledger model, while the fee breakdown and fee total remain
+explicit audit data. Cash is credited only with net proceeds, so fees are not deducted twice.
+
+### Partial/full accounting and slots
+
+For a partial SELL, removed cost basis is
+`floor(existing basis * sold quantity / quantity before)`. Remaining quantity and basis are exact
+integer subtraction; fill and account realized P&L equal net proceeds minus removed basis. A full
+SELL removes every remaining basis unit, closes the existing position row, and cannot leave basis
+dust. Rebuying reopens that same canonical position identity.
+
+The journal debits net `CASH` and explicit `TRADING_FEES`, credits removed `POSITION_COST`, and posts
+the signed gross `TRADING_PNL` balancing amount. Token quantities remain fill/position inventory and
+are never posted as invented SOL ledger value. A close never deletes `competition_token_slots`, so a
+same-token rebuy remains eligible while an unseen sixth token remains blocked at 5/5.
+
+### Idempotency, concurrency, and adapter control
+
+Normal SELL uses `AUTHORITATIVE_PAPER_SELL`; forced SELL uses
+`FORCED_HOURLY_SETTLEMENT_SELL`. Deterministic order/fill/execution IDs and canonical request hashes
+make same-key/same-request retries return the original result and changed requests return
+`IDEMPOTENCY_CONFLICT`. The account/position locks serialize concurrent inventory removal; two
+75-unit sells against 100 units cannot both succeed.
+
+`ExecutionRouter.setEnabled` is the minimal server-side safety switch. A disabled protocol rejects
+new user BUY/SELL with `PROTOCOL_DISABLED`. `resolveForSettlement` deliberately permits installed
+adapter code for risk-reducing forced liquidation, so operationally pausing exposure does not strand
+positions. This is not an admin UI or persisted authorization system.
+
+### Settlement state, ordering, and transaction boundaries
+
+`settleHourlyRound` locks the round and, only at or after cutoff, performs the approved
+`OPEN -> CLOSING -> SETTLING` transitions. Workers enumerate open positions in reproducible
+protocol ID, market ID, token mint order. Each position is fully liquidated through the same
+authoritative simulation/accounting implementation as user SELL, distinguished by order
+`execution_context = FORCED_HOURLY_SETTLEMENT`.
+
+The transaction unit is one forced position, not the entire round. Market-state acquisition and
+simulation occur before the short financial transaction; the transaction revalidates round state,
+account finalization, and locked current inventory before committing. This avoids holding critical
+PostgreSQL locks during network access while retaining oversell/cutoff correctness. Successful
+liquidations remain committed if another market fails. Deterministic per-position idempotency keys
+make retries and concurrent workers observe one effective liquidation without duplicate cash,
+fills, journals, or results.
+
+If state is unavailable, invalid, or migrated, no price is invented. The affected position stays
+open, the round stays `SETTLING`, and the returned typed failure is retryable. In particular,
+Pump.fun `complete` curves return `MARKET_MIGRATED`; Phase 3C has no PumpSwap/Raydium fallback, so the
+round cannot finalize until a supported migrated-market adapter exists or an explicitly approved
+future recovery policy is implemented.
+
+### Account/result/daily/round finalization
+
+After an account has no open quantity, settlement requires the materialized cash, position cost,
+fill quantity, starting capital, realized P&L/fees, and every journal to reconcile. It then writes
+the one immutable hourly result using the canonical formula:
+
+```text
+hourly P&L = final settled CASH - snapshotted starting Paper SOL
+```
+
+Trade-level realized P&L is audit detail and is not summed to create the result. Negative, zero, and
+positive signed lamports are preserved. The result contributes exactly once through
+`daily_result_hourly_results` to the UTC day containing the round start. No-trade accounts receive a
+zero result and increment the daily completed-round count. Zero-participant rounds also finalize.
+
+Only when every participating account has a result and no open position remains does the worker set
+`SETTLING -> FINALIZED`; it does not enter `PAYING`.
+
+### Persisted evidence replay
+
+`replayPersistedFill` is read-only. It loads the fill and immutable evidence, reconstructs the exact
+normalized `MarketState`, verifies the SHA-256 fingerprint, resolves the recorded protocol and
+adapter version, reruns BUY or SELL simulation, and compares exact input, output, and fee totals.
+Fingerprint mismatch returns `EVIDENCE_CORRUPTED`; unavailable historical code returns
+`ADAPTER_VERSION_UNAVAILABLE`; output mismatch returns `INVALID_EXECUTION_RESULT`.
+
+Freshness thresholds remain explicitly TBD. Evidence continues to preserve observation timestamps
+and chain slots without choosing an unapproved production threshold.

@@ -16,6 +16,7 @@ import {
   type ExecutionRouter,
   type JsonObject,
   type MarketIdentity,
+  type MarketState,
   type MarketStateEvidence,
   type SimulatedExecution,
 } from '@paperfund/execution';
@@ -26,10 +27,12 @@ export const DEFAULT_STARTING_PAPER_SOL_LAMPORTS = 10_000_000_000n;
 
 export type FinancialErrorCode =
   | 'INVALID_FINANCIAL_INPUT'
+  | 'INVALID_SELL_QUANTITY'
   | 'IDEMPOTENCY_CONFLICT'
   | 'ENTITY_NOT_FOUND'
   | 'INSUFFICIENT_BALANCE'
   | 'INSUFFICIENT_POSITION'
+  | 'INSUFFICIENT_TOKEN_BALANCE'
   | 'ORDER_MISMATCH'
   | 'ROUND_NOT_OPEN'
   | 'OUTSIDE_ROUND_WINDOW'
@@ -44,6 +47,11 @@ export type FinancialErrorCode =
   | 'RPC_ERROR'
   | 'POSITION_VALUATION_FAILED'
   | 'INVALID_EXECUTION_RESULT'
+  | 'PROTOCOL_DISABLED'
+  | 'ADAPTER_VERSION_UNAVAILABLE'
+  | 'EVIDENCE_CORRUPTED'
+  | 'SETTLEMENT_INCOMPLETE'
+  | 'SETTLEMENT_EXECUTION_FAILED'
   | 'TOKEN_LIMIT_EXCEEDED'
   | 'FINALIZATION_CONFLICT'
   | 'DAILY_ATTRIBUTION_MISMATCH';
@@ -1605,6 +1613,13 @@ function translateExecutionError(error: unknown, valuation: boolean): never {
       throw new FinancialServiceError('MARKET_STATE_UNAVAILABLE', error.message);
     }
     if (
+      error.code === 'PROTOCOL_DISABLED' ||
+      error.code === 'ADAPTER_VERSION_UNAVAILABLE' ||
+      error.code === 'EVIDENCE_CORRUPTED'
+    ) {
+      throw new FinancialServiceError(error.code, error.message);
+    }
+    if (
       error.code === 'MARKET_ACCOUNT_NOT_FOUND' ||
       error.code === 'MARKET_MIGRATED' ||
       error.code === 'RPC_TIMEOUT' ||
@@ -1887,7 +1902,20 @@ export async function executePaperBuy(
       [`${orderId}:buy-execution`, orderId, buyEvidenceId],
     );
 
-    const existingPosition = positions.find(({ market_id }) => market_id === input.marketId);
+    const existingPosition =
+      positions.find(({ market_id }) => market_id === input.marketId) ??
+      (
+        await client.query<AuthoritativePositionRow>(
+          `select p.id, p.competition_account_id, p.market_id, p.asset_id,
+                  p.remaining_base_units, p.cost_basis_lamports, p.realized_pnl_lamports,
+                  p.status, m.venue, a.mint_address
+           from positions p
+           join markets m on m.id = p.market_id
+           join assets a on a.id = p.asset_id
+           where p.competition_account_id = $1 and p.market_id = $2 for update of p`,
+          [input.competitionAccountId, input.marketId],
+        )
+      ).rows[0];
     const positionId =
       existingPosition?.id ?? `position:${input.competitionAccountId}:${input.marketId}`;
     if (existingPosition) {
@@ -1981,4 +2009,901 @@ export async function executePaperBuy(
     );
     return getAuthoritativePaperBuyResult(client, fillId);
   });
+}
+
+export type SellExecutionContext = 'NORMAL_USER' | 'FORCED_HOURLY_SETTLEMENT';
+
+export interface AuthoritativePaperSellResult {
+  readonly orderId: string;
+  readonly fillId: string;
+  readonly executionId: string;
+  readonly competitionAccountId: string;
+  readonly marketId: string;
+  readonly protocolId: string;
+  readonly executionContext: SellExecutionContext;
+  readonly marketStateEvidenceId: string;
+  readonly marketStateFingerprint: string;
+  readonly requestedTokenQuantity: bigint;
+  readonly actualTokenInputBaseUnits: bigint;
+  readonly actualNetPaperSolOutputLamports: bigint;
+  readonly feeLamports: bigint;
+  readonly costBasisLamportsRemoved: bigint;
+  readonly fillRealizedPnlLamports: bigint;
+  readonly adapterVersion: string;
+  readonly paperSolBalanceLamports: bigint;
+  readonly position: PositionState;
+  readonly executedAt: Date;
+}
+
+async function getAuthoritativePaperSellResult(
+  client: PoolClient,
+  fillId: string,
+): Promise<AuthoritativePaperSellResult> {
+  const row = firstRow(
+    await client.query<{
+      fill_id: string;
+      order_id: string;
+      execution_id: string;
+      competition_account_id: string;
+      market_id: string;
+      protocol_id: string;
+      execution_context: SellExecutionContext;
+      market_state_evidence_id: string;
+      state_fingerprint: string;
+      requested_base_units: string;
+      base_quantity: string;
+      actual_output_lamports: string;
+      fee_lamports: string;
+      cost_basis_lamports_removed: string;
+      realized_pnl_lamports: string;
+      adapter_version: string;
+      paper_sol_balance_lamports: string;
+      position_id: string;
+      executed_at: Date;
+    }>(
+      `select f.id as fill_id, f.order_id, f.execution_id, o.competition_account_id,
+              f.market_id, f.protocol_id, o.execution_context,
+              f.market_state_evidence_id, e.state_fingerprint, o.requested_base_units,
+              f.base_quantity, f.actual_output_lamports, f.fee_lamports,
+              f.cost_basis_lamports_removed, f.realized_pnl_lamports,
+              f.adapter_version, a.paper_sol_balance_lamports,
+              p.id as position_id, f.executed_at
+       from fills f
+       join orders o on o.id = f.order_id
+       join competition_accounts a on a.id = o.competition_account_id
+       join positions p on p.competition_account_id = o.competition_account_id
+                       and p.market_id = f.market_id
+       join market_state_evidence e on e.id = f.market_state_evidence_id
+       where f.id = $1`,
+      [fillId],
+    ),
+    'Authoritative paper sell',
+  );
+  return {
+    orderId: row.order_id,
+    fillId: row.fill_id,
+    executionId: row.execution_id,
+    competitionAccountId: row.competition_account_id,
+    marketId: row.market_id,
+    protocolId: row.protocol_id,
+    executionContext: row.execution_context,
+    marketStateEvidenceId: row.market_state_evidence_id,
+    marketStateFingerprint: row.state_fingerprint,
+    requestedTokenQuantity: BigInt(row.requested_base_units),
+    actualTokenInputBaseUnits: BigInt(row.base_quantity),
+    actualNetPaperSolOutputLamports: BigInt(row.actual_output_lamports),
+    feeLamports: BigInt(row.fee_lamports),
+    costBasisLamportsRemoved: BigInt(row.cost_basis_lamports_removed),
+    fillRealizedPnlLamports: BigInt(row.realized_pnl_lamports),
+    adapterVersion: row.adapter_version,
+    paperSolBalanceLamports: BigInt(row.paper_sol_balance_lamports),
+    position: await getPositionWithClient(client, row.position_id),
+    executedAt: row.executed_at,
+  };
+}
+
+function validateAuthoritativeSellExecution(input: {
+  readonly execution: SimulatedExecution;
+  readonly orderId: string;
+  readonly executionId: string;
+  readonly identity: MarketIdentity;
+  readonly requestedTokenQuantity: bigint;
+  readonly evidence: MarketStateEvidence;
+  readonly adapterVersion: string;
+}): void {
+  const { execution } = input;
+  if (
+    execution.id !== input.executionId ||
+    execution.orderId !== input.orderId ||
+    execution.quote.orderId !== input.orderId ||
+    execution.quote.protocolId !== input.identity.protocolId ||
+    execution.quote.marketId !== input.identity.marketId ||
+    execution.quote.adapterVersion !== input.adapterVersion ||
+    execution.quote.marketStateFingerprint !== input.evidence.fingerprint ||
+    execution.quote.normalizationVersion !== input.evidence.normalizationVersion ||
+    input.evidence.identity.protocolId !== input.identity.protocolId ||
+    input.evidence.identity.marketId !== input.identity.marketId ||
+    input.evidence.identity.tokenMint !== input.identity.tokenMint ||
+    input.evidence.adapterVersion !== input.adapterVersion ||
+    execution.actualInput.asset !== 'TOKEN' ||
+    execution.actualInput.tokenMint !== input.identity.tokenMint ||
+    execution.actualInput.amount !== input.requestedTokenQuantity ||
+    execution.actualOutput.asset !== 'PAPER_SOL' ||
+    execution.actualOutput.amount <= 0n
+  ) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'The adapter returned an invalid or mismatched SELL execution result.',
+    );
+  }
+  const fees = paperSolFeeTotal(execution);
+  if (fees < 0n) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'The SELL fee breakdown is invalid.',
+    );
+  }
+}
+
+interface PreparedSell {
+  readonly identity: MarketIdentity;
+  readonly state: MarketState;
+  readonly evidence: MarketStateEvidence;
+  readonly execution: SimulatedExecution;
+  readonly adapterVersion: string;
+}
+
+async function prepareAuthoritativeSell(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    readonly competitionAccountId: string;
+    readonly marketId: string;
+    readonly requestedTokenQuantity: bigint;
+    readonly idempotencyKey: string;
+    readonly authoritativeTimestamp: Date;
+    readonly executionContext: SellExecutionContext;
+  },
+  ids: { readonly orderId: string; readonly executionId: string },
+): Promise<PreparedSell> {
+  const market = firstRow(
+    await database.pool.query<AuthoritativeMarketRow>(
+      `select m.id, m.venue, m.base_asset_id, a.mint_address
+       from markets m join assets a on a.id = m.base_asset_id where m.id = $1`,
+      [input.marketId],
+    ),
+    'Market',
+  );
+  const identity: MarketIdentity = {
+    protocolId: identifier(market.venue, 'ProtocolId'),
+    marketId: identifier(market.id, 'MarketId'),
+    tokenMint: identifier(market.mint_address, 'TokenMint'),
+  };
+  try {
+    const adapter =
+      input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
+        ? router.resolveForSettlement(identity.protocolId)
+        : router.resolve(identity.protocolId);
+    const state = await adapter.loadMarketState(identity);
+    const evidence = createMarketStateEvidence(state);
+    const execution = await adapter.simulateSell(
+      {
+        orderId: identifier(ids.orderId, 'OrderId'),
+        executionId: identifier(ids.executionId, 'ExecutionId'),
+        identity,
+        requestedTokenQuantity: tokenBaseUnits(input.requestedTokenQuantity),
+        executedAt: utcInstant(input.authoritativeTimestamp),
+      },
+      state,
+    );
+    validateAuthoritativeSellExecution({
+      execution,
+      orderId: ids.orderId,
+      executionId: ids.executionId,
+      identity,
+      requestedTokenQuantity: input.requestedTokenQuantity,
+      evidence,
+      adapterVersion: adapter.adapterVersion,
+    });
+    return { identity, state, evidence, execution, adapterVersion: adapter.adapterVersion };
+  } catch (error) {
+    translateExecutionError(error, false);
+  }
+}
+
+async function executeAuthoritativePaperSell(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    readonly competitionAccountId: string;
+    readonly marketId: string;
+    readonly requestedTokenQuantity: bigint;
+    readonly idempotencyKey: string;
+    readonly authoritativeTimestamp: Date;
+    readonly executionContext: SellExecutionContext;
+  },
+): Promise<AuthoritativePaperSellResult> {
+  if (input.requestedTokenQuantity <= 0n) {
+    throw new FinancialServiceError(
+      'INVALID_SELL_QUANTITY',
+      'Requested token quantity must be positive.',
+    );
+  }
+  if (Number.isNaN(input.authoritativeTimestamp.getTime())) {
+    throw new FinancialServiceError('INVALID_FINANCIAL_INPUT', 'Timestamp is invalid.');
+  }
+  const requestHash = fingerprint(input);
+  const prefix =
+    input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
+      ? 'forced-settlement-sell'
+      : 'authoritative-sell';
+  const orderId = deterministicEntityId(`${prefix}-order`, input.idempotencyKey);
+  const fillId = deterministicEntityId(`${prefix}-fill`, input.idempotencyKey);
+  const executionId = deterministicEntityId(`${prefix}-execution`, input.idempotencyKey);
+  const operationClass =
+    input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
+      ? 'FORCED_HOURLY_SETTLEMENT_SELL'
+      : 'AUTHORITATIVE_PAPER_SELL';
+  const existingClient = await database.pool.connect();
+  try {
+    const existing = await existingClient.query<IdempotencyRow>(
+      `select id, request_hash, status, result_entity_type, result_entity_id
+       from idempotency_records where operation_class = $1 and idempotency_key = $2`,
+      [operationClass, input.idempotencyKey],
+    );
+    const record = existing.rows[0];
+    if (record) {
+      if (record.request_hash !== requestHash) {
+        throw new FinancialServiceError(
+          'IDEMPOTENCY_CONFLICT',
+          'The idempotency key was already used with a different request.',
+        );
+      }
+      if (record.status === 'COMPLETED' && record.result_entity_id) {
+        return await getAuthoritativePaperSellResult(existingClient, record.result_entity_id);
+      }
+    }
+  } finally {
+    existingClient.release();
+  }
+  const prepared = await prepareAuthoritativeSell(database, router, input, {
+    orderId,
+    executionId,
+  });
+
+  return runFinancialTransaction(database, async (client) => {
+    const claimed = await claimIdempotency(client, {
+      operationClass,
+      idempotencyKey: input.idempotencyKey,
+      requestHash,
+      competitionAccountId: input.competitionAccountId,
+    });
+    if (claimed.replay) {
+      return getAuthoritativePaperSellResult(client, claimed.record.result_entity_id!);
+    }
+    const authority = firstRow(
+      await client.query<{
+        hourly_round_id: string;
+        state: string;
+        starts_at: Date;
+        ends_at_exclusive: Date;
+      }>(
+        `select a.hourly_round_id, r.state, r.starts_at, r.ends_at_exclusive
+         from competition_accounts a join hourly_rounds r on r.id = a.hourly_round_id
+         where a.id = $1 for share of r`,
+        [input.competitionAccountId],
+      ),
+      'Competition account',
+    );
+    if (input.executionContext === 'NORMAL_USER') {
+      if (authority.state !== 'OPEN') {
+        throw new FinancialServiceError('ROUND_NOT_OPEN', 'The hourly round is not open.');
+      }
+      if (
+        input.authoritativeTimestamp < authority.starts_at ||
+        input.authoritativeTimestamp >= authority.ends_at_exclusive
+      ) {
+        throw new FinancialServiceError(
+          'OUTSIDE_ROUND_WINDOW',
+          'The authoritative timestamp is outside the hourly round window.',
+        );
+      }
+    } else if (authority.state !== 'SETTLING') {
+      throw new FinancialServiceError(
+        'SETTLEMENT_EXECUTION_FAILED',
+        'Forced liquidation requires the round to be SETTLING.',
+      );
+    }
+    const account = await getAccountStateWithClient(client, input.competitionAccountId, true);
+    if (account.finalSettledBalanceLamports !== null) {
+      throw new FinancialServiceError('ROUND_NOT_OPEN', 'The competition account is finalized.');
+    }
+    const positionRow = firstRow(
+      await client.query<PositionRow>(
+        `select id, competition_account_id, market_id, asset_id, remaining_base_units,
+                cost_basis_lamports, realized_pnl_lamports, status
+         from positions where competition_account_id = $1 and market_id = $2 for update`,
+        [input.competitionAccountId, input.marketId],
+      ),
+      'Position',
+    );
+    const quantityBefore = BigInt(positionRow.remaining_base_units);
+    const costBefore = BigInt(positionRow.cost_basis_lamports);
+    if (positionRow.status !== 'OPEN' || input.requestedTokenQuantity > quantityBefore) {
+      throw new FinancialServiceError(
+        'INSUFFICIENT_TOKEN_BALANCE',
+        'Requested SELL quantity exceeds the open token balance.',
+      );
+    }
+    if (
+      input.executionContext === 'FORCED_HOURLY_SETTLEMENT' &&
+      input.requestedTokenQuantity !== quantityBefore
+    ) {
+      throw new FinancialServiceError(
+        'SETTLEMENT_EXECUTION_FAILED',
+        'Forced liquidation must close the entire position.',
+      );
+    }
+
+    const netProceeds = prepared.execution.actualOutput.amount;
+    const feeLamports = paperSolFeeTotal(prepared.execution);
+    const grossProceeds = netProceeds + feeLamports;
+    const isFullSell = input.requestedTokenQuantity === quantityBefore;
+    const costRemoved = isFullSell
+      ? costBefore
+      : (costBefore * input.requestedTokenQuantity) / quantityBefore;
+    const fillPnl = netProceeds - costRemoved;
+    const remainingQuantity = quantityBefore - input.requestedTokenQuantity;
+    const remainingCost = costBefore - costRemoved;
+    const evidenceId = await persistMarketStateEvidence(client, prepared.evidence);
+
+    await client.query(
+      `insert into orders
+        (id, competition_account_id, market_id, side, requested_base_units,
+         execution_context, status, idempotency_record_id, requested_at)
+       values ($1, $2, $3, 'SELL', $4, $5, 'COMPLETED', $6, $7)`,
+      [
+        orderId,
+        input.competitionAccountId,
+        input.marketId,
+        input.requestedTokenQuantity,
+        input.executionContext,
+        claimed.record.id,
+        input.authoritativeTimestamp,
+      ],
+    );
+    await client.query(
+      `insert into order_market_state_evidence
+        (id, order_id, evidence_id, purpose, position_id)
+       values ($1, $2, $3, 'SELL_EXECUTION', $4)`,
+      [`${orderId}:sell-execution`, orderId, evidenceId, positionRow.id],
+    );
+    await client.query(
+      `update positions
+       set remaining_base_units = $2, cost_basis_lamports = $3,
+           realized_pnl_lamports = realized_pnl_lamports + $4,
+           status = $5, closed_at = $6, updated_at = $7
+       where id = $1`,
+      [
+        positionRow.id,
+        remainingQuantity,
+        remainingCost,
+        fillPnl,
+        remainingQuantity === 0n ? 'CLOSED' : 'OPEN',
+        remainingQuantity === 0n ? input.authoritativeTimestamp : null,
+        input.authoritativeTimestamp,
+      ],
+    );
+    await client.query(
+      `insert into fills
+        (id, order_id, market_id, execution_id, side, base_quantity, quote_lamports,
+         execution_price, fee_lamports, actual_output_lamports, fee_breakdown,
+         protocol_id, adapter_version, market_state_evidence_id,
+         cost_basis_lamports_removed, realized_pnl_lamports, idempotency_record_id, executed_at)
+       values ($1, $2, $3, $4, 'SELL', $5, $6, $7, $8, $9, $10::jsonb,
+               $11, $12, $13, $14, $15, $16, $17)`,
+      [
+        fillId,
+        orderId,
+        input.marketId,
+        executionId,
+        input.requestedTokenQuantity,
+        grossProceeds,
+        executionPrice(netProceeds, input.requestedTokenQuantity),
+        feeLamports,
+        netProceeds,
+        JSON.stringify(normalizedFeeBreakdown(prepared.execution)),
+        prepared.identity.protocolId,
+        prepared.adapterVersion,
+        evidenceId,
+        costRemoved,
+        fillPnl,
+        claimed.record.id,
+        input.authoritativeTimestamp,
+      ],
+    );
+    await client.query(
+      `update competition_accounts
+       set paper_sol_balance_lamports = paper_sol_balance_lamports + $2,
+           realized_pnl_lamports = realized_pnl_lamports + $3
+       where id = $1`,
+      [input.competitionAccountId, netProceeds, fillPnl],
+    );
+    const entries: JournalEntryInput[] = [];
+    if (netProceeds > 0n) {
+      entries.push({ accountCode: 'CASH', direction: 'DEBIT', amountLamports: netProceeds });
+    }
+    if (feeLamports > 0n) {
+      entries.push({
+        accountCode: 'TRADING_FEES',
+        direction: 'DEBIT',
+        amountLamports: feeLamports,
+      });
+    }
+    if (costRemoved > 0n) {
+      entries.push({
+        accountCode: 'POSITION_COST',
+        direction: 'CREDIT',
+        amountLamports: costRemoved,
+      });
+    }
+    const grossPnl = grossProceeds - costRemoved;
+    if (grossPnl > 0n) {
+      entries.push({ accountCode: 'TRADING_PNL', direction: 'CREDIT', amountLamports: grossPnl });
+    } else if (grossPnl < 0n) {
+      entries.push({ accountCode: 'TRADING_PNL', direction: 'DEBIT', amountLamports: -grossPnl });
+    }
+    await insertJournal(client, {
+      id: `journal:${prefix}:${fillId}`,
+      competitionAccountId: input.competitionAccountId,
+      operationType:
+        input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
+          ? 'FORCED_HOURLY_SETTLEMENT_SELL'
+          : 'AUTHORITATIVE_SIMULATED_SELL',
+      sourceEntityType: 'FILL',
+      sourceEntityId: fillId,
+      idempotencyRecordId: claimed.record.id,
+      entries,
+    });
+    await completeIdempotency(
+      client,
+      claimed.record.id,
+      'AUTHORITATIVE_SELL_FILL',
+      fillId,
+      input.competitionAccountId,
+    );
+    return getAuthoritativePaperSellResult(client, fillId);
+  });
+}
+
+/** Server-authoritative normal user SELL. Forced settlement uses the internal context only. */
+export async function executePaperSell(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    readonly competitionAccountId: string;
+    readonly marketId: string;
+    readonly requestedTokenQuantity: bigint;
+    readonly idempotencyKey: string;
+    readonly authoritativeTimestamp: Date;
+  },
+): Promise<AuthoritativePaperSellResult> {
+  return executeAuthoritativePaperSell(database, router, {
+    ...input,
+    executionContext: 'NORMAL_USER',
+  });
+}
+
+export interface SettlementFailure {
+  readonly competitionAccountId: string;
+  readonly marketId: string | null;
+  readonly code: FinancialErrorCode;
+  readonly message: string;
+}
+
+export interface HourlySettlementResult {
+  readonly hourlyRoundId: string;
+  readonly state: 'SETTLING' | 'FINALIZED';
+  readonly forcedSells: readonly AuthoritativePaperSellResult[];
+  readonly hourlyResults: readonly HourlyResultState[];
+  readonly failures: readonly SettlementFailure[];
+}
+
+async function enterHourlySettlement(
+  database: DatabaseService,
+  hourlyRoundId: string,
+  authoritativeTimestamp: Date,
+): Promise<{ readonly state: string; readonly endsAtExclusive: Date }> {
+  return runFinancialTransaction(database, async (client) => {
+    const round = firstRow(
+      await client.query<{ state: string; ends_at_exclusive: Date }>(
+        `select state, ends_at_exclusive from hourly_rounds where id = $1 for update`,
+        [hourlyRoundId],
+      ),
+      'Hourly round',
+    );
+    if (round.state === 'FINALIZED') {
+      return { state: round.state, endsAtExclusive: round.ends_at_exclusive };
+    }
+    if (authoritativeTimestamp < round.ends_at_exclusive) {
+      throw new FinancialServiceError(
+        'OUTSIDE_ROUND_WINDOW',
+        'Hourly settlement cannot begin before the exclusive cutoff.',
+      );
+    }
+    if (round.state === 'OPEN') {
+      await client.query(`update hourly_rounds set state = 'CLOSING' where id = $1`, [
+        hourlyRoundId,
+      ]);
+      round.state = 'CLOSING';
+    }
+    if (round.state === 'CLOSING') {
+      await client.query(`update hourly_rounds set state = 'SETTLING' where id = $1`, [
+        hourlyRoundId,
+      ]);
+      round.state = 'SETTLING';
+    }
+    if (round.state !== 'SETTLING') {
+      throw new FinancialServiceError(
+        'SETTLEMENT_EXECUTION_FAILED',
+        `Round state ${round.state} cannot enter settlement.`,
+      );
+    }
+    return { state: round.state, endsAtExclusive: round.ends_at_exclusive };
+  });
+}
+
+function settlementFailure(
+  error: unknown,
+  competitionAccountId: string,
+  marketId: string | null,
+): SettlementFailure {
+  if (error instanceof FinancialServiceError) {
+    return { competitionAccountId, marketId, code: error.code, message: error.message };
+  }
+  return {
+    competitionAccountId,
+    marketId,
+    code: 'SETTLEMENT_EXECUTION_FAILED',
+    message: 'Forced settlement failed without a safe authoritative result.',
+  };
+}
+
+/**
+ * Retryable round settlement. Each forced position commits independently; account and round
+ * finalization occur only after all positions are closed and reconciled.
+ */
+export async function settleHourlyRound(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    readonly hourlyRoundId: string;
+    readonly authoritativeTimestamp: Date;
+  },
+): Promise<HourlySettlementResult> {
+  if (Number.isNaN(input.authoritativeTimestamp.getTime())) {
+    throw new FinancialServiceError('INVALID_FINANCIAL_INPUT', 'Timestamp is invalid.');
+  }
+  const entered = await enterHourlySettlement(
+    database,
+    input.hourlyRoundId,
+    input.authoritativeTimestamp,
+  );
+  if (entered.state === 'FINALIZED') {
+    const existing = await database.pool.query<HourlyResultRow>(
+      `select id, hourly_round_id, competition_account_id, user_id,
+              final_settled_balance_lamports, starting_paper_sol_lamports,
+              hourly_pnl_lamports, finalized_at
+       from hourly_results where hourly_round_id = $1 order by competition_account_id`,
+      [input.hourlyRoundId],
+    );
+    return {
+      hourlyRoundId: input.hourlyRoundId,
+      state: 'FINALIZED',
+      forcedSells: [],
+      hourlyResults: existing.rows.map(toHourlyResult),
+      failures: [],
+    };
+  }
+
+  const positions = (
+    await database.pool.query<{
+      id: string;
+      competition_account_id: string;
+      market_id: string;
+      remaining_base_units: string;
+      venue: string;
+      mint_address: string;
+    }>(
+      `select p.id, p.competition_account_id, p.market_id, p.remaining_base_units,
+              m.venue, a.mint_address
+       from positions p
+       join competition_accounts ca on ca.id = p.competition_account_id
+       join markets m on m.id = p.market_id
+       join assets a on a.id = p.asset_id
+       where ca.hourly_round_id = $1 and p.status = 'OPEN'
+       order by m.venue, p.market_id, a.mint_address`,
+      [input.hourlyRoundId],
+    )
+  ).rows;
+  const forcedSells: AuthoritativePaperSellResult[] = [];
+  const failures: SettlementFailure[] = [];
+  for (const position of positions) {
+    try {
+      forcedSells.push(
+        await executeAuthoritativePaperSell(database, router, {
+          competitionAccountId: position.competition_account_id,
+          marketId: position.market_id,
+          requestedTokenQuantity: BigInt(position.remaining_base_units),
+          idempotencyKey: `hourly-settlement:${input.hourlyRoundId}:${position.id}`,
+          authoritativeTimestamp: entered.endsAtExclusive,
+          executionContext: 'FORCED_HOURLY_SETTLEMENT',
+        }),
+      );
+    } catch (error) {
+      failures.push(settlementFailure(error, position.competition_account_id, position.market_id));
+    }
+  }
+
+  const accounts = (
+    await database.pool.query<{ id: string }>(
+      `select id from competition_accounts where hourly_round_id = $1 order by id`,
+      [input.hourlyRoundId],
+    )
+  ).rows;
+  const hourlyResults: HourlyResultState[] = [];
+  for (const account of accounts) {
+    const unresolved = firstRow(
+      await database.pool.query<{ count: number }>(
+        `select count(*)::int as count from positions
+         where competition_account_id = $1 and status = 'OPEN'`,
+        [account.id],
+      ),
+      'Open-position aggregate',
+    );
+    if (unresolved.count !== 0) continue;
+    try {
+      const existing = await database.pool.query<HourlyResultRow>(
+        `select id, hourly_round_id, competition_account_id, user_id,
+                final_settled_balance_lamports, starting_paper_sol_lamports,
+                hourly_pnl_lamports, finalized_at
+         from hourly_results where competition_account_id = $1`,
+        [account.id],
+      );
+      let hourlyResult = existing.rows[0] ? toHourlyResult(existing.rows[0]) : undefined;
+      if (!hourlyResult) {
+        const reconciliation = await reconcileAccountLedger(database, account.id);
+        if (!reconciliation.reconciled || reconciliation.materializedCashLamports < 0n) {
+          throw new FinancialServiceError(
+            'FINALIZATION_CONFLICT',
+            'Account ledger does not reconcile for finalization.',
+          );
+        }
+        hourlyResult = await finalizeHourlyResult(database, {
+          resultId: `hourly-result:${account.id}`,
+          accountId: account.id,
+          finalSettledBalanceLamports: reconciliation.materializedCashLamports,
+          finalizedAt: entered.endsAtExclusive,
+          idempotencyKey: `hourly-result:${input.hourlyRoundId}:${account.id}`,
+        });
+      }
+      hourlyResults.push(hourlyResult);
+
+      const daily = firstRow(
+        await database.pool.query<{ id: string }>(
+          `select d.id from daily_competitions d
+           join hourly_rounds r on r.id = $1
+           where r.starts_at >= d.starts_at and r.starts_at < d.ends_at_exclusive`,
+          [input.hourlyRoundId],
+        ),
+        'Daily competition',
+      );
+      await contributeHourlyResultToDailyCompetition(database, {
+        dailyResultId: `daily-result:${daily.id}:${hourlyResult.userId}`,
+        contributionId: `daily-contribution:${hourlyResult.id}`,
+        dailyCompetitionId: daily.id,
+        hourlyResultId: hourlyResult.id,
+        idempotencyKey: `daily-contribution:${hourlyResult.id}`,
+      });
+    } catch (error) {
+      failures.push(settlementFailure(error, account.id, null));
+    }
+  }
+
+  const finalState = await runFinancialTransaction(database, async (client) => {
+    const round = firstRow(
+      await client.query<{ state: string }>(
+        'select state from hourly_rounds where id = $1 for update',
+        [input.hourlyRoundId],
+      ),
+      'Hourly round',
+    );
+    if (round.state === 'FINALIZED') return 'FINALIZED' as const;
+    const readiness = firstRow(
+      await client.query<{ accounts: number; results: number; open_positions: number }>(
+        `select
+           (select count(*)::int from competition_accounts where hourly_round_id = $1) accounts,
+           (select count(*)::int from hourly_results where hourly_round_id = $1) results,
+           (select count(*)::int from positions p join competition_accounts a
+              on a.id = p.competition_account_id
+            where a.hourly_round_id = $1 and p.status = 'OPEN') open_positions`,
+        [input.hourlyRoundId],
+      ),
+      'Settlement readiness',
+    );
+    if (
+      round.state === 'SETTLING' &&
+      readiness.open_positions === 0 &&
+      readiness.results === readiness.accounts &&
+      failures.length === 0
+    ) {
+      await client.query(
+        `update hourly_rounds set state = 'FINALIZED', finalized_at = $2 where id = $1`,
+        [input.hourlyRoundId, input.authoritativeTimestamp],
+      );
+      return 'FINALIZED' as const;
+    }
+    return 'SETTLING' as const;
+  });
+
+  return {
+    hourlyRoundId: input.hourlyRoundId,
+    state: finalState,
+    forcedSells,
+    hourlyResults,
+    failures:
+      finalState === 'SETTLING' && failures.length === 0
+        ? [
+            {
+              competitionAccountId: '',
+              marketId: null,
+              code: 'SETTLEMENT_INCOMPLETE',
+              message: 'The round remains incomplete and retryable.',
+            },
+          ]
+        : failures,
+  };
+}
+
+export interface PersistedFillReplayResult {
+  readonly fillId: string;
+  readonly matched: true;
+  readonly marketStateFingerprint: string;
+  readonly adapterVersion: string;
+}
+
+/** Read-only audit replay. It never mutates financial or evidence records. */
+export async function replayPersistedFill(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  fillId: string,
+): Promise<PersistedFillReplayResult> {
+  const row = firstRow(
+    await database.pool.query<{
+      fill_id: string;
+      order_id: string;
+      execution_id: string;
+      side: 'BUY' | 'SELL';
+      requested_base_units: string | null;
+      requested_quote_lamports: string | null;
+      base_quantity: string;
+      actual_input_lamports: string | null;
+      actual_output_lamports: string | null;
+      fee_lamports: string;
+      executed_at: Date;
+      protocol_id: string;
+      adapter_version: string;
+      market_id: string;
+      mint_address: string;
+      observed_at: Date;
+      chain_slot: string | null;
+      chain_block_id: string | null;
+      normalization_version: string;
+      normalized_state: JsonObject;
+      raw_source: JsonObject | null;
+      state_fingerprint: string;
+    }>(
+      `select f.id fill_id, f.order_id, f.execution_id, f.side,
+              o.requested_base_units, o.requested_quote_lamports,
+              f.base_quantity, f.actual_input_lamports, f.actual_output_lamports,
+              f.fee_lamports, f.executed_at, f.protocol_id, f.adapter_version,
+              f.market_id, a.mint_address, e.observed_at, e.chain_slot,
+              e.chain_block_id, e.normalization_version, e.normalized_state,
+              e.raw_source, e.state_fingerprint
+       from fills f
+       join orders o on o.id = f.order_id
+       join markets m on m.id = f.market_id
+       join assets a on a.id = m.base_asset_id
+       join market_state_evidence e on e.id = f.market_state_evidence_id
+       where f.id = $1`,
+      [fillId],
+    ),
+    'Persisted fill',
+  );
+  if (!row.protocol_id || !row.adapter_version) {
+    throw new FinancialServiceError(
+      'ADAPTER_VERSION_UNAVAILABLE',
+      'The fill does not identify a replayable adapter version.',
+    );
+  }
+  const identity: MarketIdentity = {
+    protocolId: identifier(row.protocol_id, 'ProtocolId'),
+    marketId: identifier(row.market_id, 'MarketId'),
+    tokenMint: identifier(row.mint_address, 'TokenMint'),
+  };
+  const state: MarketState = {
+    identity,
+    observedAt: utcInstant(row.observed_at),
+    chainSlot: row.chain_slot === null ? null : BigInt(row.chain_slot),
+    chainBlockId: row.chain_block_id,
+    adapterVersion: row.adapter_version,
+    normalizationVersion: row.normalization_version,
+    normalizedState: row.normalized_state,
+    ...(row.raw_source === null ? {} : { rawSource: row.raw_source }),
+  };
+  const evidence = createMarketStateEvidence(state);
+  if (evidence.fingerprint !== row.state_fingerprint) {
+    throw new FinancialServiceError(
+      'EVIDENCE_CORRUPTED',
+      'Persisted market-state evidence fingerprint is invalid.',
+    );
+  }
+  let adapter;
+  try {
+    adapter = router.resolveVersion(identity.protocolId, row.adapter_version);
+  } catch (error) {
+    translateExecutionError(error, false);
+  }
+  let replay: SimulatedExecution;
+  try {
+    replay =
+      row.side === 'BUY'
+        ? await adapter!.simulateBuy(
+            {
+              orderId: identifier(row.order_id, 'OrderId'),
+              executionId: identifier(row.execution_id, 'ExecutionId'),
+              identity,
+              requestedPaperSol: paperSolBaseUnits(BigInt(row.requested_quote_lamports!)),
+              executedAt: utcInstant(row.executed_at),
+            },
+            state,
+          )
+        : await adapter!.simulateSell(
+            {
+              orderId: identifier(row.order_id, 'OrderId'),
+              executionId: identifier(row.execution_id, 'ExecutionId'),
+              identity,
+              requestedTokenQuantity: tokenBaseUnits(BigInt(row.requested_base_units!)),
+              executedAt: utcInstant(row.executed_at),
+            },
+            state,
+          );
+  } catch (error) {
+    translateExecutionError(error, false);
+  }
+  const replayFees = paperSolFeeTotal(replay!);
+  const matched =
+    replay!.quote.marketStateFingerprint === row.state_fingerprint &&
+    replayFees === BigInt(row.fee_lamports) &&
+    (row.side === 'BUY'
+      ? replay!.actualInput.asset === 'PAPER_SOL' &&
+        replay!.actualInput.amount === BigInt(row.actual_input_lamports!) &&
+        replay!.actualOutput.asset === 'TOKEN' &&
+        replay!.actualOutput.amount === BigInt(row.base_quantity)
+      : replay!.actualInput.asset === 'TOKEN' &&
+        replay!.actualInput.amount === BigInt(row.base_quantity) &&
+        replay!.actualOutput.asset === 'PAPER_SOL' &&
+        replay!.actualOutput.amount === BigInt(row.actual_output_lamports!));
+  if (!matched) {
+    throw new FinancialServiceError(
+      'INVALID_EXECUTION_RESULT',
+      'Persisted fill does not match deterministic replay output.',
+    );
+  }
+  return {
+    fillId,
+    matched: true,
+    marketStateFingerprint: row.state_fingerprint,
+    adapterVersion: row.adapter_version,
+  };
 }

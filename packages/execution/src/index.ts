@@ -122,7 +122,10 @@ export class ExecutionEngineError extends Error {
       | 'MARKET_MIGRATED'
       | 'RPC_TIMEOUT'
       | 'RPC_ERROR'
-      | 'INVALID_EXECUTION_RESULT',
+      | 'INVALID_EXECUTION_RESULT'
+      | 'PROTOCOL_DISABLED'
+      | 'ADAPTER_VERSION_UNAVAILABLE'
+      | 'EVIDENCE_CORRUPTED',
     message: string,
   ) {
     super(message);
@@ -171,6 +174,7 @@ export function createMarketStateEvidence(state: MarketState): MarketStateEviden
 
 export class ExecutionRouter {
   readonly #adapters = new Map<ProtocolId, ProtocolAdapter>();
+  readonly #enabled = new Map<ProtocolId, boolean>();
 
   constructor(adapters: readonly ProtocolAdapter[] = []) {
     for (const adapter of adapters) this.register(adapter);
@@ -184,6 +188,7 @@ export class ExecutionRouter {
       );
     }
     this.#adapters.set(adapter.protocolId, adapter);
+    this.#enabled.set(adapter.protocolId, true);
   }
 
   resolve(protocolId: ProtocolId): ProtocolAdapter {
@@ -192,6 +197,50 @@ export class ExecutionRouter {
       throw new ExecutionEngineError(
         'UNSUPPORTED_PROTOCOL',
         `No execution adapter is registered for protocol ${protocolId}.`,
+      );
+    }
+    if (this.#enabled.get(protocolId) === false) {
+      throw new ExecutionEngineError(
+        'PROTOCOL_DISABLED',
+        `Protocol ${protocolId} is disabled for new user trading.`,
+      );
+    }
+    return adapter;
+  }
+
+  /** Operational switch for new user exposure. Forced liquidation remains available. */
+  setEnabled(protocolId: ProtocolId, enabled: boolean): void {
+    if (!this.#adapters.has(protocolId)) {
+      throw new ExecutionEngineError(
+        'UNSUPPORTED_PROTOCOL',
+        `No execution adapter is registered for protocol ${protocolId}.`,
+      );
+    }
+    this.#enabled.set(protocolId, enabled);
+  }
+
+  isEnabled(protocolId: ProtocolId): boolean {
+    return this.#enabled.get(protocolId) === true;
+  }
+
+  /** Risk-reducing settlement may use installed code even when new trading is disabled. */
+  resolveForSettlement(protocolId: ProtocolId): ProtocolAdapter {
+    const adapter = this.#adapters.get(protocolId);
+    if (!adapter) {
+      throw new ExecutionEngineError(
+        'UNSUPPORTED_PROTOCOL',
+        `No execution adapter is registered for protocol ${protocolId}.`,
+      );
+    }
+    return adapter;
+  }
+
+  resolveVersion(protocolId: ProtocolId, adapterVersion: string): ProtocolAdapter {
+    const adapter = this.#adapters.get(protocolId);
+    if (!adapter || adapter.adapterVersion !== adapterVersion) {
+      throw new ExecutionEngineError(
+        'ADAPTER_VERSION_UNAVAILABLE',
+        `Adapter ${protocolId}@${adapterVersion} is unavailable.`,
       );
     }
     return adapter;

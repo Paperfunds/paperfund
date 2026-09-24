@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 2 implementation record
-**Product status:** Corrected Phase 2 hourly/daily PostgreSQL foundation complete
+**Document status:** Canonical specification with Phase 3C implementation record
+**Product status:** Authoritative Pump.fun BUY/SELL and hourly forced settlement complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-24
 
@@ -805,3 +805,55 @@ Future Codex prompts should begin with:
 Tasks should remain small and controlled. A preferred early sequence is repository foundation; domain configuration/types; starting account/token slots/20% validator; positions/fake executions/ledger; hourly state machine/settlement; daily score; reward economics/curves; Reward Buffer formula; protocol adapter abstraction; and only then live Solana integration.
 
 Application implementation must not begin until this context document has been reviewed.
+
+## 25. Phase 3C implementation record
+
+Phase 3C completes the paper-trading lifecycle through application-level authoritative SELL and
+retryable hourly forced settlement. It does not add an API endpoint, frontend, ranking, creator-fee
+revenue, rewards, payouts, or real Solana transactions.
+
+### 25.1 Authoritative SELL
+
+`executePaperSell` accepts an exact positive token base-unit quantity, loads explicit authoritative
+market state through the registered production adapter, simulates exact-token SELL, and atomically
+persists evidence, the order/fill, position/cost-basis mutation, net cash, realized P&L, balanced
+journal, and idempotency result. Normal user SELL requires persisted `OPEN` state and the
+authoritative timestamp in `[starts_at, ends_at_exclusive)`.
+
+Partial basis removal uses the approved floor-proportional Phase 1C rule. A final SELL removes all
+remaining basis and closes the canonical position row. Token slots are immutable consumption
+history: closing does not release a slot, and a same-token rebuy reopens the existing position.
+
+### 25.2 Forced settlement and finalization
+
+At or after cutoff, `settleHourlyRound` transactionally advances `OPEN -> CLOSING -> SETTLING`, then
+enumerates positions by protocol ID, market ID, and token mint. Each full-position liquidation uses
+the same authoritative SELL implementation and commits in its own transaction. Deterministic
+per-position idempotency makes concurrent workers and retries safe while allowing completed
+liquidations to remain committed if another market fails.
+
+An unavailable, invalid, or migrated market never receives a fabricated price. Its position remains
+open and the round remains visibly `SETTLING` with a typed retryable failure. Pre-migration Pump.fun
+curves remain the only supported Pump execution venue; `MARKET_MIGRATED` blocks finalization until a
+future migrated-market adapter or approved recovery policy exists.
+
+After all positions for an account are closed, ledger/materialized state must reconcile. The one
+immutable hourly result is calculated from final cash minus snapshotted starting Paper SOL, then
+contributed exactly once to the UTC day containing the round start. Negative, zero, and positive
+results all count. The round reaches `FINALIZED` only after every account result exists; empty and
+no-trade rounds finalize deterministically. Phase 3C does not transition to `PAYING`.
+
+### 25.3 Audit and operations
+
+Orders persist `NORMAL_USER` versus `FORCED_HOURLY_SETTLEMENT`; SELL fills persist exact net Paper SOL
+output separately from gross proceeds and fees. `replayPersistedFill` verifies the evidence
+fingerprint, resolves the recorded adapter version, deterministically re-simulates BUY/SELL, and
+compares exact output without mutation.
+
+The server-side adapter switch blocks new user BUY/SELL when disabled but deliberately permits
+risk-reducing forced settlement while the installed adapter code remains available. No admin UI is
+included. Market-state freshness thresholds remain TBD; timestamps and slots are recorded without
+inventing a product threshold.
+
+Detailed lifecycle, accounting, transaction-boundary, retry, replay, and limitation documentation is
+in `docs/PHASE_3_EXECUTION_ENGINE.md`.
