@@ -23,6 +23,8 @@ import {
   type SimulatedExecution,
 } from '@paperfund/execution';
 
+export * from './pump-fun.js';
+
 export const REFERENCE_PROTOCOL_ID: ProtocolId = identifier('REFERENCE_TEST_ONLY', 'ProtocolId');
 export const REFERENCE_ADAPTER_VERSION = 'reference-constant-price-v1';
 

@@ -38,6 +38,10 @@ export type FinancialErrorCode =
   | 'TOKEN_SLOT_LIMIT_REACHED'
   | 'UNSUPPORTED_PROTOCOL'
   | 'MARKET_STATE_UNAVAILABLE'
+  | 'MARKET_ACCOUNT_NOT_FOUND'
+  | 'MARKET_MIGRATED'
+  | 'RPC_TIMEOUT'
+  | 'RPC_ERROR'
   | 'POSITION_VALUATION_FAILED'
   | 'INVALID_EXECUTION_RESULT'
   | 'TOKEN_LIMIT_EXCEEDED'
@@ -1599,6 +1603,14 @@ function translateExecutionError(error: unknown, valuation: boolean): never {
     }
     if (error.code === 'MARKET_STATE_UNAVAILABLE') {
       throw new FinancialServiceError('MARKET_STATE_UNAVAILABLE', error.message);
+    }
+    if (
+      error.code === 'MARKET_ACCOUNT_NOT_FOUND' ||
+      error.code === 'MARKET_MIGRATED' ||
+      error.code === 'RPC_TIMEOUT' ||
+      error.code === 'RPC_ERROR'
+    ) {
+      throw new FinancialServiceError(error.code, error.message);
     }
     throw new FinancialServiceError('INVALID_EXECUTION_RESULT', error.message);
   }

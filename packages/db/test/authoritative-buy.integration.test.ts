@@ -7,12 +7,24 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { identifier } from '@paperfund/core';
-import { ExecutionRouter, type MarketIdentity } from '@paperfund/execution';
 import {
+  ExecutionEngineError,
+  ExecutionRouter,
+  type MarketIdentity,
+  type MarketState,
+  type MarketStateSource,
+} from '@paperfund/execution';
+import {
+  PumpFunProtocolAdapter,
   REFERENCE_PROTOCOL_ID,
   ReferenceProtocolAdapter,
   type ReferenceMarketFixture,
 } from '@paperfund/protocols';
+
+import {
+  recordedPumpState,
+  type ActivePumpFixtureName,
+} from '../../protocols/test/fixtures/pump-real-chain.js';
 
 import type { DatabaseService } from '../src/database.js';
 import { createDatabase } from '../src/database.js';
@@ -494,5 +506,146 @@ describe('authoritative paper BUY', () => {
         'tampered',
       ]),
     ).rejects.toThrow(/immutable/);
+  });
+});
+
+class IntegrationPumpSource implements MarketStateSource {
+  constructor(
+    readonly state: MarketState,
+    readonly failure?: ExecutionEngineError,
+  ) {}
+
+  async loadMarketState(): Promise<MarketState> {
+    if (this.failure) throw this.failure;
+    return this.state;
+  }
+}
+
+async function pumpDatabaseFixture(name: ActivePumpFixtureName, label: string) {
+  const state = recordedPumpState(name);
+  const prefix = unique(`pump-${label}`);
+  const startsAt = new Date(Date.UTC(2035, 0, 1 + Math.floor(hour / 24), hour++ % 24));
+  const userId = `${prefix}:user`;
+  const roundId = `${prefix}:round`;
+  const accountId = `${prefix}:account`;
+  const assetId = `${prefix}:asset`;
+  const quoteId = `${prefix}:quote`;
+  await createUser(database, { id: userId, walletAddress: `${prefix}:wallet` });
+  await createHourlyRound(database, {
+    id: roundId,
+    startsAt,
+    endsAtExclusive: new Date(startsAt.getTime() + 3_600_000),
+    state: 'OPEN',
+    rulesVersion: 'phase-3b-pump-tests',
+  });
+  await createAsset(database, { id: assetId, mintAddress: state.identity.tokenMint, decimals: 6 });
+  await createAsset(database, {
+    id: quoteId,
+    mintAddress: `${prefix}:paper-sol`,
+    decimals: 9,
+  });
+  await createMarket(database, {
+    id: state.identity.marketId,
+    baseAssetId: assetId,
+    quoteAssetId: quoteId,
+    venue: state.identity.protocolId,
+    providerMarketId: state.identity.marketId,
+  });
+  await initializeCompetitionAccount(database, {
+    accountId,
+    userId,
+    hourlyRoundId: roundId,
+    idempotencyKey: `${prefix}:initialize`,
+  });
+  return { state, prefix, startsAt, accountId, assetId, marketId: state.identity.marketId };
+}
+
+describe('authoritative Pump.fun BUY', () => {
+  it('uses Pump executable equity, persists evidence, rebuys one slot, and replays idempotently', async () => {
+    const target = await pumpDatabaseFixture('developed', 'vertical');
+    await seedPosition(
+      {
+        prefix: target.prefix,
+        accountId: target.accountId,
+        startsAt: target.startsAt,
+      } as Fixture,
+      target.marketId,
+      100_000_000_000_000n,
+      6_000_000_000n,
+      'existing-pump',
+    );
+    const executionRouter = new ExecutionRouter([
+      new PumpFunProtocolAdapter(new IntegrationPumpSource(target.state)),
+    ]);
+    const request = {
+      competitionAccountId: target.accountId,
+      marketId: target.marketId,
+      requestedPaperSolLamports: 2_400_000_000n,
+      idempotencyKey: `${target.prefix}:pump-buy`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 1_000),
+    };
+    const first = await executePaperBuy(database, executionRouter, request);
+    const replay = await executePaperBuy(database, executionRouter, request);
+    expect(replay).toEqual(first);
+    expect(first).toMatchObject({
+      protocolId: 'PUMP_FUN',
+      adapterVersion: 'pump-bonding-curve-v1',
+      requestedPaperSolLamports: 2_400_000_000n,
+    });
+    expect(first.actualPaperSolInputLamports).toBeLessThanOrEqual(2_400_000_000n);
+    expect(first.position.remainingBaseUnits).toBeGreaterThan(100_000_000_000_000n);
+    expect(first.position.costBasisLamports).toBe(
+      6_000_000_000n + first.actualPaperSolInputLamports,
+    );
+    const persisted = await database.pool.query<{
+      slots: string;
+      evidence: string;
+      links: string;
+      source: string;
+    }>(
+      `select
+         (select count(*) from competition_token_slots where competition_account_id=$1)::text slots,
+         (select count(*) from market_state_evidence where protocol_id='PUMP_FUN')::text evidence,
+         (select count(*) from order_market_state_evidence where order_id=$2)::text links,
+         (select raw_source->>'source' from market_state_evidence where id=$3) source`,
+      [target.accountId, first.orderId, first.marketStateEvidenceId],
+    );
+    expect(persisted.rows[0]).toMatchObject({
+      slots: '1',
+      links: '2',
+      source: 'recorded-mainnet-getMultipleAccounts',
+    });
+    expect(Number(persisted.rows[0]!.evidence)).toBeGreaterThanOrEqual(1);
+    expect((await reconcileAccountLedger(database, target.accountId)).reconciled).toBe(true);
+  });
+
+  it('rolls back every financial row when the Pump state source fails', async () => {
+    const target = await pumpDatabaseFixture('normal', 'rpc-failure');
+    const executionRouter = new ExecutionRouter([
+      new PumpFunProtocolAdapter(
+        new IntegrationPumpSource(
+          target.state,
+          new ExecutionEngineError('RPC_TIMEOUT', 'Solana RPC request timed out.'),
+        ),
+      ),
+    ]);
+    await expect(
+      executePaperBuy(database, executionRouter, {
+        competitionAccountId: target.accountId,
+        marketId: target.marketId,
+        requestedPaperSolLamports: 1_000_000_000n,
+        idempotencyKey: `${target.prefix}:failed-buy`,
+        authoritativeTimestamp: new Date(target.startsAt.getTime() + 1_000),
+      }),
+    ).rejects.toMatchObject({ code: 'RPC_TIMEOUT' });
+    const rows = await database.pool.query<{ count: string }>(
+      `select ((select count(*) from orders where competition_account_id=$1) +
+               (select count(*) from competition_token_slots where competition_account_id=$1))::text count`,
+      [target.accountId],
+    );
+    expect(rows.rows[0]?.count).toBe('0');
+    expect(
+      (await getAccountFinancialState(database, target.accountId)).paperSolBalanceLamports,
+    ).toBe(10_000_000_000n);
   });
 });

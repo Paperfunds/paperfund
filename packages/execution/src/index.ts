@@ -42,6 +42,11 @@ export interface MarketStateEvidence extends MarketState {
   readonly fingerprint: string;
 }
 
+/** A controlled, independently testable source of authoritative market state. */
+export interface MarketStateSource {
+  loadMarketState(identity: MarketIdentity): Promise<MarketState>;
+}
+
 export interface BuySimulationRequest {
   readonly orderId: OrderId;
   readonly executionId: ExecutionId;
@@ -78,6 +83,8 @@ export interface ExecutionQuote extends CoreExecutionQuote {
 /** Phase 1's simulated execution contract, refined with the evidence-bound quote. */
 export interface SimulatedExecution extends Omit<CoreSimulatedExecution, 'quote'> {
   readonly quote: ExecutionQuote;
+  /** Deterministic protocol audit data such as fee inputs and post-trade reserves. */
+  readonly executionDetails?: JsonObject;
 }
 
 export interface ExecutablePositionValue {
@@ -110,7 +117,11 @@ export class ExecutionEngineError extends Error {
       | 'UNSUPPORTED_PROTOCOL'
       | 'DUPLICATE_PROTOCOL'
       | 'MARKET_STATE_UNAVAILABLE'
+      | 'MARKET_ACCOUNT_NOT_FOUND'
       | 'INVALID_MARKET_STATE'
+      | 'MARKET_MIGRATED'
+      | 'RPC_TIMEOUT'
+      | 'RPC_ERROR'
       | 'INVALID_EXECUTION_RESULT',
     message: string,
   ) {

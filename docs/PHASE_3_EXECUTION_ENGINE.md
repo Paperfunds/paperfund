@@ -125,3 +125,114 @@ plus operational adapter enable/disable controls. Phase 4 must then select an ap
 venue, implement and independently validate its on-chain state decoding and exact protocol math,
 define freshness/migration behavior, and add recorded chain fixtures. No reference-adapter output may
 be treated as production pricing.
+
+## Phase 3B: Pump.fun bonding-curve production adapter
+
+Phase 3B selects Pump.fun as the first production venue and is intentionally limited to active,
+pre-migration, SOL-paired Pump bonding curves. The adapter version is
+`pump-bonding-curve-v1`; the normalized state version is `pump-bonding-curve-state-v1`. Completed
+curves return `MARKET_MIGRATED`. PumpSwap/Raydium execution, token-quoted Pump V2 curves, real
+transactions, and application-level SELL orchestration remain out of scope.
+
+### Verified protocol sources
+
+The implementation was checked on 2026-09-24 against:
+
+- Pump's official current public IDL and integration documentation at
+  `pump-fun/pump-public-docs` (program ID, discriminators, versioned account fields, PDAs, buy/sell
+  instruction semantics, completion behavior, and Pump Fees accounts);
+- official `@pump-fun/pump-sdk` version `2.0.0`, specifically `bondingCurve.ts`, `fees.ts`, and the
+  version-aware decoders in `sdk.ts`;
+- confirmed mainnet `getMultipleAccounts` snapshots for three active curves and one completed curve,
+  captured at slots `450076965` and `450077014`.
+
+The Pump program is `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`; the Pump Fees program is
+`pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ`. Bonding-curve identities are the PDA derived from
+`["bonding-curve", mint]`. The source rejects an identity whose market address is not that PDA.
+
+### RPC source and snapshot consistency
+
+`PumpFunSolanaMarketStateSource` is separate from deterministic simulation. It uses one
+`getMultipleAccounts` request to read the bonding curve, Pump global config, Pump fee config, and
+token mint under one RPC context slot. Owners, discriminators, mint initialization, PDA identity,
+account lengths, quote asset, fee tiers, and reserve validity are checked before normalization.
+`SOLANA_RPC_URL` is server-only; `SOLANA_RPC_TIMEOUT_MS` defaults to 10 seconds; optional
+`SOLANA_COMMITMENT` defaults to `confirmed`. Errors are reduced to typed codes and provider URLs are
+never stored or logged. The evidence may contain bounded account bytes, but never the RPC URL.
+
+Solana's contextual multi-account read provides a coherent bank snapshot for all required accounts.
+It does not provide a block hash in this response, so evidence records the context slot and leaves the
+block identifier null.
+
+### Normalized state and layout
+
+The replay state records exact decimal strings for virtual token/SOL reserves, real token/SOL
+reserves, curve token supply, mint supply, the fee-evaluation supply, selected protocol and creator
+fee basis points, selected tier threshold, configured creator rate, creator, completion and mode
+flags, token program/decimals, all relevant account addresses, and source account version/length.
+Legacy curve lengths are decoded with the same trailing zero/default semantics documented by the
+official SDK. Financial values are converted to `bigint` before use.
+
+Only SOL-like curve state (zero-key legacy SOL or wrapped-SOL representation) is accepted in this
+adapter version. A non-SOL quote is rejected rather than incorrectly denominated as Paper SOL.
+
+### Curve and fee math
+
+Let `x` be virtual token reserves and `y` virtual SOL reserves. For a BUY whose request is the maximum
+total Paper SOL leaving the account, including fees, the official exact-input helper first derives a
+conservative curve budget:
+
+```text
+curve_budget = floor((maximum_total - 1) * 10_000 / (10_000 + total_fee_bps))
+token_out = min(floor(curve_budget * x / (y + curve_budget)), real_token_reserves)
+curve_input = floor(token_out * y / (x - token_out)) + 1
+protocol_fee = ceil(curve_input * protocol_fee_bps / 10_000)
+creator_fee = ceil(curve_input * creator_fee_bps / 10_000)
+actual_total_input = curve_input + protocol_fee + creator_fee
+```
+
+The creator fee is omitted for legacy curves whose creator remains the zero key. The selected
+creator rate can be replaced by the curve's configured rate only when the global configurable-fee
+gate is enabled. BUY post-state subtracts token output from virtual/real token reserves and adds only
+the curve input (not fees) to virtual/real SOL reserves.
+
+For an exact-token SELL:
+
+```text
+gross_sol = floor(token_in * y / (x + token_in))
+protocol_fee = ceil(gross_sol * protocol_fee_bps / 10_000)
+creator_fee = ceil(gross_sol * creator_fee_bps / 10_000)
+net_sol = gross_sol - protocol_fee - creator_fee
+```
+
+SELL post-state adds tokens to virtual/real token reserves and subtracts gross SOL from virtual/real
+SOL reserves. Output above the physical real SOL reserve, non-positive output, and impossible reserve
+results are rejected. `actualInput`/`actualOutput` retain Paperfund semantics: BUY input is total SOL
+including fees and net token output; SELL input is exact tokens and output is net SOL. Fees are
+reported separately for audit but are never debited twice.
+
+Current Pump Fees selects a dynamic tier from market capitalization, not an old hard-coded flat
+percentage. Market cap is integer `virtual_sol * supply / virtual_token`; non-Mayhem curves use the
+protocol's one-billion-token base-unit supply constant while Mayhem curves use the live mint supply.
+Each protocol/creator fee is ceiling-rounded independently, matching the official SDK.
+
+### Evidence, replay, fixtures, and limitations
+
+Market evidence reuses Phase 3A canonical JSON and SHA-256 fingerprinting. A quote is bound to the
+supplied fingerprint and records deterministic post-trade reserves and derived price-impact audit
+data. Full-exit valuation calls the exact same SELL math, so portfolio equity reflects executable net
+SOL rather than cost basis or a chart mark.
+
+Recorded fixtures in `packages/protocols/test/fixtures` contain stable mint/curve identities,
+normalized replay state, curve account bytes, slots, capture date, and source notes for an early
+curve, a more developed curve, a normal active curve, and a completed curve. Golden BUY/SELL values
+were cross-checked from the official SDK equations rather than generated at test runtime by the
+adapter. Ordinary tests are offline; a read-only live smoke test runs only when `SOLANA_RPC_URL` is
+set and never constructs or submits a transaction.
+
+Known limitations: freshness thresholds remain product-policy TBD; the source records but does not
+invent such a threshold. The live smoke fixture can naturally graduate later and should then be
+replaced with a newly recorded active identity. Token-2022 transfer-fee tokens are not given an
+invented transfer model; Pump's current curve output custody transfer is assumed to match the
+program's supported mint configuration, and future token-extension-specific behavior requires a
+separate verified adapter revision.
