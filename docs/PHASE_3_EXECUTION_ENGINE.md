@@ -417,8 +417,9 @@ receive worse average execution, and full-exit value differs from spot value.
 ### User SELL, portfolio valuation, settlement, and controls
 
 Normal partial/full SELL, pre-BUY portfolio valuation, and hourly forced settlement all resolve the
-position route immediately before state acquisition. The destination market must be registered for
-the same base asset; otherwise execution stops safely. Partial basis removal and final basis cleanup
+position route immediately before state acquisition. The server idempotently registers the verified destination market from the origin market's existing
+base/quote asset identity, then validates that identity before execution; a conflicting registration
+stops safely. Partial basis removal and final basis cleanup
 are unchanged. Settlement can use installed destination code when new trading is administratively
 disabled, preserving the Phase 3C risk-reduction rule. Unavailable routing leaves the position open
 and round `SETTLING`; completed per-position liquidations remain idempotently committed.
