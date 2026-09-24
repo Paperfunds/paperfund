@@ -10,12 +10,20 @@ import { identifier, utcInstant } from '@paperfund/core';
 import {
   ExecutionEngineError,
   ExecutionRouter,
+  type ExecutionRouteResolver,
   type MarketIdentity,
   type MarketState,
   type MarketStateSource,
 } from '@paperfund/execution';
 import {
+  PUMP_AMM_PROGRAM_ID,
+  PUMP_FUN_PROTOCOL_ID,
+  PUMP_SWAP_ADAPTER_VERSION,
+  PUMP_SWAP_NORMALIZATION_VERSION,
+  PUMP_SWAP_PROTOCOL_ID,
   PumpFunProtocolAdapter,
+  PumpSwapProtocolAdapter,
+  canonicalPumpSwapPoolAddress,
   REFERENCE_PROTOCOL_ID,
   ReferenceProtocolAdapter,
   type ReferenceMarketFixture,
@@ -577,5 +585,324 @@ describe('Pump.fun BUY to SELL integration', () => {
     await expect(
       replayPersistedFill(database, executionRouter, sold.fillId),
     ).resolves.toMatchObject({ matched: true });
+  });
+});
+class MutableMigrationRoute implements ExecutionRouteResolver {
+  readonly originProtocolId = PUMP_FUN_PROTOCOL_ID;
+  migrated = false;
+  unavailable = false;
+  constructor(readonly destination: MarketIdentity) {}
+  async resolveExecutionRoute(identity: MarketIdentity) {
+    if (this.unavailable) {
+      throw new ExecutionEngineError(
+        'MIGRATION_DESTINATION_UNAVAILABLE',
+        'Canonical destination is unavailable.',
+      );
+    }
+    return {
+      originIdentity: identity,
+      executionIdentity: this.migrated ? this.destination : identity,
+      migrated: this.migrated,
+    };
+  }
+}
+
+function migratedPoolState(initial: MarketState, poolId: string, observedAt: Date): MarketState {
+  return {
+    identity: {
+      protocolId: PUMP_SWAP_PROTOCOL_ID,
+      marketId: identifier(poolId, 'MarketId'),
+      tokenMint: initial.identity.tokenMint,
+    },
+    observedAt: utcInstant(observedAt),
+    chainSlot: (initial.chainSlot ?? 0n) + 100n,
+    chainBlockId: null,
+    adapterVersion: PUMP_SWAP_ADAPTER_VERSION,
+    normalizationVersion: PUMP_SWAP_NORMALIZATION_VERSION,
+    normalizedState: {
+      model: 'PUMP_SWAP_CANONICAL_POOL',
+      programId: PUMP_AMM_PROGRAM_ID,
+      feeProgramId: 'pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ',
+      poolAddress: poolId,
+      canonicalCreator: '11111111111111111111111111111111',
+      baseMint: initial.identity.tokenMint,
+      quoteMint: 'So11111111111111111111111111111111111111112',
+      baseVault: 'base-vault-recorded',
+      quoteVault: 'quote-vault-recorded',
+      baseTokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+      quoteTokenProgram: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+      tokenDecimals: '6',
+      mintSupply: '1000000000000000',
+      baseReserves: '600000000000000',
+      rawQuoteReserves: '90000000000',
+      virtualQuoteReserves: '0',
+      effectiveQuoteReserves: '90000000000',
+      coinCreator: 'creator-recorded',
+      isMayhemMode: false,
+      isCashbackCoin: false,
+      disableFlags: '0',
+      lpFeeBps: '2',
+      protocolFeeBps: '93',
+      creatorFeeBps: '30',
+      creatorFeeApplies: true,
+      feeTierMarketCapLamportsThreshold: '0',
+      feeConfigAccountLength: '4097',
+      poolAccountLength: '300',
+      stateSlots: { configuration: '450000000', reserves: '450000000' },
+    },
+  };
+}
+
+const migrationFixtureIdentities = [
+  {
+    mint: '7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump',
+    curve: '3MUkKMbuornHohtAtzrToSzqkj1gEEhQqYVz8sZnmQg1',
+  },
+  {
+    mint: '12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump',
+    curve: 'GKQwrFVUdsvRzDbPgmXbHktSf4fJqJc3F6FTLsPkGcJ5',
+  },
+  {
+    mint: '6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump',
+    curve: '5DDomERtuUV8fonYNy72xS9yp5QmZVHFoEXmN66w6htQ',
+  },
+  {
+    mint: '9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump',
+    curve: 'CebN5WGQ4jvEPvsVU4EoHEpgzq1VVZaZhQpRX4bxvCaw',
+  },
+] as const;
+let migrationFixtureIndex = 0;
+
+async function migratedSetup(label: string) {
+  const template = recordedPumpState('developed');
+  const fixtureIdentity = migrationFixtureIdentities[migrationFixtureIndex++]!;
+  const initial: MarketState = {
+    ...template,
+    identity: {
+      protocolId: PUMP_FUN_PROTOCOL_ID,
+      marketId: identifier(fixtureIdentity.curve, 'MarketId'),
+      tokenMint: identifier(fixtureIdentity.mint, 'TokenMint'),
+    },
+    normalizedState: {
+      ...template.normalizedState,
+      bondingCurveAddress: fixtureIdentity.curve,
+      tokenMint: fixtureIdentity.mint,
+    },
+  };
+  const prefix = unique(label);
+  const startsAt = new Date(dayStart.getTime() + hour++ * 3_600_000);
+  const roundId = `${prefix}:round`;
+  const userId = `${prefix}:user`;
+  const accountId = `${prefix}:account`;
+  const assetId = `${prefix}:asset`;
+  const quoteId = `${prefix}:sol`;
+  const poolId = await canonicalPumpSwapPoolAddress(initial.identity.tokenMint);
+  await createUser(database, { id: userId, walletAddress: `${prefix}:wallet` });
+  await createHourlyRound(database, {
+    id: roundId,
+    startsAt,
+    endsAtExclusive: new Date(startsAt.getTime() + 3_600_000),
+    state: 'OPEN',
+    rulesVersion: 'phase-3d-pump-migration',
+  });
+  await createAsset(database, {
+    id: assetId,
+    mintAddress: initial.identity.tokenMint,
+    decimals: 6,
+  });
+  await createAsset(database, { id: quoteId, mintAddress: `${prefix}:sol`, decimals: 9 });
+  await createMarket(database, {
+    id: initial.identity.marketId,
+    baseAssetId: assetId,
+    quoteAssetId: quoteId,
+    venue: PUMP_FUN_PROTOCOL_ID,
+    providerMarketId: initial.identity.marketId,
+  });
+  await createMarket(database, {
+    id: poolId,
+    baseAssetId: assetId,
+    quoteAssetId: quoteId,
+    venue: PUMP_SWAP_PROTOCOL_ID,
+    providerMarketId: poolId,
+  });
+  await initializeCompetitionAccount(database, {
+    accountId,
+    userId,
+    hourlyRoundId: roundId,
+    idempotencyKey: `${prefix}:initialize`,
+  });
+  const pumpSource = new MutablePumpSource(initial);
+  const swapState = migratedPoolState(initial, poolId, new Date(startsAt.getTime() + 2_000));
+  const route = new MutableMigrationRoute(swapState.identity);
+  const executionRouter = new ExecutionRouter([
+    new PumpFunProtocolAdapter(pumpSource),
+    new PumpSwapProtocolAdapter(new MutablePumpSource(swapState)),
+  ]);
+  executionRouter.registerRouteResolver(route);
+  return {
+    prefix,
+    startsAt,
+    roundId,
+    userId,
+    accountId,
+    assetId,
+    quoteId,
+    initial,
+    poolId,
+    route,
+    executionRouter,
+  };
+}
+
+describe('Pump.fun migration continuity', () => {
+  it('partially and fully sells a Pump-origin position through PumpSwap with distinct fill venues', async () => {
+    const target = await migratedSetup('pump-migrated-user-sell');
+    const bought = await executePaperBuy(database, target.executionRouter, {
+      competitionAccountId: target.accountId,
+      marketId: target.initial.identity.marketId,
+      requestedPaperSolLamports: 1_000_000_000n,
+      idempotencyKey: `${target.prefix}:buy`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 1_000),
+    });
+    target.route.migrated = true;
+    const half = bought.actualTokenOutputBaseUnits / 2n;
+    const partial = await executePaperSell(database, target.executionRouter, {
+      competitionAccountId: target.accountId,
+      marketId: target.initial.identity.marketId,
+      requestedTokenQuantity: half,
+      idempotencyKey: `${target.prefix}:partial`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 2_000),
+    });
+    expect(partial).toMatchObject({
+      marketId: target.poolId,
+      protocolId: PUMP_SWAP_PROTOCOL_ID,
+      adapterVersion: PUMP_SWAP_ADAPTER_VERSION,
+    });
+    expect(partial.position).toMatchObject({
+      marketId: target.initial.identity.marketId,
+      remainingBaseUnits: bought.actualTokenOutputBaseUnits - half,
+      status: 'OPEN',
+    });
+    const full = await executePaperSell(database, target.executionRouter, {
+      competitionAccountId: target.accountId,
+      marketId: target.initial.identity.marketId,
+      requestedTokenQuantity: bought.actualTokenOutputBaseUnits - half,
+      idempotencyKey: `${target.prefix}:full`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 3_000),
+    });
+    expect(full.position).toMatchObject({
+      remainingBaseUnits: 0n,
+      costBasisLamports: 0n,
+      status: 'CLOSED',
+    });
+    const history = await database.pool.query<{
+      side: string;
+      protocol_id: string;
+      market_id: string;
+    }>(
+      `select f.side, f.protocol_id, f.market_id from fills f join orders o on o.id=f.order_id
+       where o.competition_account_id=$1 order by f.executed_at`,
+      [target.accountId],
+    );
+    expect(history.rows).toEqual([
+      {
+        side: 'BUY',
+        protocol_id: PUMP_FUN_PROTOCOL_ID,
+        market_id: target.initial.identity.marketId,
+      },
+      { side: 'SELL', protocol_id: PUMP_SWAP_PROTOCOL_ID, market_id: target.poolId },
+      { side: 'SELL', protocol_id: PUMP_SWAP_PROTOCOL_ID, market_id: target.poolId },
+    ]);
+    expect((await reconcileAccountLedger(database, target.accountId)).reconciled).toBe(true);
+    await expect(
+      replayPersistedFill(database, target.executionRouter, full.fillId),
+    ).resolves.toMatchObject({ matched: true });
+  });
+
+  it('values a migrated holding for a later unrelated BUY', async () => {
+    const target = await migratedSetup('pump-migrated-valuation');
+    await executePaperBuy(database, target.executionRouter, {
+      competitionAccountId: target.accountId,
+      marketId: target.initial.identity.marketId,
+      requestedPaperSolLamports: 1_000_000_000n,
+      idempotencyKey: `${target.prefix}:buy`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 1_000),
+    });
+    target.route.migrated = true;
+    const other = await addReferenceMarket(target.prefix, 'other');
+    const reference = marketFixture(
+      { identity: other.identity, startsAt: target.startsAt },
+      10_000_000n,
+      0n,
+    );
+    const combined = new ExecutionRouter([
+      target.executionRouter.resolveForSettlement(PUMP_FUN_PROTOCOL_ID),
+      target.executionRouter.resolveForSettlement(PUMP_SWAP_PROTOCOL_ID),
+      new ReferenceProtocolAdapter([reference]),
+    ]);
+    combined.registerRouteResolver(target.route);
+    await expect(
+      executePaperBuy(database, combined, {
+        competitionAccountId: target.accountId,
+        marketId: other.marketId,
+        requestedPaperSolLamports: 100_000_000n,
+        idempotencyKey: `${target.prefix}:unrelated-buy`,
+        authoritativeTimestamp: new Date(target.startsAt.getTime() + 3_000),
+      }),
+    ).resolves.toMatchObject({ marketId: other.marketId });
+    const evidence = await database.pool.query<{ protocol_id: string; market_id: string }>(
+      `select e.protocol_id, e.market_id from order_market_state_evidence oe
+       join orders o on o.id=oe.order_id join market_state_evidence e on e.id=oe.evidence_id
+       where o.competition_account_id=$1 and oe.purpose='POSITION_EXIT_VALUATION'`,
+      [target.accountId],
+    );
+    expect(evidence.rows).toContainEqual({
+      protocol_id: PUMP_SWAP_PROTOCOL_ID,
+      market_id: target.poolId,
+    });
+  });
+
+  it('force-settles a mid-hour migration, finalizes, and safely remains incomplete when routing is unavailable', async () => {
+    const target = await migratedSetup('pump-migrated-settlement');
+    const bought = await executePaperBuy(database, target.executionRouter, {
+      competitionAccountId: target.accountId,
+      marketId: target.initial.identity.marketId,
+      requestedPaperSolLamports: 1_000_000_000n,
+      idempotencyKey: `${target.prefix}:buy`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 1_000),
+    });
+    target.route.migrated = true;
+    const settled = await settleHourlyRound(database, target.executionRouter, {
+      hourlyRoundId: target.roundId,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 3_600_000),
+    });
+    expect(settled).toMatchObject({ state: 'FINALIZED', failures: [] });
+    expect(settled.forcedSells[0]).toMatchObject({
+      marketId: target.poolId,
+      protocolId: PUMP_SWAP_PROTOCOL_ID,
+      requestedTokenQuantity: bought.actualTokenOutputBaseUnits,
+      executionContext: 'FORCED_HOURLY_SETTLEMENT',
+    });
+    expect((await reconcileAccountLedger(database, target.accountId)).reconciled).toBe(true);
+
+    const blocked = await migratedSetup('pump-migration-unavailable');
+    await executePaperBuy(database, blocked.executionRouter, {
+      competitionAccountId: blocked.accountId,
+      marketId: blocked.initial.identity.marketId,
+      requestedPaperSolLamports: 1_000_000_000n,
+      idempotencyKey: `${blocked.prefix}:buy`,
+      authoritativeTimestamp: new Date(blocked.startsAt.getTime() + 1_000),
+    });
+    blocked.route.migrated = true;
+    blocked.route.unavailable = true;
+    const incomplete = await settleHourlyRound(database, blocked.executionRouter, {
+      hourlyRoundId: blocked.roundId,
+      authoritativeTimestamp: new Date(blocked.startsAt.getTime() + 3_600_000),
+    });
+    expect(incomplete.state).toBe('SETTLING');
+    expect(incomplete.failures[0]?.code).toBe('MIGRATION_DESTINATION_UNAVAILABLE');
+    expect(
+      (await getAccountFinancialState(database, blocked.accountId)).finalSettledBalanceLamports,
+    ).toBeNull();
   });
 });

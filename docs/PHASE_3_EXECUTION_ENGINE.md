@@ -333,3 +333,103 @@ Fingerprint mismatch returns `EVIDENCE_CORRUPTED`; unavailable historical code r
 
 Freshness thresholds remain explicitly TBD. Evidence continues to preserve observation timestamps
 and chain slots without choosing an unapproved production threshold.
+
+## Phase 3D: migrated Pump.fun market execution
+
+### Verified migration destination and scope
+
+Current SOL-paired Pump.fun bonding curves graduate to a canonical PumpSwap pool. The destination
+program is `pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA`. The canonical pool has index `0`; its
+creator seed is the Pump program PDA `['pool-authority', base_mint]`; and its address is the PumpSwap
+PDA `['pool', u16_le(0), creator, base_mint, wrapped_SOL_mint]`. Phase 3D intentionally supports only
+this SOL-paired path because it is the universe already admitted by the production bonding-curve
+adapter. USDC/custom-pair curves and historical pre-PumpSwap Raydium migrations remain explicit
+unsupported routes.
+
+This behavior was verified on 2026-09-24 from Pump's official `pump-public-docs` PumpSwap README and
+IDL, the official `@pump-fun/pump-swap-sdk` version `1.20.0` source, Pump's current fee documentation,
+and read-only mainnet account captures. The current PumpSwap adapter is
+`pump-swap-canonical-v1`; normalized replay state is `pump-swap-state-v1`.
+
+### Migration resolution and position continuity
+
+`PumpMigrationResolver` reads the original program-owned bonding-curve PDA. An active curve retains
+its `PUMP_FUN` route. A completed curve deterministically resolves to the mint's canonical
+`PUMP_SWAP` pool; no client destination is accepted and there is no fallback. Missing destinations,
+unsupported quote paths, and invalid route/token identities are typed failures.
+
+The persisted position keeps its original economic identity (hourly account + asset + Pump curve),
+quantity, cost basis, and realized P&L. Migration does not create a second position or accounting
+entry. At valuation or exit time, `ExecutionRouter.resolvePositionRoute` selects the current venue.
+Orders, fills, and evidence for an exit use the destination pool/protocol while the evidence link
+points back to the original position. Historical BUY records therefore remain `PUMP_FUN`; migrated
+SELL records are `PUMP_SWAP`. No database migration was necessary.
+
+### State decoding and validation
+
+`PumpSwapSolanaMarketStateSource` reuses the server-only Solana JSON-RPC client. It validates the
+PumpSwap pool/global owners and discriminators, Pump Fees owner/layout, canonical pool PDA/index and
+creator linkage, expected base mint and wrapped-SOL quote, initialized base mint, supported SPL Token
+or Token-2022 base program, legacy SPL wrapped-SOL program, vault mint/authority identities, positive
+physical reserves, effective quote reserves, fee tier ordering, and fee bounds. Missing appended pool
+fields use the official zero/false legacy defaults.
+
+The first contextual read loads pool, global config, fee config, and mint. After the pool identifies
+its vaults, a second contextual read loads both vaults together. Evidence records both context slots
+and uses the reserve read's slot. Replay state includes raw/effective/virtual quote reserves, base
+reserves, vaults/mints/programs, selected fee tier and rates, pool flags and lengths, observation time,
+adapter version, and the existing SHA-256 fingerprint.
+
+### Constant-product math, fees, and rounding
+
+All authoritative values use `bigint`. Pricing uses `effective_quote = raw_quote_vault +
+virtual_quote_reserves`; the base side uses the raw base vault. For an exact-base BUY:
+
+```text
+internal_quote = ceil(effective_quote * base_out / (base_reserve - base_out))
+fee_component = ceil(internal_quote * component_bps / 10_000)
+total_quote = internal_quote + LP fee + protocol fee + creator fee
+```
+
+For Paperfund's maximum-total-input BUY, the official exact-quote helper first removes aggregate fee
+basis points, corrects independent ceiling-fee excess, subtracts one unit before constant-product
+output division, and then recomputes the exact quote required for that integer token output. Thus
+Paperfund debits the exact amount a real exact-output PumpSwap instruction requires, never more than
+the requested budget.
+
+For an exact-token SELL:
+
+```text
+gross_quote = floor(effective_quote * base_in / (base_reserve + base_in))
+fee_component = ceil(gross_quote * component_bps / 10_000)
+net_quote = gross_quote - LP fee - protocol fee - creator fee
+```
+
+LP fees remain in the quote vault; protocol and applicable creator fees leave it. Creator fees apply
+only when `coin_creator` is nonzero. Canonical SOL pools select their on-chain dynamic tier by
+`floor(effective_quote * supply / base_reserve)`; Mayhem uses the protocol fixed supply. A permitted
+nonzero per-pool creator rate replaces only the tier creator rate. No bonding-curve fee is reused and
+fees are never charged twice.
+
+Full-position valuation calls the same exact-base SELL path. Larger buys and sells demonstrably
+receive worse average execution, and full-exit value differs from spot value.
+
+### User SELL, portfolio valuation, settlement, and controls
+
+Normal partial/full SELL, pre-BUY portfolio valuation, and hourly forced settlement all resolve the
+position route immediately before state acquisition. The destination market must be registered for
+the same base asset; otherwise execution stops safely. Partial basis removal and final basis cleanup
+are unchanged. Settlement can use installed destination code when new trading is administratively
+disabled, preserving the Phase 3C risk-reduction rule. Unavailable routing leaves the position open
+and round `SETTLING`; completed per-position liquidations remain idempotently committed.
+
+Recorded offline fixtures cover a normal, deep, and shallow canonical pool plus each linked completed
+Pump curve, including public addresses, reserves, virtual quote state, slot, capture time, fee rates,
+and curve bytes. Golden values are independent constants calculated from the official SDK equations.
+An optional read-only live smoke runs when `SOLANA_RPC_URL` is configured; ordinary tests remain
+offline and never sign or submit transactions.
+
+Known limitations: only SOL-paired canonical PumpSwap pools are supported. Historical Raydium routes,
+USDC/custom quote pairs, and token extensions that impose transfer-side economics beyond the current
+program quote helpers require separately verified adapter revisions. Market-state freshness policy
+remains product-policy TBD; Phase 3D records observation context without inventing a threshold.

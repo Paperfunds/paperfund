@@ -111,6 +111,18 @@ export interface ProtocolAdapter {
   ): Promise<ExecutablePositionValue>;
 }
 
+export interface ExecutionRoute {
+  readonly originIdentity: MarketIdentity;
+  readonly executionIdentity: MarketIdentity;
+  readonly migrated: boolean;
+}
+
+/** Resolves an economic position's current authoritative execution venue. */
+export interface ExecutionRouteResolver {
+  readonly originProtocolId: ProtocolId;
+  resolveExecutionRoute(identity: MarketIdentity): Promise<ExecutionRoute>;
+}
+
 export class ExecutionEngineError extends Error {
   constructor(
     readonly code:
@@ -120,6 +132,9 @@ export class ExecutionEngineError extends Error {
       | 'MARKET_ACCOUNT_NOT_FOUND'
       | 'INVALID_MARKET_STATE'
       | 'MARKET_MIGRATED'
+      | 'MIGRATION_DESTINATION_UNAVAILABLE'
+      | 'UNSUPPORTED_MIGRATED_PROTOCOL'
+      | 'POSITION_EXECUTION_ROUTE_UNAVAILABLE'
       | 'RPC_TIMEOUT'
       | 'RPC_ERROR'
       | 'INVALID_EXECUTION_RESULT'
@@ -175,6 +190,7 @@ export function createMarketStateEvidence(state: MarketState): MarketStateEviden
 export class ExecutionRouter {
   readonly #adapters = new Map<ProtocolId, ProtocolAdapter>();
   readonly #enabled = new Map<ProtocolId, boolean>();
+  readonly #routeResolvers = new Map<ProtocolId, ExecutionRouteResolver>();
 
   constructor(adapters: readonly ProtocolAdapter[] = []) {
     for (const adapter of adapters) this.register(adapter);
@@ -189,6 +205,51 @@ export class ExecutionRouter {
     }
     this.#adapters.set(adapter.protocolId, adapter);
     this.#enabled.set(adapter.protocolId, true);
+  }
+
+  registerRouteResolver(resolver: ExecutionRouteResolver): void {
+    if (this.#routeResolvers.has(resolver.originProtocolId)) {
+      throw new ExecutionEngineError(
+        'DUPLICATE_PROTOCOL',
+        `Protocol ${resolver.originProtocolId} already has an execution-route resolver.`,
+      );
+    }
+    this.#routeResolvers.set(resolver.originProtocolId, resolver);
+  }
+
+  /** Resolve the current venue without changing the position's economic identity. */
+  async resolvePositionRoute(
+    identity: MarketIdentity,
+    forSettlement = false,
+  ): Promise<{ readonly route: ExecutionRoute; readonly adapter: ProtocolAdapter }> {
+    const resolver = this.#routeResolvers.get(identity.protocolId);
+    let route: ExecutionRoute;
+    try {
+      route = resolver
+        ? await resolver.resolveExecutionRoute(identity)
+        : { originIdentity: identity, executionIdentity: identity, migrated: false };
+    } catch (error) {
+      if (error instanceof ExecutionEngineError) throw error;
+      throw new ExecutionEngineError(
+        'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+        'The current execution venue for this position could not be resolved.',
+      );
+    }
+    if (
+      route.originIdentity.protocolId !== identity.protocolId ||
+      route.originIdentity.marketId !== identity.marketId ||
+      route.originIdentity.tokenMint !== identity.tokenMint ||
+      route.executionIdentity.tokenMint !== identity.tokenMint
+    ) {
+      throw new ExecutionEngineError(
+        'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+        'The resolved execution route does not preserve the position token identity.',
+      );
+    }
+    const adapter = forSettlement
+      ? this.resolveForSettlement(route.executionIdentity.protocolId)
+      : this.resolve(route.executionIdentity.protocolId);
+    return { route, adapter };
   }
 
   resolve(protocolId: ProtocolId): ProtocolAdapter {
@@ -269,12 +330,12 @@ export async function valuePortfolioPositions(
   const valued: PortfolioExecutableValuation['positions'][number][] = [];
   let total = 0n;
   for (const position of positions) {
-    const adapter = router.resolve(position.identity.protocolId);
-    const state = await adapter.loadMarketState(position.identity);
+    const { route, adapter } = await router.resolvePositionRoute(position.identity);
+    const state = await adapter.loadMarketState(route.executionIdentity);
     const evidence = createMarketStateEvidence(state);
     if (
-      evidence.identity.protocolId !== position.identity.protocolId ||
-      evidence.identity.marketId !== position.identity.marketId ||
+      evidence.identity.protocolId !== route.executionIdentity.protocolId ||
+      evidence.identity.marketId !== route.executionIdentity.marketId ||
       evidence.identity.tokenMint !== position.identity.tokenMint ||
       evidence.adapterVersion !== adapter.adapterVersion
     ) {
@@ -283,7 +344,10 @@ export async function valuePortfolioPositions(
         'Loaded market state does not match the requested position identity or adapter.',
       );
     }
-    const value = await adapter.valuePositionForExit(position, state);
+    const value = await adapter.valuePositionForExit(
+      { identity: route.executionIdentity, tokenQuantity: position.tokenQuantity },
+      state,
+    );
     if (
       value.marketStateFingerprint !== evidence.fingerprint ||
       value.adapterVersion !== adapter.adapterVersion ||

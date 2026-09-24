@@ -43,6 +43,9 @@ export type FinancialErrorCode =
   | 'MARKET_STATE_UNAVAILABLE'
   | 'MARKET_ACCOUNT_NOT_FOUND'
   | 'MARKET_MIGRATED'
+  | 'MIGRATION_DESTINATION_UNAVAILABLE'
+  | 'UNSUPPORTED_MIGRATED_PROTOCOL'
+  | 'POSITION_EXECUTION_ROUTE_UNAVAILABLE'
   | 'RPC_TIMEOUT'
   | 'RPC_ERROR'
   | 'POSITION_VALUATION_FAILED'
@@ -1622,6 +1625,9 @@ function translateExecutionError(error: unknown, valuation: boolean): never {
     if (
       error.code === 'MARKET_ACCOUNT_NOT_FOUND' ||
       error.code === 'MARKET_MIGRATED' ||
+      error.code === 'MIGRATION_DESTINATION_UNAVAILABLE' ||
+      error.code === 'UNSUPPORTED_MIGRATED_PROTOCOL' ||
+      error.code === 'POSITION_EXECUTION_ROUTE_UNAVAILABLE' ||
       error.code === 'RPC_TIMEOUT' ||
       error.code === 'RPC_ERROR'
     ) {
@@ -1749,12 +1755,32 @@ export async function executePaperBuy(
         tokenMint: identifier(position.mint_address, 'TokenMint'),
       };
       try {
-        const adapter = router.resolve(identity.protocolId);
-        const state = await adapter.loadMarketState(identity);
+        const { route, adapter } = await router.resolvePositionRoute(identity);
+        if (route.migrated) {
+          const routedMarket = (
+            await client.query<AuthoritativeMarketRow>(
+              `select m.id, m.venue, m.base_asset_id, a.mint_address
+               from markets m join assets a on a.id = m.base_asset_id where m.id = $1`,
+              [route.executionIdentity.marketId],
+            )
+          ).rows[0];
+          if (
+            !routedMarket ||
+            routedMarket.venue !== route.executionIdentity.protocolId ||
+            routedMarket.base_asset_id !== position.asset_id ||
+            routedMarket.mint_address !== position.mint_address
+          ) {
+            throw new ExecutionEngineError(
+              'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+              'The migrated valuation market is not registered for this position asset.',
+            );
+          }
+        }
+        const state = await adapter.loadMarketState(route.executionIdentity);
         const evidence = createMarketStateEvidence(state);
         if (
-          evidence.identity.protocolId !== identity.protocolId ||
-          evidence.identity.marketId !== identity.marketId ||
+          evidence.identity.protocolId !== route.executionIdentity.protocolId ||
+          evidence.identity.marketId !== route.executionIdentity.marketId ||
           evidence.identity.tokenMint !== identity.tokenMint ||
           evidence.adapterVersion !== adapter.adapterVersion
         ) {
@@ -1764,12 +1790,15 @@ export async function executePaperBuy(
           );
         }
         const valuation = await adapter.valuePositionForExit(
-          { identity, tokenQuantity: tokenBaseUnits(BigInt(position.remaining_base_units)) },
+          {
+            identity: route.executionIdentity,
+            tokenQuantity: tokenBaseUnits(BigInt(position.remaining_base_units)),
+          },
           state,
         );
         if (
-          valuation.identity.marketId !== identity.marketId ||
-          valuation.identity.protocolId !== identity.protocolId ||
+          valuation.identity.marketId !== route.executionIdentity.marketId ||
+          valuation.identity.protocolId !== route.executionIdentity.protocolId ||
           valuation.identity.tokenMint !== identity.tokenMint ||
           valuation.marketStateFingerprint !== evidence.fingerprint ||
           valuation.adapterVersion !== adapter.adapterVersion ||
@@ -2071,8 +2100,10 @@ async function getAuthoritativePaperSellResult(
        from fills f
        join orders o on o.id = f.order_id
        join competition_accounts a on a.id = o.competition_account_id
-       join positions p on p.competition_account_id = o.competition_account_id
-                       and p.market_id = f.market_id
+       join order_market_state_evidence oe on oe.order_id = o.id
+                       and oe.evidence_id = f.market_state_evidence_id
+                       and oe.purpose = 'SELL_EXECUTION'
+       join positions p on p.id = oe.position_id
        join market_state_evidence e on e.id = f.market_state_evidence_id
        where f.id = $1`,
       [fillId],
@@ -2180,17 +2211,35 @@ async function prepareAuthoritativeSell(
     tokenMint: identifier(market.mint_address, 'TokenMint'),
   };
   try {
-    const adapter =
-      input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
-        ? router.resolveForSettlement(identity.protocolId)
-        : router.resolve(identity.protocolId);
-    const state = await adapter.loadMarketState(identity);
+    const { route, adapter } = await router.resolvePositionRoute(
+      identity,
+      input.executionContext === 'FORCED_HOURLY_SETTLEMENT',
+    );
+    const executionMarket = (
+      await database.pool.query<AuthoritativeMarketRow>(
+        `select m.id, m.venue, m.base_asset_id, a.mint_address
+         from markets m join assets a on a.id = m.base_asset_id where m.id = $1`,
+        [route.executionIdentity.marketId],
+      )
+    ).rows[0];
+    if (
+      !executionMarket ||
+      executionMarket.venue !== route.executionIdentity.protocolId ||
+      executionMarket.base_asset_id !== market.base_asset_id ||
+      executionMarket.mint_address !== market.mint_address
+    ) {
+      throw new ExecutionEngineError(
+        'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+        'The resolved execution market is not registered for this position asset.',
+      );
+    }
+    const state = await adapter.loadMarketState(route.executionIdentity);
     const evidence = createMarketStateEvidence(state);
     const execution = await adapter.simulateSell(
       {
         orderId: identifier(ids.orderId, 'OrderId'),
         executionId: identifier(ids.executionId, 'ExecutionId'),
-        identity,
+        identity: route.executionIdentity,
         requestedTokenQuantity: tokenBaseUnits(input.requestedTokenQuantity),
         executedAt: utcInstant(input.authoritativeTimestamp),
       },
@@ -2200,12 +2249,18 @@ async function prepareAuthoritativeSell(
       execution,
       orderId: ids.orderId,
       executionId: ids.executionId,
-      identity,
+      identity: route.executionIdentity,
       requestedTokenQuantity: input.requestedTokenQuantity,
       evidence,
       adapterVersion: adapter.adapterVersion,
     });
-    return { identity, state, evidence, execution, adapterVersion: adapter.adapterVersion };
+    return {
+      identity: route.executionIdentity,
+      state,
+      evidence,
+      execution,
+      adapterVersion: adapter.adapterVersion,
+    };
   } catch (error) {
     translateExecutionError(error, false);
   }
@@ -2365,7 +2420,7 @@ async function executeAuthoritativePaperSell(
       [
         orderId,
         input.competitionAccountId,
-        input.marketId,
+        prepared.identity.marketId,
         input.requestedTokenQuantity,
         input.executionContext,
         claimed.record.id,
@@ -2405,7 +2460,7 @@ async function executeAuthoritativePaperSell(
       [
         fillId,
         orderId,
-        input.marketId,
+        prepared.identity.marketId,
         executionId,
         input.requestedTokenQuantity,
         grossProceeds,

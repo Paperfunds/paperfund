@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 3C implementation record
-**Product status:** Authoritative Pump.fun BUY/SELL and hourly forced settlement complete
+**Document status:** Canonical specification with Phase 3D implementation record
+**Product status:** Authoritative Pump.fun bonding-curve and migrated PumpSwap execution complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-24
 
@@ -857,3 +857,28 @@ inventing a product threshold.
 
 Detailed lifecycle, accounting, transaction-boundary, retry, replay, and limitation documentation is
 in `docs/PHASE_3_EXECUTION_ENGINE.md`.
+## 26. Phase 3D implementation record
+
+Phase 3D preserves a Pump-origin position across migration and executes it through the current
+canonical PumpSwap destination. `PUMP_FUN` and `PUMP_SWAP` remain separate production protocols.
+The server reads the original curve, derives the canonical index-0 PumpSwap pool from verified PDAs,
+and routes active curves to the bonding adapter or completed SOL-paired curves to
+`pump-swap-canonical-v1`. Client-supplied destinations and hidden fallback are forbidden.
+
+Economic position identity remains the original hourly-account/asset/Pump-market row. Migration does
+not alter quantity, cost basis, realized P&L, or historical entry fills. Current venue identity is an
+execution-time concern: a migrated exit order/fill/evidence records PumpSwap while its immutable
+evidence link identifies the original position. This minimum evolution required no schema migration.
+
+The PumpSwap state source validates canonical linkage, account owners/discriminators, mint/vault/token
+program identities, initialized accounts, physical/effective reserves, flags, and dynamic fee state.
+Simulation uses exact constant-product integer math, effective quote reserves, independently
+ceiling-rounded LP/protocol/creator fees, and the official exact-input BUY correction. Exact-token
+SELL and full-exit valuation share one path.
+
+Portfolio valuation, voluntary SELL, and forced hourly settlement resolve the route before loading
+state. Missing or unsupported destinations leave state unchanged with a typed retryable failure.
+Forced settlement may use installed adapter code when new trading is disabled. Recorded mainnet
+fixtures and offline golden tests cover normal, shallow, and deep pools and linked completed curves.
+Detailed mechanics, sources, rounding, evidence, tests, and limitations are in
+`docs/PHASE_3_EXECUTION_ENGINE.md`.
