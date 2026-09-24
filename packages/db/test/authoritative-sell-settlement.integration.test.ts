@@ -718,13 +718,7 @@ async function migratedSetup(label: string) {
     venue: PUMP_FUN_PROTOCOL_ID,
     providerMarketId: initial.identity.marketId,
   });
-  await createMarket(database, {
-    id: poolId,
-    baseAssetId: assetId,
-    quoteAssetId: quoteId,
-    venue: PUMP_SWAP_PROTOCOL_ID,
-    providerMarketId: poolId,
-  });
+
   await initializeCompetitionAccount(database, {
     accountId,
     userId,
@@ -778,6 +772,9 @@ describe('Pump.fun migration continuity', () => {
       protocolId: PUMP_SWAP_PROTOCOL_ID,
       adapterVersion: PUMP_SWAP_ADAPTER_VERSION,
     });
+    await expect(
+      database.pool.query('select id from markets where id=$1', [target.poolId]),
+    ).resolves.toMatchObject({ rowCount: 1 });
     expect(partial.position).toMatchObject({
       marketId: target.initial.identity.marketId,
       remainingBaseUnits: bought.actualTokenOutputBaseUnits - half,

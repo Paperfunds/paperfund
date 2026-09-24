@@ -1757,6 +1757,19 @@ export async function executePaperBuy(
       try {
         const { route, adapter } = await router.resolvePositionRoute(identity);
         if (route.migrated) {
+          await client.query(
+            `insert into markets
+              (id, base_asset_id, quote_asset_id, venue, provider_market_id, metadata)
+             select $1, base_asset_id, quote_asset_id, $2, $1,
+                    jsonb_build_object('migrationResolvedFromMarketId', id)
+             from markets where id = $3
+             on conflict do nothing`,
+            [
+              route.executionIdentity.marketId,
+              route.executionIdentity.protocolId,
+              identity.marketId,
+            ],
+          );
           const routedMarket = (
             await client.query<AuthoritativeMarketRow>(
               `select m.id, m.venue, m.base_asset_id, a.mint_address
@@ -2215,6 +2228,17 @@ async function prepareAuthoritativeSell(
       identity,
       input.executionContext === 'FORCED_HOURLY_SETTLEMENT',
     );
+    if (route.migrated) {
+      await database.pool.query(
+        `insert into markets
+          (id, base_asset_id, quote_asset_id, venue, provider_market_id, metadata)
+         select $1, base_asset_id, quote_asset_id, $2, $1,
+                jsonb_build_object('migrationResolvedFromMarketId', id)
+         from markets where id = $3
+         on conflict do nothing`,
+        [route.executionIdentity.marketId, route.executionIdentity.protocolId, identity.marketId],
+      );
+    }
     const executionMarket = (
       await database.pool.query<AuthoritativeMarketRow>(
         `select m.id, m.venue, m.base_asset_id, a.mint_address
