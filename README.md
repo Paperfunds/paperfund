@@ -9,11 +9,12 @@ The current development baseline includes:
 - the corrected Phase 2 authoritative hourly PostgreSQL ledger;
 - the Phase 3 Pump.fun/PumpSwap authoritative execution and forced-settlement engine;
 - the Phase 4A wallet-authenticated competition API and automatic hourly lifecycle worker;
+- the Phase 4B React web trading application;
 - validated local PostgreSQL and Redis development infrastructure.
 
 See [Phase 2 ledger and schema](./docs/PHASE_2_LEDGER_AND_SCHEMA.md),
 [Phase 3 execution engine](./docs/PHASE_3_EXECUTION_ENGINE.md), and
-[V1 API](./docs/API.md) for implementation details.
+[V1 API](./docs/API.md), and [web application](./docs/WEB_APP.md) for implementation details.
 
 ## Prerequisites
 
@@ -31,14 +32,14 @@ npm run db:migrate
 npm run dev
 ```
 
-The API defaults to `http://127.0.0.1:3000`. The root `npm run dev` starts both the API and lifecycle worker. Use `GET /health` for process health and `GET /ready` for PostgreSQL and Redis readiness.
+Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:3000`; the root `npm run dev` starts the API, lifecycle worker, and Vite web app together. Use `GET /health` for process health and `GET /ready` for PostgreSQL and Redis readiness.
 
 ## Important commands
 
 | Command                | Purpose                                          |
 | ---------------------- | ------------------------------------------------ |
-| `npm run dev`          | Run the API and lifecycle worker in watch mode   |
-| `npm run build`        | Compile all current workspaces                   |
+| `npm run dev`          | Run API, worker, and web app in watch mode       |
+| `npm run build`        | Compile workspaces and build the production web  |
 | `npm run typecheck`    | Type-check the monorepo                          |
 | `npm run lint`         | Run ESLint                                       |
 | `npm run format`       | Apply Prettier formatting                        |

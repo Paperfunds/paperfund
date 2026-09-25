@@ -8,7 +8,11 @@ function spawnWorkspace(workspace) {
   return spawn(executable, ['run', 'dev', '--workspace', workspace], { stdio: 'inherit' });
 }
 
-const children = [spawnWorkspace('@paperfund/api'), spawnWorkspace('@paperfund/worker')];
+const children = [
+  spawnWorkspace('@paperfund/api'),
+  spawnWorkspace('@paperfund/worker'),
+  spawnWorkspace('@paperfund/web'),
+];
 let stopping = false;
 
 function stop(signal = 'SIGTERM') {

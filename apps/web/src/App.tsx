@@ -1,0 +1,1167 @@
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+
+import { ApiError, api, errorMessage, type BuyResult, type SellResult } from './api.js';
+import {
+  formatSol,
+  formatUnits,
+  lamportsToSolInput,
+  percentageQuantity,
+  pnlClass,
+  shorten,
+  solTextToLamports,
+  venueName,
+} from './format.js';
+import type {
+  Account,
+  HourlyResult,
+  LeaderboardEntry,
+  MarketSupport,
+  Position,
+  Round,
+  Trade,
+  User,
+} from './types.js';
+import { encodeBase58, getInjectedWallet } from './wallet.js';
+
+type Notice = { tone: 'success' | 'error' | 'info'; title: string; body: ReactNode };
+
+function requestKey(): string {
+  return globalThis.crypto.randomUUID();
+}
+
+function useAuth() {
+  const client = useQueryClient();
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const session = useQuery({
+    queryKey: ['session'],
+    queryFn: async () => {
+      try {
+        return (await api.me()).user;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return null;
+        throw error;
+      }
+    },
+    retry: false,
+  });
+  const connect = useMutation({
+    mutationFn: async () => {
+      const wallet = getInjectedWallet();
+      if (!wallet)
+        throw new Error(
+          'No compatible Solana wallet was found. Install or enable a browser wallet first.',
+        );
+      return (await wallet.connect()).publicKey.toString();
+    },
+    onSuccess: (address) => {
+      setWalletAddress(address);
+      setWalletError(null);
+    },
+    onError: (error) => setWalletError(errorMessage(error)),
+  });
+  const signIn = useMutation({
+    mutationFn: async () => {
+      const wallet = getInjectedWallet();
+      if (!wallet || !walletAddress) throw new Error('Connect your wallet before signing in.');
+      const challenge = await api.challenge(walletAddress);
+      const signed = await wallet.signMessage(new TextEncoder().encode(challenge.message), 'utf8');
+      return (
+        await api.verify({ ...challenge, walletAddress, signature: encodeBase58(signed.signature) })
+      ).user;
+    },
+    onSuccess: (user) => {
+      client.setQueryData(['session'], user);
+      setWalletError(null);
+    },
+    onError: (error) => setWalletError(errorMessage(error)),
+  });
+  const logout = useMutation({
+    mutationFn: api.logout,
+    onSettled: async () => {
+      client.setQueryData(['session'], null);
+      await client.invalidateQueries();
+    },
+  });
+  useEffect(() => {
+    const expire = () => client.setQueryData(['session'], null);
+    window.addEventListener('paperfund:unauthenticated', expire);
+    return () => window.removeEventListener('paperfund:unauthenticated', expire);
+  }, [client]);
+  return {
+    user: session.data ?? null,
+    session,
+    walletAddress,
+    walletError,
+    connect,
+    signIn,
+    logout,
+  };
+}
+
+function useRound() {
+  return useQuery({ queryKey: ['round'], queryFn: api.currentRound, refetchInterval: 4_000 });
+}
+
+function useAccount(user: User | null) {
+  return useQuery({
+    queryKey: ['account', user?.id],
+    enabled: Boolean(user),
+    queryFn: async () => {
+      try {
+        return await api.account();
+      } catch (error) {
+        if (error instanceof ApiError && error.code === 'ROUND_ACCOUNT_NOT_FOUND') return null;
+        throw error;
+      }
+    },
+    refetchInterval: 4_000,
+    retry: false,
+  });
+}
+
+export function App() {
+  const auth = useAuth();
+  const round = useRound();
+  const account = useAccount(auth.user);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const offset = round.data
+    ? Date.parse(round.data.serverTime) - (round.dataUpdatedAt || Date.now())
+    : 0;
+  const serverNow = now + offset;
+  const currentRound = round.data?.round ?? null;
+  const tradingOpen =
+    currentRound?.state === 'OPEN' && serverNow < Date.parse(currentRound.endsAtExclusive);
+  const countdown = currentRound
+    ? countdownText(Date.parse(currentRound.endsAtExclusive) - serverNow)
+    : '--:--';
+
+  useEffect(() => {
+    const previous = account.data?.roundId;
+    if (previous && currentRound?.id && previous !== currentRound.id) void account.refetch();
+  }, [currentRound?.id, account.data?.roundId]);
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <NavLink className="wordmark" to="/trade" aria-label="Paperfund home">
+          <span className="wordmark-mark">P</span>
+          <span>Paperfund</span>
+        </NavLink>
+        <nav aria-label="Primary navigation">
+          <NavItem to="/trade" icon="↗">
+            Trade
+          </NavItem>
+          <NavItem to="/hourly" icon="◷">
+            Hourly
+          </NavItem>
+          <NavItem to="/daily" icon="◇">
+            Daily
+          </NavItem>
+          <NavItem to="/history" icon="≡">
+            History
+          </NavItem>
+        </nav>
+        <div className="sidebar-foot">
+          <span className="status-dot" /> Paper trading only
+        </div>
+      </aside>
+      <main>
+        <header className="topbar">
+          <div className="mobile-brand">Paperfund</div>
+          <div className="round-chip">
+            <span>ROUND</span>
+            <strong>{currentRound ? roundLabel(currentRound) : 'Unavailable'}</strong>
+          </div>
+          <div className="timer" aria-label={`${countdown} remaining`}>
+            <span>{tradingOpen ? 'CLOSES IN' : 'STATUS'}</span>
+            <strong>{tradingOpen ? countdown : (currentRound?.state ?? 'OFFLINE')}</strong>
+          </div>
+          <div className="top-balance">
+            <span>PAPER SOL</span>
+            <strong>
+              {account.isLoading
+                ? '—'
+                : account.data
+                  ? formatSol(account.data.paperSolLamports, 3)
+                  : 'Not entered'}
+            </strong>
+          </div>
+          <WalletControl auth={auth} />
+        </header>
+        <div className="mobile-nav">
+          <NavItem to="/trade">Trade</NavItem>
+          <NavItem to="/hourly">Hourly</NavItem>
+          <NavItem to="/daily">Daily</NavItem>
+          <NavItem to="/history">History</NavItem>
+        </div>
+        <Routes>
+          <Route
+            path="/trade"
+            element={
+              <TradePage
+                user={auth.user}
+                round={currentRound}
+                account={account.data ?? null}
+                accountLoading={account.isLoading}
+                tradingOpen={tradingOpen}
+              />
+            }
+          />
+          <Route path="/hourly" element={<HourlyPage />} />
+          <Route path="/daily" element={<DailyPage user={auth.user} />} />
+          <Route path="/history" element={<HistoryPage user={auth.user} />} />
+          <Route path="*" element={<Navigate to="/trade" replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function NavItem({ to, icon, children }: { to: string; icon?: string; children: ReactNode }) {
+  return (
+    <NavLink to={to} className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}>
+      {icon && <span>{icon}</span>}
+      {children}
+    </NavLink>
+  );
+}
+
+function WalletControl({ auth }: { auth: ReturnType<typeof useAuth> }) {
+  if (!auth.walletAddress && !auth.user)
+    return (
+      <button
+        className="wallet-button"
+        onClick={() => auth.connect.mutate()}
+        disabled={auth.connect.isPending}
+      >
+        Connect Wallet
+      </button>
+    );
+  if (!auth.user)
+    return (
+      <div className="wallet-area">
+        <span className="wallet-address">{shorten(auth.walletAddress!)}</span>
+        <button
+          className="button primary compact"
+          onClick={() => auth.signIn.mutate()}
+          disabled={auth.signIn.isPending}
+        >
+          {auth.signIn.isPending ? 'Signing…' : 'Sign In'}
+        </button>
+        {auth.walletError && <span className="floating-error">{auth.walletError}</span>}
+      </div>
+    );
+  return (
+    <div className="wallet-area">
+      <span className="wallet-address authenticated">
+        <span className="status-dot" />
+        {shorten(auth.user.walletAddress)}
+      </span>
+      <button
+        className="icon-button"
+        aria-label="Sign out"
+        title="Sign out"
+        onClick={() => auth.logout.mutate()}
+      >
+        ↪
+      </button>
+    </div>
+  );
+}
+
+function TradePage({
+  user,
+  round,
+  account,
+  accountLoading,
+  tradingOpen,
+}: {
+  user: User | null;
+  round: Round | null;
+  account: Account | null;
+  accountLoading: boolean;
+  tradingOpen: boolean;
+}) {
+  const client = useQueryClient();
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const enter = useMutation({
+    mutationFn: api.enterRound,
+    onSuccess: async () => {
+      setNotice({
+        tone: 'success',
+        title: 'Round entered',
+        body: 'Your fresh 10 Paper SOL account is ready.',
+      });
+      await client.invalidateQueries({ queryKey: ['account'] });
+    },
+    onError: (error) =>
+      setNotice({ tone: 'error', title: 'Could not enter', body: errorMessage(error) }),
+  });
+  const previousResult = useQuery({
+    queryKey: ['latest-result', user?.id],
+    enabled: Boolean(user),
+    queryFn: async () => (await api.results()).items[0] ?? null,
+  });
+
+  if (!user)
+    return (
+      <PageFrame>
+        <WelcomePanel />
+      </PageFrame>
+    );
+  if (accountLoading)
+    return (
+      <PageFrame>
+        <SkeletonPanel />
+      </PageFrame>
+    );
+  if (!round)
+    return (
+      <PageFrame>
+        <EmptyState
+          title="Round unavailable"
+          body="The lifecycle worker has not published a current round yet. Paperfund will recover automatically."
+        />
+      </PageFrame>
+    );
+  if (account && account.roundId !== round.id)
+    return (
+      <PageFrame>
+        <NoticeCard
+          notice={{
+            tone: 'info',
+            title: 'New round available',
+            body: 'Your previous account is never carried forward. Enter the new round to receive a fresh 10 Paper SOL.',
+          }}
+        />
+        {previousResult.data && <RoundComplete result={previousResult.data} />}
+        <EnterRound round={round} pending={enter.isPending} onEnter={() => enter.mutate()} />
+      </PageFrame>
+    );
+  if (!account)
+    return (
+      <PageFrame>
+        {previousResult.data && <RoundComplete result={previousResult.data} />}
+        <EnterRound round={round} pending={enter.isPending} onEnter={() => enter.mutate()} />
+        {notice && <NoticeCard notice={notice} />}
+      </PageFrame>
+    );
+
+  return (
+    <PageFrame>
+      {notice && <NoticeCard notice={notice} />}
+      <AccountStrip account={account} round={round} />
+      <div className="trade-layout">
+        <section className="panel order-panel">
+          <PanelHead
+            eyebrow="EXECUTION"
+            title="Paper trade"
+            badge={tradingOpen ? 'MARKET OPEN' : 'CLOSED'}
+          />
+          <OrderTicket account={account} tradingOpen={tradingOpen} onNotice={setNotice} />
+        </section>
+        <section className="panel positions-panel">
+          <PanelHead eyebrow="PORTFOLIO" title="Open positions" count={account.positions.length} />
+          <Positions account={account} tradingOpen={tradingOpen} onNotice={setNotice} />
+        </section>
+      </div>
+      <TradeHistory user={user} />
+    </PageFrame>
+  );
+}
+
+function WelcomePanel() {
+  return (
+    <section className="welcome">
+      <div className="eyebrow">HOURLY SOLANA COMPETITION</div>
+      <h1>
+        Trade the market.
+        <br />
+        <em>Risk nothing real.</em>
+      </h1>
+      <p>
+        Connect a Solana wallet, sign one authentication message, and compete with 10 Paper SOL
+        every UTC hour.
+      </p>
+      <div className="rule-grid">
+        <Rule number="01" title="10 Paper SOL" body="A fresh simulated balance every round." />
+        <Rule
+          number="02"
+          title="Real execution math"
+          body="Price impact and protocol fees included."
+        />
+        <Rule number="03" title="Hourly reset" body="Every position closes automatically." />
+      </div>
+      <span className="simulation-label">
+        No deposits · No transaction signing · No real trades
+      </span>
+    </section>
+  );
+}
+
+function EnterRound({
+  round,
+  pending,
+  onEnter,
+}: {
+  round: Round;
+  pending: boolean;
+  onEnter(): void;
+}) {
+  return (
+    <section className="enter-card">
+      <div>
+        <div className="eyebrow">ROUND {roundLabel(round)}</div>
+        <h1>Your next run starts here.</h1>
+        <p>Enter with a clean slate. Prior balances and positions never carry over.</p>
+        <ul>
+          <li>Start with 10 Paper SOL</li>
+          <li>Trade up to 5 unique tokens</li>
+          <li>Each new buy is capped at 20% of equity</li>
+          <li>Positions close automatically at the hourly end</li>
+        </ul>
+      </div>
+      <button
+        className="button primary enter-button"
+        onClick={onEnter}
+        disabled={pending || round.state !== 'OPEN'}
+      >
+        {pending ? 'Entering…' : 'Enter Round'}
+        <span>→</span>
+      </button>
+    </section>
+  );
+}
+
+function AccountStrip({ account, round }: { account: Account; round: Round }) {
+  return (
+    <section className="account-strip">
+      <Metric label="Available Paper SOL" value={formatSol(account.paperSolLamports, 3)} accent />
+      <Metric label="Starting balance" value={formatSol(account.startingPaperSolLamports, 2)} />
+      <Metric
+        label="Realized P&L"
+        value={signedSol(account.realizedPnlLamports)}
+        className={pnlClass(account.realizedPnlLamports)}
+      />
+      <Metric
+        label="Token slots"
+        value={`${account.slotsUsed} / ${account.slotLimit}`}
+        note={`${account.slotLimit - account.slotsUsed} remaining`}
+      />
+      <Metric label="Round state" value={round.state} />
+    </section>
+  );
+}
+
+function OrderTicket({
+  account,
+  tradingOpen,
+  onNotice,
+}: {
+  account: Account;
+  tradingOpen: boolean;
+  onNotice(notice: Notice): void;
+}) {
+  const client = useQueryClient();
+  const [mint, setMint] = useState('');
+  const [checkedMint, setCheckedMint] = useState('');
+  const [amount, setAmount] = useState('');
+  const market = useQuery({
+    queryKey: ['market', checkedMint],
+    enabled: checkedMint.length > 0,
+    queryFn: () => api.market(checkedMint),
+    retry: false,
+  });
+  const buy = useMutation({
+    mutationFn: () => api.buy(checkedMint, amount, requestKey()),
+    onSuccess: async (result) => {
+      onNotice({ tone: 'success', title: 'BUY FILLED', body: <FillSummary result={result} /> });
+      setAmount('');
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['account'] }),
+        client.invalidateQueries({ queryKey: ['trades'] }),
+      ]);
+    },
+    onError: (error) =>
+      onNotice({ tone: 'error', title: 'Buy rejected', body: errorMessage(error) }),
+  });
+  const exactAmount = solTextToLamports(amount);
+  const canBuy =
+    tradingOpen &&
+    market.data?.supported &&
+    exactAmount !== null &&
+    exactAmount > 0n &&
+    !buy.isPending;
+  const safeMax = (BigInt(account.paperSolLamports) * 2n) / 10n;
+  function inspect(event: FormEvent) {
+    event.preventDefault();
+    setCheckedMint(mint.trim());
+  }
+  return (
+    <div className="ticket">
+      <form onSubmit={inspect}>
+        <label htmlFor="mint">Token mint</label>
+        <div className="input-row">
+          <input
+            id="mint"
+            value={mint}
+            onChange={(event) => {
+              setMint(event.target.value);
+              if (event.target.value.trim() !== checkedMint) setCheckedMint('');
+            }}
+            placeholder="Paste Solana mint address"
+            autoComplete="off"
+          />
+          <button className="button secondary" disabled={!mint.trim() || market.isFetching}>
+            Inspect
+          </button>
+        </div>
+      </form>
+      {market.isFetching && <div className="market-status">Loading authoritative market…</div>}
+      {market.error && <div className="market-status error">{errorMessage(market.error)}</div>}
+      {market.data && <MarketCard market={market.data} />}
+      <div className="divider" />
+      <label htmlFor="buy-amount">Paper SOL amount</label>
+      <div className="amount-input">
+        <input
+          id="buy-amount"
+          inputMode="decimal"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+          placeholder="0.00"
+        />
+        <span>SOL</span>
+      </div>
+      <div className="quick-row">
+        <button onClick={() => setAmount(lamportsToSolInput(safeMax / 4n))}>25%</button>
+        <button onClick={() => setAmount(lamportsToSolInput(safeMax / 2n))}>50%</button>
+        <button
+          onClick={() => setAmount(lamportsToSolInput(safeMax))}
+          title="Safe maximum based on current cash; the server validates authoritative portfolio equity."
+        >
+          MAX
+        </button>
+      </div>
+      <div className="ticket-review">
+        <span>Token</span>
+        <strong>{checkedMint ? shorten(checkedMint, 7) : '—'}</strong>
+        <span>Venue</span>
+        <strong>{venueName(market.data?.executionProtocol)}</strong>
+        <span>Requested</span>
+        <strong>{exactAmount && exactAmount > 0n ? formatSol(exactAmount) : '—'}</strong>
+      </div>
+      <button className="button buy-button" onClick={() => buy.mutate()} disabled={!canBuy}>
+        {buy.isPending ? 'Submitting…' : tradingOpen ? 'Buy with Paper SOL' : 'Round closed'}
+      </button>
+      <p className="fine-print">
+        MAX is a conservative cash-based shortcut. The backend recalculates the exact 20% equity cap
+        against live authoritative markets before every fill.
+      </p>
+    </div>
+  );
+}
+
+function MarketCard({ market }: { market: MarketSupport }) {
+  return (
+    <div className={`market-card ${market.supported ? 'supported' : 'unsupported'}`}>
+      <div>
+        <span className="status-dot" />
+        <strong>{market.supported ? 'Supported market' : 'Unsupported market'}</strong>
+        <small>
+          {market.supported
+            ? market.status === 'MIGRATED_POOL'
+              ? 'PumpSwap migrated'
+              : 'Pump.fun bonding curve'
+            : market.reason}
+        </small>
+      </div>
+      {market.supported && (
+        <div className="market-meta">
+          <span>{venueName(market.executionProtocol)}</span>
+          <span>{market.tokenDecimals} decimals</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Positions({
+  account,
+  tradingOpen,
+  onNotice,
+}: {
+  account: Account;
+  tradingOpen: boolean;
+  onNotice(notice: Notice): void;
+}) {
+  if (!account.positions.length)
+    return (
+      <EmptyState
+        title="No active positions"
+        body="Inspect a supported mint and place a paper buy to open your first position."
+        compact
+      />
+    );
+  return (
+    <div className="position-list">
+      {account.positions.map((position) => (
+        <PositionRow
+          key={position.id}
+          position={position}
+          tradingOpen={tradingOpen}
+          onNotice={onNotice}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PositionRow({
+  position,
+  tradingOpen,
+  onNotice,
+}: {
+  position: Position;
+  tradingOpen: boolean;
+  onNotice(notice: Notice): void;
+}) {
+  const client = useQueryClient();
+  const [quantity, setQuantity] = useState('');
+  const sell = useMutation({
+    mutationFn: (requested: string) => api.sell(position.mint, requested, requestKey()),
+    onSuccess: async (result) => {
+      onNotice({
+        tone: 'success',
+        title: 'SELL FILLED',
+        body: <SellSummary result={result} decimals={position.tokenDecimals} />,
+      });
+      setQuantity('');
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['account'] }),
+        client.invalidateQueries({ queryKey: ['trades'] }),
+      ]);
+    },
+    onError: (error) =>
+      onNotice({ tone: 'error', title: 'Sell rejected', body: errorMessage(error) }),
+  });
+  const valid =
+    /^[1-9]\d*$/.test(quantity) && BigInt(quantity) <= BigInt(position.tokenQuantityBaseUnits);
+  return (
+    <article className="position">
+      <div className="position-top">
+        <div className="token-avatar">{position.mint.slice(0, 2).toUpperCase()}</div>
+        <div>
+          <strong>{shorten(position.mint, 7)}</strong>
+          <small>{venueName(position.originProtocol)} origin</small>
+        </div>
+        <div className="position-quantity">
+          <span>QUANTITY</span>
+          <strong>{formatUnits(position.tokenQuantityBaseUnits, position.tokenDecimals, 6)}</strong>
+        </div>
+      </div>
+      <div className="position-stats">
+        <div>
+          <span>Cost basis</span>
+          <strong>{formatSol(position.costBasisPaperSolLamports)}</strong>
+        </div>
+        <div>
+          <span>Executable value</span>
+          <strong>
+            {position.valuation.status === 'AVAILABLE'
+              ? formatSol(position.valuation.executablePaperSolLamports)
+              : 'Valuation unavailable'}
+          </strong>
+        </div>
+      </div>
+      <label className="sr-only" htmlFor={`sell-${position.id}`}>
+        Token base units to sell
+      </label>
+      <input
+        id={`sell-${position.id}`}
+        className="sell-input"
+        inputMode="numeric"
+        placeholder="Exact token base units"
+        value={quantity}
+        onChange={(event) => setQuantity(event.target.value)}
+      />
+      <div className="sell-actions">
+        <div className="quick-row">
+          {([25, 50, 75] as const).map((percent) => (
+            <button
+              key={percent}
+              onClick={() =>
+                setQuantity(percentageQuantity(position.tokenQuantityBaseUnits, percent))
+              }
+            >
+              {percent}%
+            </button>
+          ))}
+        </div>
+        <button
+          className="button secondary"
+          disabled={!tradingOpen || !valid || sell.isPending}
+          onClick={() => sell.mutate(quantity)}
+        >
+          Sell
+        </button>
+        <button
+          className="button danger"
+          disabled={!tradingOpen || sell.isPending}
+          onClick={() => sell.mutate('ALL')}
+        >
+          Sell All
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function TradeHistory({ user }: { user: User }) {
+  const trades = useInfiniteQuery({
+    queryKey: ['trades', user.id],
+    queryFn: ({ pageParam }) => api.trades(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    refetchInterval: 15_000,
+  });
+  const items = trades.data?.pages.flatMap((page) => page.items) ?? [];
+  return (
+    <section className="panel activity-panel">
+      <PanelHead eyebrow="LEDGER" title="Trade activity" count={items.length} />
+      {trades.isLoading ? (
+        <SkeletonRows />
+      ) : items.length ? (
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th>Mint</th>
+                <th>Venue</th>
+                <th>Input</th>
+                <th>Output</th>
+                <th>Fee</th>
+                <th>Realized P&L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((trade) => (
+                <TradeRow key={trade.id} trade={trade} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState
+          title="No trades yet"
+          body="Completed buys, sells, and hourly auto-closes will appear here."
+          compact
+        />
+      )}
+      {trades.hasNextPage && (
+        <button
+          className="button secondary load-more"
+          onClick={() => trades.fetchNextPage()}
+          disabled={trades.isFetchingNextPage}
+        >
+          Load more
+        </button>
+      )}
+    </section>
+  );
+}
+
+function TradeRow({ trade }: { trade: Trade }) {
+  const forced = trade.execution_context === 'FORCED_HOURLY_SETTLEMENT';
+  return (
+    <tr>
+      <td>{utcTime(trade.executed_at)}</td>
+      <td>
+        <span className={`trade-side ${trade.side.toLowerCase()}`}>
+          {forced ? 'AUTO CLOSE' : trade.side}
+        </span>
+      </td>
+      <td className="mono">{shorten(trade.mint_address)}</td>
+      <td>{venueName(trade.protocol_id)}</td>
+      <td>
+        {trade.side === 'BUY'
+          ? formatSol(trade.actual_input_lamports ?? trade.quote_lamports)
+          : `${trade.base_quantity} base units`}
+      </td>
+      <td>
+        {trade.side === 'SELL'
+          ? formatSol(trade.actual_output_lamports ?? trade.quote_lamports)
+          : `${trade.base_quantity} base units`}
+      </td>
+      <td>{formatSol(trade.fee_lamports)}</td>
+      <td className={pnlClass(trade.realized_pnl_lamports)}>
+        {trade.side === 'SELL' ? signedSol(trade.realized_pnl_lamports) : '—'}
+      </td>
+    </tr>
+  );
+}
+
+function HourlyPage() {
+  const board = useQuery({
+    queryKey: ['hourly'],
+    queryFn: api.hourly,
+    refetchInterval: 8_000,
+    retry: false,
+  });
+  return (
+    <PageFrame>
+      <PageTitle
+        eyebrow="FINALIZED RESULTS"
+        title="Hourly leaderboard"
+        subtitle="Final ranks use settled Paper SOL after every position has been closed through the execution engine."
+      />
+      {board.isLoading ? (
+        <SkeletonPanel />
+      ) : board.error ? (
+        <EmptyState
+          title="Round in progress"
+          body="The latest hourly leaderboard is not finalized yet. Rankings appear only after forced settlement completes."
+        />
+      ) : board.data ? (
+        <Leaderboard entries={board.data.entries} kind="hourly" />
+      ) : (
+        <EmptyState
+          title="No finalized rounds yet"
+          body="The first leaderboard will appear after a round completes and settles."
+        />
+      )}
+    </PageFrame>
+  );
+}
+
+function DailyPage({ user }: { user: User | null }) {
+  const board = useQuery({ queryKey: ['daily'], queryFn: api.daily, refetchInterval: 8_000 });
+  return (
+    <PageFrame>
+      <PageTitle
+        eyebrow="UTC CHAMPIONSHIP"
+        title="Daily leaderboard"
+        subtitle="Every finalized hourly gain and loss contributes to the current UTC day's cumulative score."
+      />
+      {board.isLoading ? (
+        <SkeletonPanel />
+      ) : board.data?.entries.length ? (
+        <Leaderboard entries={board.data.entries} kind="daily" user={user} />
+      ) : (
+        <EmptyState
+          title="No Daily Championship results yet"
+          body="Complete an hourly round to post a score for the current UTC day."
+        />
+      )}
+    </PageFrame>
+  );
+}
+
+function Leaderboard({
+  entries,
+  kind,
+  user,
+}: {
+  entries: LeaderboardEntry[];
+  kind: 'hourly' | 'daily';
+  user?: User | null;
+}) {
+  return (
+    <section className="panel leaderboard">
+      <div className="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Trader</th>
+              {kind === 'hourly' ? (
+                <>
+                  <th>Final Paper SOL</th>
+                  <th>Hourly P&L</th>
+                </>
+              ) : (
+                <>
+                  <th>Cumulative P&L</th>
+                  <th>Rounds</th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry) => (
+              <tr key={entry.user_id} className={entry.user_id === user?.id ? 'user-row' : ''}>
+                <td>
+                  <span className={`rank rank-${entry.rank}`}>{entry.rank}</span>
+                  {entry.tied && <small className="tie">T{entry.tieGroupSize}</small>}
+                </td>
+                <td className="mono">
+                  {shorten(entry.wallet_address, 7)}
+                  {entry.user_id === user?.id && <span className="you">YOU</span>}
+                </td>
+                {kind === 'hourly' ? (
+                  <>
+                    <td>{formatSol(entry.final_settled_balance_lamports!)}</td>
+                    <td className={pnlClass(entry.score)}>{signedSol(entry.score)}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className={pnlClass(entry.score)}>{signedSol(entry.score)}</td>
+                    <td>{entry.completed_hourly_round_count}</td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="table-note">
+        Ties are shown exactly as returned by the backend. Paperfund does not invent a tie-break.
+      </p>
+    </section>
+  );
+}
+
+function HistoryPage({ user }: { user: User | null }) {
+  const results = useInfiniteQuery({
+    queryKey: ['results', user?.id],
+    enabled: Boolean(user),
+    queryFn: ({ pageParam }) => api.results(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+  });
+  const items = results.data?.pages.flatMap((page) => page.items) ?? [];
+  return (
+    <PageFrame>
+      <PageTitle
+        eyebrow="YOUR RECORD"
+        title="Round history"
+        subtitle="Final results remain attached to their original UTC hour. New rounds always begin from 10 Paper SOL."
+      />
+      {!user ? (
+        <EmptyState
+          title="Sign in to view history"
+          body="Connect your wallet and sign in to load finalized personal results."
+        />
+      ) : results.isLoading ? (
+        <SkeletonPanel />
+      ) : items.length ? (
+        <section className="history-grid">
+          {items.map((result) => (
+            <ResultCard key={result.id} result={result} />
+          ))}
+        </section>
+      ) : (
+        <EmptyState
+          title="No finalized rounds yet"
+          body="Your settled hourly results will appear here."
+        />
+      )}
+      {results.hasNextPage && (
+        <button className="button secondary load-more" onClick={() => results.fetchNextPage()}>
+          Load more
+        </button>
+      )}
+    </PageFrame>
+  );
+}
+
+function RoundComplete({ result }: { result: HourlyResult }) {
+  return (
+    <section className="round-complete">
+      <div>
+        <span className="eyebrow">ROUND COMPLETE</span>
+        <strong>{roundRange(result.starts_at, result.ends_at_exclusive)}</strong>
+      </div>
+      <Metric label="Final Paper SOL" value={formatSol(result.final_settled_balance_lamports)} />
+      <Metric
+        label="Hourly P&L"
+        value={signedSol(result.hourly_pnl_lamports)}
+        className={pnlClass(result.hourly_pnl_lamports)}
+      />
+    </section>
+  );
+}
+function ResultCard({ result }: { result: HourlyResult }) {
+  return (
+    <article className="result-card">
+      <div>
+        <span>
+          {new Date(result.starts_at).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+          })}
+        </span>
+        <strong>{roundRange(result.starts_at, result.ends_at_exclusive)}</strong>
+      </div>
+      <Metric label="Final" value={formatSol(result.final_settled_balance_lamports)} />
+      <Metric
+        label="P&L"
+        value={signedSol(result.hourly_pnl_lamports)}
+        className={pnlClass(result.hourly_pnl_lamports)}
+      />
+    </article>
+  );
+}
+
+function FillSummary({ result }: { result: BuyResult }) {
+  return (
+    <span>
+      Spent {formatSol(result.actualPaperSolSpentLamports)} · Received{' '}
+      {result.tokenQuantityReceivedBaseUnits} base units · {venueName(result.executionProtocol)} ·
+      Fee {formatSol(result.feeLamports)}
+    </span>
+  );
+}
+function SellSummary({ result, decimals }: { result: SellResult; decimals: number }) {
+  return (
+    <span>
+      Sold {formatUnits(result.tokenAmountSoldBaseUnits, decimals, 6)} · Received{' '}
+      {formatSol(result.paperSolCreditedLamports)} · P&L {signedSol(result.realizedPnlLamports)} ·{' '}
+      {venueName(result.executionProtocol)}
+    </span>
+  );
+}
+function NoticeCard({ notice }: { notice: Notice }) {
+  return (
+    <div className={`notice ${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>
+      <strong>{notice.title}</strong>
+      <span>{notice.body}</span>
+    </div>
+  );
+}
+function PageFrame({ children }: { children: ReactNode }) {
+  return <div className="page">{children}</div>;
+}
+function PageTitle({
+  eyebrow,
+  title,
+  subtitle,
+}: {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <header className="page-title">
+      <span className="eyebrow">{eyebrow}</span>
+      <h1>{title}</h1>
+      <p>{subtitle}</p>
+    </header>
+  );
+}
+function PanelHead({
+  eyebrow,
+  title,
+  badge,
+  count,
+}: {
+  eyebrow: string;
+  title: string;
+  badge?: string;
+  count?: number;
+}) {
+  return (
+    <header className="panel-head">
+      <div>
+        <span className="eyebrow">{eyebrow}</span>
+        <h2>{title}</h2>
+      </div>
+      {badge && (
+        <span className="badge">
+          <span className="status-dot" />
+          {badge}
+        </span>
+      )}
+      {count !== undefined && <span className="count">{count}</span>}
+    </header>
+  );
+}
+function Metric({
+  label,
+  value,
+  note,
+  accent,
+  className = '',
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  accent?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={`metric ${accent ? 'accent' : ''} ${className}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      {note && <small>{note}</small>}
+    </div>
+  );
+}
+function Rule({ number, title, body }: { number: string; title: string; body: string }) {
+  return (
+    <div className="rule">
+      <span>{number}</span>
+      <strong>{title}</strong>
+      <p>{body}</p>
+    </div>
+  );
+}
+function EmptyState({ title, body, compact }: { title: string; body: string; compact?: boolean }) {
+  return (
+    <section className={`empty ${compact ? 'compact' : ''}`}>
+      <div className="empty-icon">◇</div>
+      <h2>{title}</h2>
+      <p>{body}</p>
+    </section>
+  );
+}
+function SkeletonPanel() {
+  return (
+    <div className="panel skeleton-panel">
+      <i />
+      <i />
+      <i />
+    </div>
+  );
+}
+function SkeletonRows() {
+  return (
+    <div className="skeleton-rows">
+      <i />
+      <i />
+      <i />
+    </div>
+  );
+}
+
+function signedSol(value: string): string {
+  const amount = BigInt(value);
+  return `${amount > 0n ? '+' : ''}${formatSol(amount)}`;
+}
+function utcTime(value: string): string {
+  return new Date(value).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'UTC',
+  });
+}
+function roundRange(start: string, end: string): string {
+  return `${utcTime(start).slice(0, 5)}–${utcTime(end).slice(0, 5)} UTC`;
+}
+function roundLabel(round: Round): string {
+  return roundRange(round.startsAt, round.endsAtExclusive);
+}
+function countdownText(milliseconds: number): string {
+  if (milliseconds <= 0) return '00:00';
+  const seconds = Math.floor(milliseconds / 1_000);
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}

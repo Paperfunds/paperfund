@@ -30,7 +30,7 @@ export const environmentSchema = z
       .refine((value) => !value.split(',').some((origin) => origin.trim() === '*'), {
         message: 'ALLOWED_ORIGINS must not use a wildcard',
       })
-      .default('http://127.0.0.1:3000,http://localhost:3000'),
+      .default('http://127.0.0.1:5173,http://localhost:5173'),
     API_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
     API_RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(20),
     API_RATE_LIMIT_TRADE_MAX: z.coerce.number().int().positive().default(30),

@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 3D implementation record
-**Product status:** Authoritative Pump.fun bonding-curve and migrated PumpSwap execution complete
+**Document status:** Canonical specification with Phase 4B implementation record
+**Product status:** First usable wallet-authenticated Paperfund web application complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-24
 
@@ -910,3 +910,43 @@ support resolution. Financial JSON fields are exact strings. Trade idempotency u
 Developer configuration, auth flow, endpoint examples, unit conventions, error envelopes, and
 lifecycle behavior are documented in `docs/API.md`. PostgreSQL remains authoritative for every
 round, balance, position, fill, journal, and result; Redis remains ephemeral.
+
+## 28. Phase 4B implementation record
+
+Phase 4B replaces the `apps/web` placeholder with the first user-facing Paperfund application. The
+frontend uses React, TypeScript, Vite, React Router, and TanStack Query. Its dark, responsive trading
+shell provides Trade, Hourly, Daily, and History routes without adding a browser extension, real
+trades, deposits, reward economics, payouts, or admin behavior.
+
+The browser supports Phantom-compatible injected Solana providers. Wallet connection and Paperfund
+authentication are separate explicit actions: the user connects, requests the Phase 4A challenge,
+signs the exact UTF-8 message, and establishes the existing HttpOnly cookie session. Wallet signing
+is authentication-only. No session token, private key, seed phrase, RPC secret, or server secret is
+available to frontend code.
+
+The web API client centralizes its public base URL, credentialed requests, typed error envelopes,
+pagination, and per-action idempotency headers. Financial JSON remains exact string data and client
+calculations use `BigInt`; partial-sell percentages floor integer token base units and SELL ALL sends
+the authoritative `ALL` intent. The API still does not expose a read-only authoritative max-buy
+preflight. The UI's MAX shortcut therefore uses the safe conservative bound of 20% of current cash,
+while the backend continues to value all positions and enforce the exact portfolio-equity rule at
+submission. This shortcut may understate the available maximum when open positions have value.
+
+The current-round countdown derives a display offset from API server time and updates locally between
+polls. Persisted round state and backend transaction admission remain authoritative. The app polls
+round/account state every four seconds, leaderboards every eight seconds, and trade activity every
+fifteen seconds plus after mutations. A changed round ID is surfaced without carrying forward the
+prior account, positions, or balance; the most recent finalized result is shown with the next entry
+prompt when available.
+
+Market inspection displays only backend-confirmed Pump.fun/PumpSwap support and decimals. Position
+valuation remains explicitly unavailable because Phase 4A does not expose authoritative executable
+values. Trade history distinguishes `FORCED_HOURLY_SETTLEMENT` as `AUTO CLOSE`, and leaderboard ties
+use backend ranks and tie metadata without a client-side tie-break.
+
+Local `npm run dev` now starts API, worker, and web together. Local web/API origins are configurable
+through `VITE_API_BASE_URL` and `ALLOWED_ORIGINS`. Component tests cover authentication states, round
+entry and transition, BUY and typed rejection, positions, partial SELL, SELL ALL, and both
+leaderboards. A browser-level Playwright smoke harness is deferred to avoid adding a second mock
+runtime; no frontend test requires live Solana RPC. Detailed architecture and limitations are in
+`docs/WEB_APP.md`.

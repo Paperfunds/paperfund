@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "dev": "npm run build && node scripts/dev.mjs",
-    "build": "tsc -b",
+    "build": "tsc -b && npm run build --workspace @paperfund/web",
     "clean": "tsc -b --clean",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint .",
