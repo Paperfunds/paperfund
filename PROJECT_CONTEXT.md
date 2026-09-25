@@ -882,3 +882,31 @@ Forced settlement may use installed adapter code when new trading is disabled. R
 fixtures and offline golden tests cover normal, shallow, and deep pools and linked completed curves.
 Detailed mechanics, sources, rounding, evidence, tests, and limitations are in
 `docs/PHASE_3_EXECUTION_ENGINE.md`.
+
+## 27. Phase 4A implementation record
+
+Phase 4A exposes the authoritative competition engine through `/api/v1` and adds persisted,
+restart-safe hourly lifecycle orchestration in `apps/worker`. Infrastructure health remains at
+`/health` and `/ready`. No frontend, creator-fee ingestion, reward calculation, payout, or real trade
+was added.
+
+Wallet authentication uses exact UTF-8 message signing with an Ed25519 Solana public key. Redis holds
+short-lived, wallet-bound, atomically consumed challenges and opaque revocable sessions; PostgreSQL
+stores the one-wallet/one-user identity. Browser transport uses an HttpOnly session cookie with
+configurable Secure and SameSite behavior. Redis also holds bounded auth/trade rate-limit counters,
+but never financial authority.
+
+The worker idempotently creates the current and next exact UTC hourly windows, creates the UTC daily
+competition, opens due rounds, discovers ended or partially settling rounds from PostgreSQL, and
+reuses `settleHourlyRound` until finalization. A new hour is independent of prior settlement. Daily
+attribution remains based exclusively on hourly round start time.
+
+The API supports current round and entry, authoritative account/position reads, Pump-origin BUY,
+partial or `ALL` SELL, stable trade history, hourly result history, finalized hourly and current daily
+leaderboards with explicit tie metadata, daily competition state, and Pump.fun/PumpSwap market
+support resolution. Financial JSON fields are exact strings. Trade idempotency uses the required
+`Idempotency-Key` header and fingerprints financial intent without volatile HTTP arrival time.
+
+Developer configuration, auth flow, endpoint examples, unit conventions, error envelopes, and
+lifecycle behavior are documented in `docs/API.md`. PostgreSQL remains authoritative for every
+round, balance, position, fill, journal, and result; Redis remains ephemeral.

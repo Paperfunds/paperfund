@@ -8,7 +8,10 @@
   "include": ["src/**/*.ts"],
   "references": [
     { "path": "../../packages/config" },
+    { "path": "../../packages/core" },
     { "path": "../../packages/db" },
+    { "path": "../../packages/execution" },
+    { "path": "../../packages/protocols" },
     { "path": "../../packages/shared" }
   ]
 }

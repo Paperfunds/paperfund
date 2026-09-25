@@ -562,9 +562,15 @@ export async function initializeCompetitionAccount(
     readonly userId: string;
     readonly hourlyRoundId: string;
     readonly idempotencyKey: string;
+    /** When supplied by the product entry API, admission is checked under the round lock. */
+    readonly requireOpenAt?: Date;
   },
 ): Promise<CompetitionAccountFinancialState> {
-  const requestHash = fingerprint(input);
+  const requestHash = fingerprint({
+    accountId: input.accountId,
+    userId: input.userId,
+    hourlyRoundId: input.hourlyRoundId,
+  });
   return runFinancialTransaction(database, async (client) => {
     const claimed = await claimIdempotency(client, {
       operationClass: 'HOURLY_ACCOUNT_INITIALIZATION',
@@ -575,12 +581,29 @@ export async function initializeCompetitionAccount(
       return getAccountStateWithClient(client, claimed.record.result_entity_id!);
     }
     const round = firstRow(
-      await client.query<{ starting_paper_sol_lamports: string }>(
-        'select starting_paper_sol_lamports from hourly_rounds where id = $1 for share',
+      await client.query<{
+        starting_paper_sol_lamports: string;
+        state: string;
+        starts_at: Date;
+        ends_at_exclusive: Date;
+      }>(
+        `select starting_paper_sol_lamports, state, starts_at, ends_at_exclusive
+         from hourly_rounds where id = $1 for share`,
         [input.hourlyRoundId],
       ),
       'Hourly round',
     );
+    if (
+      input.requireOpenAt &&
+      (round.state !== 'OPEN' ||
+        input.requireOpenAt < round.starts_at ||
+        input.requireOpenAt >= round.ends_at_exclusive)
+    ) {
+      throw new FinancialServiceError(
+        'ROUND_NOT_OPEN',
+        'The hourly round is not open for account entry.',
+      );
+    }
     const startingBalance = BigInt(round.starting_paper_sol_lamports);
     const inserted = await client.query<{ id: string }>(
       `insert into competition_accounts
@@ -1666,7 +1689,6 @@ export async function executePaperBuy(
     competitionAccountId: input.competitionAccountId,
     marketId: input.marketId,
     requestedPaperSolLamports: input.requestedPaperSolLamports,
-    authoritativeTimestamp: input.authoritativeTimestamp,
   });
   const orderId = deterministicEntityId('authoritative-buy-order', input.idempotencyKey);
   const fillId = deterministicEntityId('authoritative-buy-fill', input.idempotencyKey);
@@ -2300,6 +2322,7 @@ async function executeAuthoritativePaperSell(
     readonly idempotencyKey: string;
     readonly authoritativeTimestamp: Date;
     readonly executionContext: SellExecutionContext;
+    readonly idempotencyIntent?: 'ALL';
   },
 ): Promise<AuthoritativePaperSellResult> {
   if (input.requestedTokenQuantity <= 0n) {
@@ -2311,18 +2334,27 @@ async function executeAuthoritativePaperSell(
   if (Number.isNaN(input.authoritativeTimestamp.getTime())) {
     throw new FinancialServiceError('INVALID_FINANCIAL_INPUT', 'Timestamp is invalid.');
   }
-  const requestHash = fingerprint(input);
+  const requestHash = fingerprint({
+    competitionAccountId: input.competitionAccountId,
+    marketId: input.marketId,
+    requestedTokenQuantity: input.idempotencyIntent ?? input.requestedTokenQuantity,
+    executionContext: input.executionContext,
+  });
   const prefix =
-    input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
-      ? 'forced-settlement-sell'
-      : 'authoritative-sell';
+    input.idempotencyIntent === 'ALL'
+      ? 'authoritative-sell-all'
+      : input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
+        ? 'forced-settlement-sell'
+        : 'authoritative-sell';
   const orderId = deterministicEntityId(`${prefix}-order`, input.idempotencyKey);
   const fillId = deterministicEntityId(`${prefix}-fill`, input.idempotencyKey);
   const executionId = deterministicEntityId(`${prefix}-execution`, input.idempotencyKey);
   const operationClass =
-    input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
-      ? 'FORCED_HOURLY_SETTLEMENT_SELL'
-      : 'AUTHORITATIVE_PAPER_SELL';
+    input.idempotencyIntent === 'ALL'
+      ? 'AUTHORITATIVE_PAPER_SELL_ALL'
+      : input.executionContext === 'FORCED_HOURLY_SETTLEMENT'
+        ? 'FORCED_HOURLY_SETTLEMENT_SELL'
+        : 'AUTHORITATIVE_PAPER_SELL';
   const existingClient = await database.pool.connect();
   try {
     const existing = await existingClient.query<IdempotencyRow>(
@@ -2408,6 +2440,12 @@ async function executeAuthoritativePaperSell(
     );
     const quantityBefore = BigInt(positionRow.remaining_base_units);
     const costBefore = BigInt(positionRow.cost_basis_lamports);
+    if (input.idempotencyIntent === 'ALL' && input.requestedTokenQuantity !== quantityBefore) {
+      throw new FinancialServiceError(
+        'INVALID_SELL_QUANTITY',
+        'The position changed while preparing SELL ALL; retry the same idempotent request.',
+      );
+    }
     if (positionRow.status !== 'OPEN' || input.requestedTokenQuantity > quantityBefore) {
       throw new FinancialServiceError(
         'INSUFFICIENT_TOKEN_BALANCE',
@@ -2570,6 +2608,68 @@ export async function executePaperSell(
   return executeAuthoritativePaperSell(database, router, {
     ...input,
     executionContext: 'NORMAL_USER',
+  });
+}
+
+/** Exact full-position SELL. The quantity is snapshotted, then confirmed again under row lock. */
+export async function executePaperSellAll(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    readonly competitionAccountId: string;
+    readonly marketId: string;
+    readonly idempotencyKey: string;
+    readonly authoritativeTimestamp: Date;
+  },
+): Promise<AuthoritativePaperSellResult> {
+  const requestHash = fingerprint({
+    competitionAccountId: input.competitionAccountId,
+    marketId: input.marketId,
+    requestedTokenQuantity: 'ALL',
+    executionContext: 'NORMAL_USER',
+  });
+  const existing = await database.pool.connect();
+  try {
+    const record = (
+      await existing.query<IdempotencyRow>(
+        `select id, request_hash, status, result_entity_type, result_entity_id
+         from idempotency_records
+         where operation_class = 'AUTHORITATIVE_PAPER_SELL_ALL' and idempotency_key = $1`,
+        [input.idempotencyKey],
+      )
+    ).rows[0];
+    if (record) {
+      if (record.request_hash !== requestHash) {
+        throw new FinancialServiceError(
+          'IDEMPOTENCY_CONFLICT',
+          'The idempotency key was already used with a different request.',
+        );
+      }
+      if (record.status === 'COMPLETED' && record.result_entity_id) {
+        return await getAuthoritativePaperSellResult(existing, record.result_entity_id);
+      }
+    }
+  } finally {
+    existing.release();
+  }
+  const row = (
+    await database.pool.query<{ remaining_base_units: string }>(
+      `select remaining_base_units from positions
+       where competition_account_id = $1 and market_id = $2 and status = 'OPEN'`,
+      [input.competitionAccountId, input.marketId],
+    )
+  ).rows[0];
+  if (!row) {
+    throw new FinancialServiceError(
+      'INSUFFICIENT_TOKEN_BALANCE',
+      'No open token balance exists for SELL ALL.',
+    );
+  }
+  return executeAuthoritativePaperSell(database, router, {
+    ...input,
+    requestedTokenQuantity: BigInt(row.remaining_base_units),
+    executionContext: 'NORMAL_USER',
+    idempotencyIntent: 'ALL',
   });
 }
 

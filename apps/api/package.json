@@ -9,7 +9,10 @@
   },
   "dependencies": {
     "@paperfund/config": "*",
+    "@paperfund/core": "*",
     "@paperfund/db": "*",
+    "@paperfund/execution": "*",
+    "@paperfund/protocols": "*",
     "@paperfund/shared": "*",
     "dotenv": "^18.0.3",
     "fastify": "^5.12.5",

@@ -2,6 +2,11 @@ import { Redis } from 'ioredis';
 
 export interface RedisService {
   healthCheck(): Promise<boolean>;
+  get(key: string): Promise<string | null>;
+  setExpiring(key: string, value: string, ttlSeconds: number): Promise<void>;
+  take(key: string): Promise<string | null>;
+  delete(key: string): Promise<void>;
+  incrementWindow(key: string, ttlSeconds: number): Promise<number>;
   close(): Promise<void>;
 }
 
@@ -26,6 +31,32 @@ export function createRedis(redisUrl: string): RedisService {
       } catch {
         return false;
       }
+    },
+    async get(key) {
+      return client.get(key);
+    },
+    async setExpiring(key, value, ttlSeconds) {
+      await client.set(key, value, 'EX', ttlSeconds);
+    },
+    async take(key) {
+      const result = await client.eval(
+        "local v=redis.call('GET',KEYS[1]); if v then redis.call('DEL',KEYS[1]) end; return v",
+        1,
+        key,
+      );
+      return typeof result === 'string' ? result : null;
+    },
+    async delete(key) {
+      await client.del(key);
+    },
+    async incrementWindow(key, ttlSeconds) {
+      const result = await client.eval(
+        "local v=redis.call('INCR',KEYS[1]); if v==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return v",
+        1,
+        key,
+        ttlSeconds,
+      );
+      return Number(result);
     },
     async close() {
       if (client.status === 'end') {

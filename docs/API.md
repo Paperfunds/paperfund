@@ -1,0 +1,84 @@
+# Paperfund HTTP API (V1)
+
+The product API is rooted at `/api/v1`. `GET /health` and `GET /ready` remain unversioned infrastructure endpoints. Paperfund is paper trading only: wallet signatures authenticate a user and never authorize an on-chain transaction.
+
+## Authentication
+
+1. `POST /api/v1/auth/challenge` with `{ "walletAddress": "..." }`.
+2. Sign the returned UTF-8 `message` bytes with the named Solana wallet. Do not sign a transaction.
+3. `POST /api/v1/auth/verify` with `walletAddress`, `challengeId`, the exact `message`, and a 64-byte base58 or base64 `signature`.
+4. The server returns the user and sets `paperfund_session`, an opaque Redis-backed HttpOnly cookie. A bearer token is also accepted by the server for non-browser clients, but the verify response deliberately does not expose the cookie token in JSON.
+5. `GET /api/v1/auth/me` reads the session. `POST /api/v1/auth/logout` revokes it.
+
+Challenges contain the Paperfund identifier, purpose, wallet, random nonce, issued time, and expiry. They are wallet-bound, short-lived, consumed atomically, and cannot be replayed. Sessions are high-entropy, expire, and are revocable. Production must set `COOKIE_SECURE=true`; local HTTP development uses `false`. `COOKIE_SAME_SITE` defaults to `lax`.
+
+## Exact units and errors
+
+All authoritative financial values are JSON strings. Paper SOL values ending in `Lamports` use 1,000,000,000 lamports per SOL. Token quantities ending in `BaseUnits` use the token's integer base units. BUY accepts deterministic decimal SOL text such as `"2"`, `"2.5"`, or `"0.125"`; it rejects signs, scientific notation, and more than nine decimals. SELL accepts a positive base-unit integer or `"ALL"`.
+
+Errors use one envelope:
+
+```json
+{
+  "error": {
+    "code": "MAX_BUY_RATIO_EXCEEDED",
+    "message": "The requested buy exceeds the configured maximum.",
+    "requestId": "..."
+  }
+}
+```
+
+Domain errors map to 4xx responses; unavailable authoritative market/RPC state maps to 503; unexpected details and stack traces are never returned.
+
+## Routes
+
+| Method | Route                                | Auth | Description                                             |
+| ------ | ------------------------------------ | ---- | ------------------------------------------------------- |
+| POST   | `/api/v1/auth/challenge`             | No   | Create a single-use signing message                     |
+| POST   | `/api/v1/auth/verify`                | No   | Verify Ed25519 signature and create session             |
+| POST   | `/api/v1/auth/logout`                | No   | Revoke current session                                  |
+| GET    | `/api/v1/auth/me`                    | Yes  | Current wallet identity                                 |
+| GET    | `/api/v1/rounds/current`             | No   | Canonical persisted UTC hourly round plus server time   |
+| POST   | `/api/v1/rounds/current/enter`       | Yes  | Idempotently create the fresh 10 Paper SOL account      |
+| GET    | `/api/v1/rounds/current/account`     | Yes  | Cash, round, slots, and persisted open positions        |
+| POST   | `/api/v1/trades/buy`                 | Yes  | Authoritative Pump-origin BUY                           |
+| POST   | `/api/v1/trades/sell`                | Yes  | Partial SELL or exact server-locked `ALL` SELL          |
+| GET    | `/api/v1/trades`                     | Yes  | Stable descending fill history (`limit`, `cursor`)      |
+| GET    | `/api/v1/positions`                  | Yes  | Current hourly account positions                        |
+| GET    | `/api/v1/results/hourly`             | Yes  | Paginated finalized hourly results                      |
+| GET    | `/api/v1/leaderboards/hourly`        | No   | Latest finalized round, or `roundId` query              |
+| GET    | `/api/v1/leaderboards/daily`         | No   | Current UTC Daily Championship with tie metadata        |
+| GET    | `/api/v1/competitions/daily/current` | No   | Current persisted UTC daily competition                 |
+| GET    | `/api/v1/markets/:mint`              | No   | Pump-origin support and current Pump.fun/PumpSwap venue |
+
+Trade requests require `Idempotency-Key`, a non-empty value of at most 128 characters. Its persisted fingerprint is scoped to the authenticated user/account and the financial intent. Retrying the same request returns the original result even when the HTTP request time changes; reusing a key with a different intent returns `IDEMPOTENCY_CONFLICT`.
+
+### BUY example
+
+```http
+POST /api/v1/trades/buy
+Idempotency-Key: buy-client-001
+Content-Type: application/json
+
+{"mint":"<pump-origin mint>","paperSol":"2"}
+```
+
+The server derives the Pump bonding curve, resolves migration to the canonical index-0 PumpSwap pool when necessary, loads authoritative market state, applies the 20% rule and slot/cash checks transactionally, and returns order/fill/evidence identifiers and exact updated balances.
+
+### SELL-all example
+
+```http
+POST /api/v1/trades/sell
+Idempotency-Key: sell-client-001
+Content-Type: application/json
+
+{"mint":"<owned mint>","quantity":"ALL"}
+```
+
+`ALL` snapshots the current held quantity and confirms that exact quantity again under the transactional position lock. A concurrent change rejects safely and the same idempotent request may be retried; a completed retry returns its original fill. It cannot create a short position.
+
+## Lifecycle worker
+
+`apps/worker` polls every `WORKER_TICK_INTERVAL_MS` (default five seconds). Each tick idempotently ensures the current and next exact UTC hour plus the current UTC day, opens due rounds, discovers persisted ended `OPEN`/`CLOSING`/`SETTLING` rounds, and invokes the existing retry-safe settlement engine. The next hour opens independently while previous settlement retries. After all attributed hourly rounds are finalized, an ended daily competition becomes `FINALIZED`.
+
+PostgreSQL remains authoritative for rounds, accounts, cash, slots, positions, orders, fills, evidence, journals, and results. Redis stores only expiring challenges, sessions, and rate-limit counters.

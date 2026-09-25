@@ -2,5 +2,15 @@
   "name": "@paperfund/worker",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@paperfund/config": "*",
+    "@paperfund/db": "*",
+    "@paperfund/protocols": "*",
+    "dotenv": "^18.0.3"
+  }
 }

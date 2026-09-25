@@ -3,8 +3,11 @@ import { fileURLToPath } from 'node:url';
 
 import { parseEnvironment } from '@paperfund/config';
 import { createDatabase } from '@paperfund/db';
+import { createProductionExecutionRouter } from '@paperfund/protocols';
 
 import { buildApp } from './app.js';
+import { AuthService } from './auth.js';
+import { CompetitionService } from './competition.js';
 import { createRedis } from './redis.js';
 
 loadDotenv({
@@ -15,7 +18,19 @@ loadDotenv({
 const config = parseEnvironment(process.env);
 const database = createDatabase(config.DATABASE_URL);
 const redis = createRedis(config.REDIS_URL);
-const app = buildApp({ config, database, redis });
+const router = createProductionExecutionRouter({
+  rpcUrl: config.SOLANA_RPC_URL,
+  rpcTimeoutMs: config.SOLANA_RPC_TIMEOUT_MS,
+  commitment: config.SOLANA_COMMITMENT,
+});
+const auth = new AuthService(
+  database,
+  redis,
+  config.AUTH_CHALLENGE_TTL_SECONDS,
+  config.AUTH_SESSION_TTL_SECONDS,
+);
+const competition = new CompetitionService(database, router);
+const app = buildApp({ config, database, redis, auth, competition });
 
 let shuttingDown = false;
 
