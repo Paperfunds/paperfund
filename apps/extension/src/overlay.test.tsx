@@ -16,6 +16,7 @@ vi.mock('./client.js', () => ({
     constructor(
       readonly code: string,
       message: string,
+      readonly status?: number,
     ) {
       super(message);
     }
@@ -93,6 +94,26 @@ describe('Paperfund overlay', () => {
       <Overlay terminal={terminal()} collapsed={false} onCollapsed={vi.fn()} onDisable={vi.fn()} />,
     );
     expect(await screen.findByRole('button', { name: 'CONNECT WALLET' })).toBeVisible();
+  });
+
+  it('returns to explicit sign-in state when the authenticated session expires', async () => {
+    const { ApiError } = await import('./client.js');
+    apiRequest.mockImplementation((operation: string) => {
+      if (operation === 'ME') return Promise.resolve({ user: { id: 'u', walletAddress: MINT } });
+      if (operation === 'CURRENT_ROUND')
+        return Promise.resolve({ round, serverTime: '2099-01-01T18:30:00.000Z' });
+      if (operation === 'ACCOUNT')
+        return Promise.reject(new ApiError('UNAUTHENTICATED', 'Authentication is required.', 401));
+      if (operation === 'POSITIONS' || operation === 'TRADES' || operation === 'RESULTS')
+        return new Promise(() => undefined);
+      if (operation === 'MARKET') return Promise.resolve({ mint: MINT, supported: false });
+      throw new Error(`Unexpected ${operation}`);
+    });
+    render(
+      <Overlay terminal={terminal()} collapsed={false} onCollapsed={vi.fn()} onDisable={vi.fn()} />,
+    );
+    expect(await screen.findByText('Authentication is required.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'CONNECT WALLET' })).toBeVisible();
   });
 
   it('shows round entry and completed-round feedback for an authenticated user', async () => {
@@ -198,6 +219,45 @@ describe('Paperfund overlay', () => {
     );
     expect(await screen.findByText('Not supported by Paperfund yet')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'BUY · PAPER ONLY' })).not.toBeInTheDocument();
+  });
+
+  it('recovers market state after a transient API outage', async () => {
+    let offline = true;
+    apiRequest.mockImplementation((operation: string) => {
+      if (operation === 'ME') return Promise.reject(new Error('unauthenticated'));
+      if (operation === 'CURRENT_ROUND')
+        return Promise.resolve({ round, serverTime: '2099-01-01T18:30:00.000Z' });
+      if (operation === 'MARKET') {
+        if (offline) return Promise.reject(new Error('Paperfund API is unavailable.'));
+        return Promise.resolve({
+          mint: MINT,
+          supported: true,
+          executionProtocol: 'PUMP_FUN',
+          tokenDecimals: 6,
+        });
+      }
+      throw new Error(`Unexpected ${operation}`);
+    });
+    const { rerender } = render(
+      <Overlay terminal={terminal()} collapsed={false} onCollapsed={vi.fn()} onDisable={vi.fn()} />,
+    );
+    expect(await screen.findByText('Paperfund API is unavailable.')).toBeVisible();
+    offline = false;
+    rerender(
+      <Overlay
+        terminal={terminal(null)}
+        collapsed={false}
+        onCollapsed={vi.fn()}
+        onDisable={vi.fn()}
+      />,
+    );
+    rerender(
+      <Overlay terminal={terminal()} collapsed={false} onCollapsed={vi.fn()} onDisable={vi.fn()} />,
+    );
+    await waitFor(() =>
+      expect(apiRequest.mock.calls.filter(([operation]) => operation === 'MARKET')).toHaveLength(2),
+    );
+    expect(screen.queryByText('Paperfund API is unavailable.')).not.toBeInTheDocument();
   });
 
   it('immediately invalidates old-token controls on a mint change', async () => {

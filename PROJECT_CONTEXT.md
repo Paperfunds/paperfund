@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 4D implementation record
-**Product status:** Web MVP and Axiom Chromium overlay with authoritative trading complete
+**Document status:** Canonical specification with Phase 4E implementation record
+**Product status:** Web MVP and release-ready Axiom Chromium overlay with authoritative trading complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-25
 
@@ -1032,3 +1032,30 @@ tests plus a fixture Axiom page, message-only wallet, and in-memory API harness 
 lifecycle without live Axiom, an injected production wallet, RPC, or real SOL. Full MV3 Playwright
 bundle loading is deferred; detailed architecture, permissions, build/install steps, tests, security
 review, and limitations are in `docs/EXTENSION.md`.
+
+## 31. Phase 4E implementation record
+
+Phase 4E completes headed Manifest V3 acceptance and release hardening for the Axiom overlay without
+changing competition rules or adding real trading. A Playwright harness now loads the unpacked
+extension in a headed Chromium profile, runs against the real local API and a disposable migrated
+PostgreSQL database, and uses recorded protocol state plus a deterministic message-only Ed25519
+wallet. It covers rejected and accepted wallet connection/signing, entry, exact MAX, BUY, 25% SELL,
+SELL ALL, stale-mint fail-closed behavior, popup rendering, collapsed-state persistence, and service
+worker termination/recovery. A separate non-trading smoke confirms safe injection on the current
+public Axiom route; authenticated Axiom terminal content remains outside automated acceptance.
+
+Headed acceptance found and fixed two browser-only defects. The dynamically imported overlay bundle
+and chunks are now declared as web-accessible resources exclusively for `https://axiom.trade/*`, so
+the manifest bootstrap can load while preserving the narrow host boundary. Round entry now treats
+the API's creation result as the minimal response it actually is and reloads the authoritative full
+account before rendering positions. Market refresh and mint-change cleanup are separated so normal
+account/preflight refreshes cannot erase trade feedback or ticket state.
+
+Release builds require explicit public API and app URLs, validate credential-free HTTP(S) syntax,
+and require HTTPS except for an explicit loopback-only development override. The extension version
+comes from its package metadata. `npm run package:extension` performs a production build and emits a
+clean versioned unpacked directory under `artifacts/`, rejecting source maps, fixtures, dependency
+trees, environment files, and common server-secret markers. The generated manifest retains only the
+`storage` permission, the exact configured API origin, the Axiom content/bridge match, a local-script
+CSP, and the Axiom-scoped bundle resources. Release, installation, recovery, headed fixture, and live
+smoke procedures are documented in `README.md` and `docs/EXTENSION.md`.

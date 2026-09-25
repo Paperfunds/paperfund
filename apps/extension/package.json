@@ -1,10 +1,11 @@
 {
   "name": "@paperfund/extension",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build --mode development",
+    "build:release": "vite build --mode production",
     "dev": "vite build --watch",
     "test": "vitest run --config vite.config.ts"
   },

@@ -115,7 +115,7 @@ describe('fixture Axiom integration harness', () => {
           return entered ? ok(account()) : fail('ROUND_ACCOUNT_NOT_FOUND');
         case 'ENTER_ROUND':
           entered = true;
-          return ok(account());
+          return ok({ id: 'account:one', paperSolBalanceLamports: '10000000000' });
         case 'MARKET':
           return ok({
             mint: message.payload?.['mint'],
@@ -236,9 +236,8 @@ describe('fixture Axiom integration harness', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'CONNECT WALLET' }));
     fireEvent.click(await screen.findByRole('button', { name: 'SIGN IN TO PAPERFUND' }));
     fireEvent.click(await screen.findByRole('button', { name: 'ENTER ROUND' }));
-    const max = await screen.findByRole('button', { name: 'MAX' });
-    await waitFor(() => expect(max).toBeEnabled());
-    fireEvent.click(max);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'MAX' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'MAX' }));
     fireEvent.click(screen.getByRole('button', { name: 'BUY · PAPER ONLY' }));
     expect(await screen.findByText('CURRENT POSITION')).toBeVisible();
     const b = {

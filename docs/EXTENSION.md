@@ -2,7 +2,7 @@
 
 ## Scope and status
 
-Phase 4D replaces the `apps/extension` placeholder with a Chromium Manifest V3 extension for Axiom only. It is a fast paper-trading client for the existing `/api/v1` backend. It does not price tokens, choose Pump.fun versus PumpSwap, sign transactions, submit real trades, or duplicate accounting rules.
+Phase 4E hardens the Chromium Manifest V3 extension for headed acceptance and release packaging. It is a fast paper-trading client for the existing `/api/v1` backend. It does not price tokens, choose Pump.fun versus PumpSwap, sign transactions, submit real trades, or duplicate accounting rules.
 
 ## Current Axiom research
 
@@ -46,6 +46,8 @@ It exposes no arbitrary provider call and no transaction, transfer, approval, or
 
 For extension transport, `/api/v1/auth/verify` accepts the explicit `transport: "extension"` field after the same Ed25519 challenge verification. The returned opaque session token is stored in `chrome.storage.session`, never `localStorage`, never the Axiom DOM, and never a page-world message. The service worker adds it as a bearer token and deletes it on logout or expiry. PostgreSQL/Redis authority is unchanged.
 
+`chrome.storage.session` deliberately survives MV3 service-worker suspension but is cleared when the extension is disabled, reloaded, updated, or the browser exits. After worker suspension the next message restarts the worker, reloads the token from session storage, and refetches all round, account, position, market, and activity state. After a browser or extension restart the user signs in again; no financial state is restored from browser storage. An API 401 clears the worker token and returns the overlay to explicit sign-in state without automatically requesting another signature.
+
 ## UI and polling
 
 The bottom-right panel shows the UTC round/countdown, cash, executable equity, token slots, backend-resolved venue, exact preflight maximum, current position, partial SELL, SELL ALL, latest activity, and the most recent completed-round result. It is explicitly labeled **Paper trading only**. Collapse and enable preferences live in `chrome.storage.local`; no balance, position, fill, valuation, or round is trusted from local storage.
@@ -60,34 +62,73 @@ Requested permissions:
 
 - `storage`: `chrome.storage.session` for the opaque auth session and `chrome.storage.local` for UI preferences.
 - API host permission: the exact origin derived from `PAPERFUND_API_BASE_URL`, needed by the background service worker.
-- isolated content-script match plus the small manifest-declared `MAIN`-world bridge: `https://axiom.trade/*` only. No web-accessible resource is needed.
+- isolated content-script match plus the small manifest-declared `MAIN`-world bridge: `https://axiom.trade/*` only.
+- `content.js` and its generated JavaScript chunks are web-accessible only to `https://axiom.trade/*`; this is required for the isolated-world bootstrap's dynamic import and does not expose them on other sites.
 
 It does not request `all_urls`, browsing history, clipboard, downloads, tabs, wallet secrets, or any transaction permission.
 
-## Build and install
+## Build configuration
+
+The developer build uses loopback defaults. A release build has no implicit origin and requires both public build-time variables:
+
+| Variable                         | Scope                   | Purpose                                                                 |
+| -------------------------------- | ----------------------- | ----------------------------------------------------------------------- |
+| `PAPERFUND_API_BASE_URL`         | PUBLIC BUILD-TIME       | Paperfund API base URL and exact manifest host permission               |
+| `PAPERFUND_APP_URL`              | PUBLIC BUILD-TIME       | Full Paperfund web-app URL opened from the overlay/popup                |
+| `PAPERFUND_ALLOW_INSECURE_LOCAL` | LOCAL RELEASE TEST ONLY | Allows an explicit loopback HTTP URL while testing the release packager |
+
+Release URLs must otherwise use HTTPS and may not contain credentials or fragments. `SOLANA_RPC_URL`, database credentials, Redis credentials, cookie settings, auth TTLs, rate limits, and all private keys are SERVER-ONLY and must never be passed to Vite or the extension build.
+
+## Build and developer install
 
 ```powershell
 npm install
 npm run build:extension
 ```
 
-For a non-local deployment, set `PAPERFUND_API_BASE_URL` and `PAPERFUND_APP_URL` in the build process first. The build emits `apps/extension/build` and generates an API-origin-specific manifest. The manifest key makes the unpacked development ID stable: `lcnpjpkojoadojibfbjfohpjepkfmdln`.
+The build emits `apps/extension/build` and generates an API-origin-specific manifest. The manifest key makes the unpacked development ID stable: `lcnpjpkojoadojibfbjfohpjepkfmdln`.
 
-In Chrome/Chromium/Brave:
+Exact developer installation:
 
-1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Choose **Load unpacked**.
-4. Select `apps/extension/build`.
-5. Open an Axiom Solana `/meme/<mint>` page.
+1. Run `npm run build:extension`.
+2. Open `chrome://extensions`.
+3. Enable **Developer mode**.
+4. Choose **Load unpacked**.
+5. Select the generated `apps/extension/build` directory.
+6. Open Axiom at a Solana `/meme/<mint>` route.
+7. Verify that the Paperfund paper-trading overlay appears without covering the terminal's main controls.
 
 Use `npm run dev:extension` for watch builds, then click **Reload** for the extension on `chrome://extensions`.
 
+## Release packaging
+
+Set the two public release URLs, then run:
+
+```powershell
+$env:PAPERFUND_API_BASE_URL='https://api.example.com'
+$env:PAPERFUND_APP_URL='https://app.example.com/trade'
+npm run package:extension
+```
+
+The command performs a fresh production-mode build, verifies that the artifact contains no source maps, fixtures, `node_modules`, local `.env`, RPC variable, or obvious private-key/seed references, and writes the clean load-unpacked directory to `artifacts/paperfund-extension-0.1.0`. The package and generated manifest share version `0.1.0`.
+
 ## Tests
 
-`npm run test:extension` runs deterministic tests with no Axiom, wallet, RPC, or network dependency. Coverage includes URL and base58 detection, SPA navigation and clearing, auth states, round entry, exact MAX, BUY success/error, executable position display, partial SELL integer flooring, SELL ALL, rollover, unsupported markets, and stale-mint races. The fixture harness supplies an Axiom-like navigation state, a message-only wallet, and an in-memory API transport, then proves connect, sign-in, entry, MAX, BUY, token navigation invalidation, return, SELL ALL, and activity.
+`npm run test:extension` runs deterministic tests with no Axiom, wallet, RPC, or network dependency. Coverage includes URL and base58 detection, SPA navigation and clearing, auth states and expiry, round entry, exact MAX, BUY success/error, executable position display, partial SELL integer flooring, SELL ALL, rollover, unsupported markets, and stale-mint races. The fixture harness supplies an Axiom-like navigation state, a message-only wallet, and an in-memory API transport.
 
-Full Playwright loading of the MV3 bundle is deferred. The deterministic built-web Playwright smoke remains unchanged, and the extension production bundle plus fixture harness cover this phase without depending on live Axiom or Solana.
+`npm run test:extension:headed` builds and loads the actual unpacked MV3 bundle in headed Playwright Chromium. It uses the real local API/database lifecycle with recorded deterministic Pump market state and a test-only message-signing wallet. The acceptance covers the popup, wallet rejection recovery, sign-in, round entry, 10 Paper SOL, authoritative MAX, stale-mint invalidation before submission, BUY, partial SELL, SELL ALL, activity, persisted collapse state, and service-worker termination/restart. It never exposes a transaction-signing method and blocks real Axiom trades by serving an Axiom-origin fixture document.
+
+`npm run test:extension:live` visits the current public Axiom `/meme/<mint>` route only to verify injection, route compatibility, Shadow DOM isolation, and panel layout. It does not connect a wallet or submit any Axiom or Paperfund trade. By default both headed commands use Playwright's Chromium; `PAPERFUND_CHROMIUM_EXECUTABLE` can select another compatible executable.
+
+Chrome 137 and newer branded builds disable the legacy `--load-extension` switch. For those builds, set `PAPERFUND_CDP_LOAD_UNPACKED=true` together with `PAPERFUND_CHROMIUM_EXECUTABLE`; the harness uses Chrome's browser-scoped `Extensions.loadUnpacked` DevTools command in its temporary profile.
+
+## Failure and recovery behavior
+
+- API, Redis/session, RPC, and authoritative market failures are displayed as typed unavailable/error states. Trade controls remain disabled until current state is successfully refetched.
+- Wallet connection and message-signature rejection return control to the user. No signature request repeats automatically.
+- Invalid signatures and expired sessions return to explicit sign-in. A successful later sign-in recovers normally.
+- A route or mint change clears the old market/preflight binding synchronously. A stale TOKEN_A action cannot submit after navigation to TOKEN_B.
+- Round ID changes clear prior account, position, and preflight state. Reloads refetch all financial state from the API.
 
 ## Known limitations
 

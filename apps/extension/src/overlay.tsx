@@ -65,19 +65,33 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
 
   const loadAuthenticated = useCallback(async () => {
     if (!user) return;
-    const [accountResult, positionResult, tradeResult, resultPage] = await Promise.all([
-      apiRequest('ACCOUNT').catch((error: unknown) => {
-        if (error instanceof ApiError && error.code === 'ROUND_ACCOUNT_NOT_FOUND') return null;
-        throw error;
-      }),
-      apiRequest('POSITIONS').catch(() => null),
-      apiRequest('TRADES').catch(() => ({ items: [], nextCursor: null })),
-      apiRequest('RESULTS').catch(() => ({ items: [], nextCursor: null })),
-    ]);
-    setAccount(accountResult);
-    setPositions(positionResult);
-    setTrades(tradeResult.items);
-    setPreviousResult(resultPage.items[0] ?? null);
+    try {
+      const [accountResult, positionResult, tradeResult, resultPage] = await Promise.all([
+        apiRequest('ACCOUNT').catch((error: unknown) => {
+          if (error instanceof ApiError && error.code === 'ROUND_ACCOUNT_NOT_FOUND') return null;
+          throw error;
+        }),
+        apiRequest('POSITIONS').catch((error: unknown) => {
+          if (error instanceof ApiError && error.code === 'ROUND_ACCOUNT_NOT_FOUND') return null;
+          throw error;
+        }),
+        apiRequest('TRADES'),
+        apiRequest('RESULTS'),
+      ]);
+      setAccount(accountResult);
+      setPositions(positionResult);
+      setTrades(tradeResult.items);
+      setPreviousResult(resultPage.items[0] ?? null);
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.code === 'UNAUTHENTICATED')) {
+        setUser(null);
+        setAccount(null);
+        setPositions(null);
+        setPreflight(null);
+        setTrades([]);
+      }
+      throw error;
+    }
   }, [user]);
 
   const loadMarket = useCallback(
@@ -110,12 +124,14 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
     );
   }, [loadAuthenticated]);
   useEffect(() => {
-    const mint = terminal.mint;
     setAmount('');
     setNotice(null);
     setLoadedMint(null);
     setMarket(null);
     setPreflight(null);
+  }, [terminal.mint]);
+  useEffect(() => {
+    const mint = terminal.mint;
     if (mint)
       void loadMarket(mint).catch((error: unknown) => {
         if (mintRef.current === mint) {
@@ -212,7 +228,9 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
   async function enter(): Promise<void> {
     setPending('enter');
     try {
-      setAccount(await apiRequest('ENTER_ROUND'));
+      await apiRequest('ENTER_ROUND');
+      await loadAuthenticated();
+      if (terminal.mint) await loadMarket(terminal.mint);
       setNotice({ tone: 'success', text: 'Round entered. 10 Paper SOL is ready.' });
     } catch (error) {
       setNotice({ tone: 'error', text: errorMessage(error) });

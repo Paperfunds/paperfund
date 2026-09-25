@@ -70,7 +70,7 @@ export interface ApiContract {
   VERIFY: { user: User; expiresAt: string };
   LOGOUT: undefined;
   CURRENT_ROUND: { round: Round | null; serverTime: string };
-  ENTER_ROUND: Account;
+  ENTER_ROUND: { id: string; paperSolBalanceLamports: string };
   ACCOUNT: Account;
   MARKET: MarketSupport;
   PREFLIGHT: BuyPreflight;
