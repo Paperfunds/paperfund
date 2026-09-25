@@ -35,6 +35,10 @@ export const environmentSchema = z
     API_RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().default(20),
     API_RATE_LIMIT_TRADE_MAX: z.coerce.number().int().positive().default(30),
     WORKER_TICK_INTERVAL_MS: z.coerce.number().int().min(500).default(5_000),
+    REWARD_ALLOCATION_MODE: z.enum(['NORMAL', 'BUFFER_ACCUMULATION']).default('NORMAL'),
+    REWARD_BASELINE_WINDOW: z.coerce.number().int().positive().default(12),
+    REWARD_LAMBDA_BPS: z.coerce.number().int().min(0).max(10_000).default(6_000),
+    REWARD_FINALIZATION_GRACE_SECONDS: z.coerce.number().int().min(0).default(60),
   })
   .readonly();
 

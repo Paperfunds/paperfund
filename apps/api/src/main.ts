@@ -29,7 +29,12 @@ const auth = new AuthService(
   config.AUTH_CHALLENGE_TTL_SECONDS,
   config.AUTH_SESSION_TTL_SECONDS,
 );
-const competition = new CompetitionService(database, router);
+const competition = new CompetitionService(database, router, () => new Date(), {
+  allocationMode: config.REWARD_ALLOCATION_MODE,
+  baselineWindow: config.REWARD_BASELINE_WINDOW,
+  lambdaBps: BigInt(config.REWARD_LAMBDA_BPS),
+  configurationVersion: 'phase-5a-v1',
+});
 const app = buildApp({ config, database, redis, auth, competition });
 
 let shuttingDown = false;

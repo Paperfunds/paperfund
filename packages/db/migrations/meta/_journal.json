@@ -29,6 +29,13 @@
       "when": 1790282460250,
       "tag": "0003_sticky_selene",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790366400000,
+      "tag": "0004_creator_fee_rewards",
+      "breakpoints": true
     }
   ]
 }

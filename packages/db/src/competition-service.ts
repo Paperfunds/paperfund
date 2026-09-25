@@ -57,6 +57,7 @@ function hourlyRoundId(startsAt: Date): string {
 export async function ensureHourlyRound(
   database: DatabaseService,
   startsAt: Date,
+  rewardGraceSeconds = DEFAULT_REWARD_GRACE_SECONDS,
 ): Promise<string> {
   const endsAtExclusive = new Date(startsAt.getTime() + 3_600_000);
   const id = hourlyRoundId(startsAt);
@@ -73,7 +74,7 @@ export async function ensureHourlyRound(
       DEFAULT_STARTING_PAPER_SOL_LAMPORTS,
       DEFAULT_MAX_UNIQUE_TOKENS,
       DEFAULT_MAX_BUY_RATIO_BPS,
-      DEFAULT_REWARD_GRACE_SECONDS,
+      rewardGraceSeconds,
       CURRENT_RULES_VERSION,
     ],
   );
@@ -102,12 +103,16 @@ export async function ensureDailyCompetition(
   return result.rows[0]!.id;
 }
 
-export async function ensureCurrentAndNextRounds(database: DatabaseService, now: Date) {
+export async function ensureCurrentAndNextRounds(
+  database: DatabaseService,
+  now: Date,
+  rewardGraceSeconds = DEFAULT_REWARD_GRACE_SECONDS,
+) {
   const { startsAt, endsAtExclusive } = canonicalHourlyWindow(now);
   await ensureDailyCompetition(database, now);
   const [currentRoundId, nextRoundId] = await Promise.all([
-    ensureHourlyRound(database, startsAt),
-    ensureHourlyRound(database, endsAtExclusive),
+    ensureHourlyRound(database, startsAt, rewardGraceSeconds),
+    ensureHourlyRound(database, endsAtExclusive, rewardGraceSeconds),
   ]);
   return { currentRoundId, nextRoundId };
 }
@@ -223,6 +228,7 @@ export async function runHourlyLifecycleTick(
   database: DatabaseService,
   router: ExecutionRouter,
   now: Date,
+  rewardGraceSeconds = DEFAULT_REWARD_GRACE_SECONDS,
 ): Promise<readonly LifecycleEvent[]> {
   const events: LifecycleEvent[] = [];
   const window = canonicalHourlyWindow(now);
@@ -231,7 +237,7 @@ export async function runHourlyLifecycleTick(
     [window.startsAt, window.endsAtExclusive],
   );
   const existingTimes = new Set(existing.rows.map(({ starts_at }) => starts_at.toISOString()));
-  const ensured = await ensureCurrentAndNextRounds(database, now);
+  const ensured = await ensureCurrentAndNextRounds(database, now, rewardGraceSeconds);
   if (!existingTimes.has(window.startsAt.toISOString()))
     events.push({ type: 'ROUND_CREATED', roundId: ensured.currentRoundId });
   if (!existingTimes.has(window.endsAtExclusive.toISOString()))

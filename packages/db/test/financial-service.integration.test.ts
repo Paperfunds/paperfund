@@ -227,7 +227,7 @@ describe('corrected hourly/daily PostgreSQL financial foundation', () => {
     const migrations = await database.pool.query<{ count: string }>(
       'select count(*)::text as count from drizzle.__drizzle_migrations',
     );
-    expect(migrations.rows[0]?.count).toBe('4');
+    expect(migrations.rows[0]?.count).toBe('5');
   });
 
   it('enforces exact non-overlapping hourly rounds and exact UTC daily windows', async () => {

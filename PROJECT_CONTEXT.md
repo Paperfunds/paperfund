@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 4E implementation record
-**Product status:** Web MVP and release-ready Axiom Chromium overlay with authoritative trading complete
+**Document status:** Canonical specification with Phase 5A implementation record
+**Product status:** Authoritative trading and creator-fee reward-pool accounting complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-25
 
@@ -1059,3 +1059,36 @@ trees, environment files, and common server-secret markers. The generated manife
 `storage` permission, the exact configured API origin, the Axiom content/bridge match, a local-script
 CSP, and the Axiom-scoped bundle resources. Release, installation, recovery, headed fixture, and live
 smoke procedures are documented in `README.md` and `docs/EXTENSION.md`.
+
+
+## 32. Phase 5A implementation record
+
+Phase 5A adds authoritative creator-fee funding and reward-pool accounting without winner allocation,
+payout custody, signing, broadcasting, or real-SOL transfers.
+
+Verified creator-fee events use immutable exact lamports, authoritative event time, slot, source, and
+the unique chain identity `(transaction signature, event index)`. Only verified, attributed events
+are counted. Attribution uses the hourly round's UTC `[start, end)` window, never discovery or
+processing time. The source boundary currently includes deterministic fixtures only; a live
+Pump/PumpSwap watcher is deliberately absent because official event semantics, real-chain examples,
+and finality/reorg policy were not verified to production confidence within this phase.
+
+Hourly reward finalization begins only after the round's snapshotted grace period, defaults to 60
+seconds, and is independent of trading settlement and the next round. One PostgreSQL transaction
+uses an hour advisory lock plus Reward Buffer row lock to total events; apply the approved
+63/27/10 or 58/5/27/10 largest-remainder split; add explicit buffer capital; calculate the full-window
+baseline and exact lambda target; cap weak-hour support at available capital; persist the immutable
+hourly snapshot, daily contribution, platform allocation, buffer movements, and counted-event state;
+and enforce exact conservation. Uniqueness and locking make worker retries and concurrent finalizers
+idempotent.
+
+The baseline is the floored mean of the most recent full configured window of frozen natural hourly
+allocations ordered by round start; 12 remains the default, and partial windows do not smooth. The
+default lambda remains 6000 basis points. Reward Buffer movements are immutable, signed, and
+reasoned; its materialized balance is nonnegative and locked. Daily totals are derived from immutable
+per-hour contributions and protected against silent divergence. Platform amounts remain separate.
+
+Events discovered after freeze are retained as `LATE_AFTER_FREEZE` with an explicit reconciliation
+record and never mutate a frozen pool. Public read endpoints expose exact-string provisional versus
+frozen hourly/daily values and an audit response with events, baseline inputs, movements, and
+conservation. Detailed contracts and limitations are in `docs/REWARDS.md` and `docs/API.md`.

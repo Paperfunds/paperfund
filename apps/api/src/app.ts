@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import fastify, { type FastifyRequest } from 'fastify';
 
 import type { AppConfig } from '@paperfund/config';
-import { FinancialServiceError, type DatabaseService } from '@paperfund/db';
+import { FinancialServiceError, RewardAccountingError, type DatabaseService } from '@paperfund/db';
 import { ExecutionEngineError } from '@paperfund/execution';
 import type { ServiceStatus } from '@paperfund/shared';
 
@@ -169,6 +169,7 @@ export function buildApp(dependencies: AppDependencies) {
     const domainError =
       error instanceof ApiError ||
       error instanceof FinancialServiceError ||
+      error instanceof RewardAccountingError ||
       error instanceof ExecutionEngineError;
     const frameworkStatus =
       typeof error === 'object' &&
@@ -482,6 +483,25 @@ export function buildApp(dependencies: AppDependencies) {
   app.get('/api/v1/competitions/daily/current', async () =>
     exactJson({ competition: await competition.currentDailyCompetition(), serverTime: new Date() }),
   );
+  app.get('/api/v1/rewards/hourly/current', async () =>
+    exactJson(await competition.currentHourlyRewardPool()),
+  );
+  app.get('/api/v1/rewards/hourly/:roundId', async (request) => {
+    const roundId = (request.params as { roundId: string }).roundId;
+    if (roundId.length === 0 || roundId.length > 128)
+      throw new ApiError('INVALID_REQUEST', 'roundId is invalid.');
+    return exactJson(await competition.hourlyRewardPool(roundId));
+  });
+  app.get('/api/v1/rewards/hourly/:roundId/reconciliation', async (request) => {
+    const roundId = (request.params as { roundId: string }).roundId;
+    if (roundId.length === 0 || roundId.length > 128)
+      throw new ApiError('INVALID_REQUEST', 'roundId is invalid.');
+    return exactJson(await competition.rewardReconciliation(roundId));
+  });
+  app.get('/api/v1/rewards/daily/current', async () =>
+    exactJson(await competition.currentDailyRewardPool()),
+  );
+
   app.get('/api/v1/markets/:mint', async (request) => {
     const mint = (request.params as { mint: string }).mint;
     if (!isSolanaPublicKey(mint)) throw new ApiError('INVALID_REQUEST', 'mint is invalid.');

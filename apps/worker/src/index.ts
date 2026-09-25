@@ -2,7 +2,7 @@ import { config as loadDotenv } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 
 import { parseEnvironment } from '@paperfund/config';
-import { createDatabase, runHourlyLifecycleTick } from '@paperfund/db';
+import { createDatabase, runHourlyLifecycleTick, runRewardFinalizationTick } from '@paperfund/db';
 import { createProductionExecutionRouter } from '@paperfund/protocols';
 
 loadDotenv({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
@@ -25,7 +25,20 @@ function log(level: 'info' | 'error', event: string, metadata: Record<string, un
 
 async function tick() {
   try {
-    const events = await runHourlyLifecycleTick(database, router, new Date());
+    const now = new Date();
+    const events = await runHourlyLifecycleTick(
+      database,
+      router,
+      now,
+      config.REWARD_FINALIZATION_GRACE_SECONDS,
+    );
+    const rewardRounds = await runRewardFinalizationTick(database, now, {
+      allocationMode: config.REWARD_ALLOCATION_MODE,
+      baselineWindow: config.REWARD_BASELINE_WINDOW,
+      lambdaBps: BigInt(config.REWARD_LAMBDA_BPS),
+      configurationVersion: 'phase-5a-v1',
+    });
+    for (const roundId of rewardRounds) log('info', 'reward_pool_frozen', { roundId });
     for (const event of events) {
       log('info', event.type.toLowerCase(), {
         roundId: event.roundId,

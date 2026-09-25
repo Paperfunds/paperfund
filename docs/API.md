@@ -103,3 +103,19 @@ Content-Type: application/json
 `apps/worker` polls every `WORKER_TICK_INTERVAL_MS` (default five seconds). Each tick idempotently ensures the current and next exact UTC hour plus the current UTC day, opens due rounds, discovers persisted ended `OPEN`/`CLOSING`/`SETTLING` rounds, and invokes the existing retry-safe settlement engine. The next hour opens independently while previous settlement retries. After all attributed hourly rounds are finalized, an ended daily competition becomes `FINALIZED`.
 
 PostgreSQL remains authoritative for rounds, accounts, cash, slots, positions, orders, fills, evidence, journals, and results. Redis stores only expiring challenges, sessions, and rate-limit counters.
+
+## Reward-pool reads (Phase 5A)
+
+Reward reads are public and read-only. Exact lamport values are JSON strings. The current hourly and
+daily endpoints return `PROVISIONAL` values while verified events can still arrive; provisional
+responses never claim that dynamic smoothing is final.
+
+- `GET /api/v1/rewards/hourly/current` returns the current hour's verified fees and provisional
+  natural-hourly/daily allocation, or its frozen snapshot.
+- `GET /api/v1/rewards/hourly/:roundId` returns a provisional or frozen round pool.
+- `GET /api/v1/rewards/hourly/:roundId/reconciliation` returns the frozen calculation, counted
+  events, baseline inputs, buffer movements, and conservation proof.
+- `GET /api/v1/rewards/daily/current` returns immutable frozen contributions plus the current
+  provisional daily contribution.
+
+Raw provider payloads and internal credentials are never returned. See `docs/REWARDS.md`.

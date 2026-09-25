@@ -17,7 +17,13 @@ import {
   executePaperSellAll,
   FinancialServiceError,
   getCurrentDailyCompetition,
+  getCurrentDailyRewardPool,
+  getCurrentHourlyRewardPool,
+  getHourlyRewardPool,
+  reconcileHourlyRewardPool,
   getCurrentRound,
+  defaultRewardAccountingConfig,
+  type RewardAccountingConfig,
   type DatabaseService,
 } from '@paperfund/db';
 import {
@@ -118,6 +124,7 @@ export class CompetitionService {
     readonly database: DatabaseService,
     readonly router: ExecutionRouter,
     readonly now: () => Date = () => new Date(),
+    readonly rewardConfig: RewardAccountingConfig = defaultRewardAccountingConfig,
   ) {}
 
   getCurrentRound() {
@@ -655,6 +662,21 @@ export class CompetitionService {
 
   async currentDailyCompetition() {
     return getCurrentDailyCompetition(this.database, this.now());
+  }
+  currentHourlyRewardPool() {
+    return getCurrentHourlyRewardPool(this.database, this.now(), this.rewardConfig);
+  }
+
+  hourlyRewardPool(roundId: string) {
+    return getHourlyRewardPool(this.database, roundId, this.rewardConfig);
+  }
+
+  currentDailyRewardPool() {
+    return getCurrentDailyRewardPool(this.database, this.now(), this.rewardConfig);
+  }
+
+  rewardReconciliation(roundId: string) {
+    return reconcileHourlyRewardPool(this.database, roundId);
   }
 }
 
