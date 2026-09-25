@@ -318,7 +318,11 @@ export function buildApp(dependencies: AppDependencies) {
         tokenQuantityBaseUnits: position.remaining_base_units,
         costBasisPaperSolLamports: position.cost_basis_lamports,
         realizedPnlLamports: position.realized_pnl_lamports,
-        valuation: { status: 'UNAVAILABLE' },
+        valuation: {
+          status: 'UNAVAILABLE',
+          reason: 'VALUATION_NOT_REQUESTED',
+          valuedAt: new Date(),
+        },
       })),
     });
   });
@@ -359,6 +363,14 @@ export function buildApp(dependencies: AppDependencies) {
       costBasisPaperSolLamports: result.position.costBasisLamports,
       executedAt: result.executedAt,
     });
+  });
+
+  app.get('/api/v1/trades/buy-preflight', async (request) => {
+    const mint = (request.query as { mint?: unknown }).mint;
+    if (typeof mint !== 'string' || !isSolanaPublicKey(mint)) {
+      throw new ApiError('INVALID_REQUEST', 'mint is invalid.');
+    }
+    return exactJson(await competition.buyPreflight((await user(request)).id, mint));
   });
 
   app.post('/api/v1/trades/sell', { preHandler: rateLimit('trade') }, async (request) => {
@@ -418,6 +430,13 @@ export function buildApp(dependencies: AppDependencies) {
     return exactJson({
       accountId: result.accountId,
       roundId: result.roundId,
+      cashLamports: result.cashLamports,
+      startingPaperSolLamports: result.startingPaperSolLamports,
+      valuationStatus: result.valuationStatus,
+      executablePositionsLamports: result.executablePositionsLamports,
+      portfolioEquityLamports: result.portfolioEquityLamports,
+      livePnlLamports: result.livePnlLamports,
+      valuedAt: result.valuedAt,
       positions: result.positions.map((position) => ({
         id: position.id,
         mint: position.mint_address,
@@ -427,7 +446,7 @@ export function buildApp(dependencies: AppDependencies) {
         tokenQuantityBaseUnits: position.remaining_base_units,
         costBasisPaperSolLamports: position.cost_basis_lamports,
         realizedPnlLamports: position.realized_pnl_lamports,
-        valuation: { status: 'UNAVAILABLE' },
+        valuation: position.valuation,
       })),
     });
   });

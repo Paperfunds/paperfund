@@ -1,9 +1,9 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 4B implementation record
-**Product status:** First usable wallet-authenticated Paperfund web application complete
+**Document status:** Canonical specification with Phase 4C implementation record
+**Product status:** Web MVP with authoritative preflight, live executable valuation, and browser smoke complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
-**Last updated:** 2026-09-24
+**Last updated:** 2026-09-25
 
 ## 1. Purpose and change policy
 
@@ -950,3 +950,43 @@ entry and transition, BUY and typed rejection, positions, partial SELL, SELL ALL
 leaderboards. A browser-level Playwright smoke harness is deferred to avoid adding a second mock
 runtime; no frontend test requires live Solana RPC. Detailed architecture and limitations are in
 `docs/WEB_APP.md`.
+
+## 29. Phase 4C implementation record
+
+Phase 4C adds an authenticated, read-only BUY preflight without changing competition rules or
+duplicating execution math. For every open position the API resolves the current execution route and
+reuses full-exit adapter valuation. Portfolio equity is exact cash plus all executable exit values;
+the ratio maximum is the existing basis-point floor calculation, and the effective maximum is the
+lesser of that result and cash. Existing exposure to the target token does not reduce the per-order
+limit. It only avoids consuming another immutable token slot.
+
+Preflight returns exact string values, market/current-protocol support, target-slot impact, server
+time, and explicit valuation availability. If any open position cannot be valued, equity and maximum
+are unavailable rather than partial or fabricated. Preflight is advisory and makes no financial
+mutation; the existing BUY transaction always reloads authoritative execution state and remains the
+final authority for ratio, cash, slot, and round admission. Idempotent registration of public market
+routing metadata during market inspection is not a financial state transition.
+
+`/api/v1/positions` now returns net executable full-exit value, signed unrealized Paper P&L, current
+protocol, evidence fingerprint/observation metadata, and explicit status per position. Pump-origin
+history remains immutable while a migrated position is valued and displayed through PumpSwap.
+Account-level equity and live Paper P&L are emitted only when every open position is available; live
+P&L is provisional and is neither persisted nor used for result finalization or leaderboards.
+
+The web keeps its four-second persisted account poll and performs the at-most-five-position valuation
+query on a separate twelve-second interval. The inspected-mint preflight also refreshes every twelve
+seconds and after mutations. No cache was added: UI snapshots are advisory, and transaction execution
+never consumes them. Market freshness thresholds remain TBD, so no stale cutoff was invented.
+
+The BUY ticket now uses the exact backend maximum, displays cash/equity/venue/slot impact, disables
+known over-limit requests, and still handles transactional race errors. Positions display cost basis,
+executable value, unrealized P&L, entry venue, and current venue. The account summary distinguishes
+cash, exact portfolio equity, and provisional Live Paper P&L without redesigning the approved shell.
+
+A single Playwright smoke builds and serves the actual web app, starts the real API/service stack over
+a disposable migrated PostgreSQL database, runs the lifecycle tick, injects a deterministic test-only
+Ed25519 wallet, and uses recorded Pump market state plus in-memory ephemeral sessions. The browser
+blocks all non-local requests. It proves connect, challenge signing, entry, 10 Paper SOL, exact MAX,
+BUY, executable valuation, SELL ALL, and trade-history update without Phantom, mainnet RPC, real SOL,
+or external network. No schema migration was required. Detailed contracts and operation are recorded
+in `docs/API.md` and `docs/WEB_APP.md`.

@@ -23,9 +23,59 @@ export interface Position {
   tokenQuantityBaseUnits: string;
   costBasisPaperSolLamports: string;
   realizedPnlLamports: string;
-  valuation:
-    | { status: 'UNAVAILABLE' }
-    | { status: 'AVAILABLE'; executablePaperSolLamports: string; unrealizedPnlLamports: string };
+  valuation: PositionValuation;
+}
+
+export type PositionValuation =
+  | {
+      status: 'AVAILABLE';
+      executablePaperSolLamports: string;
+      unrealizedPnlLamports: string;
+      currentProtocol: string;
+      evidenceFingerprint: string;
+      observedAt: string;
+      chainSlot: string | null;
+      valuedAt: string;
+    }
+  | {
+      status: 'UNAVAILABLE' | 'STALE' | 'UNSUPPORTED_ROUTE';
+      reason: string;
+      valuedAt: string;
+    };
+
+export interface PositionValuationResponse {
+  accountId: string;
+  roundId: string;
+  cashLamports: string;
+  startingPaperSolLamports: string;
+  valuationStatus: 'AVAILABLE' | 'UNAVAILABLE';
+  executablePositionsLamports: string | null;
+  portfolioEquityLamports: string | null;
+  livePnlLamports: string | null;
+  valuedAt: string;
+  positions: Position[];
+}
+
+export interface BuyPreflight {
+  accountId: string;
+  roundId: string;
+  cashLamports: string;
+  executablePositionsLamports: string | null;
+  portfolioEquityLamports: string | null;
+  maxBuyByRatioLamports: string | null;
+  maxBuyLamports: string | null;
+  maxBuyRatioBps: string;
+  slotsUsed: number;
+  slotLimit: number;
+  targetAlreadyConsumesSlot: boolean;
+  requiresNewSlot: boolean;
+  slotAvailable: boolean;
+  marketSupported: boolean;
+  protocol: string | null;
+  marketStatus: string;
+  valuationStatus: 'AVAILABLE' | 'UNAVAILABLE';
+  unavailablePositionIds: string[];
+  serverTime: string;
 }
 
 export interface Account {

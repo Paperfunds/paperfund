@@ -41,10 +41,11 @@ Domain errors map to 4xx responses; unavailable authoritative market/RPC state m
 | GET    | `/api/v1/rounds/current`             | No   | Canonical persisted UTC hourly round plus server time   |
 | POST   | `/api/v1/rounds/current/enter`       | Yes  | Idempotently create the fresh 10 Paper SOL account      |
 | GET    | `/api/v1/rounds/current/account`     | Yes  | Cash, round, slots, and persisted open positions        |
+| GET    | `/api/v1/trades/buy-preflight`       | Yes  | Advisory exact BUY limit for the requested `mint`       |
 | POST   | `/api/v1/trades/buy`                 | Yes  | Authoritative Pump-origin BUY                           |
 | POST   | `/api/v1/trades/sell`                | Yes  | Partial SELL or exact server-locked `ALL` SELL          |
 | GET    | `/api/v1/trades`                     | Yes  | Stable descending fill history (`limit`, `cursor`)      |
-| GET    | `/api/v1/positions`                  | Yes  | Current hourly account positions                        |
+| GET    | `/api/v1/positions`                  | Yes  | Positions with authoritative executable exit valuation  |
 | GET    | `/api/v1/results/hourly`             | Yes  | Paginated finalized hourly results                      |
 | GET    | `/api/v1/leaderboards/hourly`        | No   | Latest finalized round, or `roundId` query              |
 | GET    | `/api/v1/leaderboards/daily`         | No   | Current UTC Daily Championship with tie metadata        |
@@ -64,6 +65,24 @@ Content-Type: application/json
 ```
 
 The server derives the Pump bonding curve, resolves migration to the canonical index-0 PumpSwap pool when necessary, loads authoritative market state, applies the 20% rule and slot/cash checks transactionally, and returns order/fill/evidence identifiers and exact updated balances.
+
+### BUY preflight and portfolio valuation
+
+`GET /api/v1/trades/buy-preflight?mint=<pump-origin-mint>` is an authenticated, read-only advisory. It resolves every open position through its current venue and computes, with exact integer math:
+
+```text
+portfolio equity = cash + sum(full-exit executable position values)
+ratio maximum = floor(portfolio equity × max_buy_ratio_bps / 10,000)
+effective maximum = min(ratio maximum, cash)
+```
+
+The response includes exact string values for cash, executable positions, equity, ratio/effective maximums, the ratio, slot usage and target-slot impact, market support/current protocol, valuation availability, and server time. Owning the target token does not reduce the per-order ratio maximum; it only means that BUY does not require another token slot. Market inspection may idempotently register public asset/market routing metadata, but preflight performs no financial mutation.
+
+If any open position cannot be valued, `valuationStatus` is `UNAVAILABLE`, the affected position IDs are explicit, and equity/max fields are `null`. No missing position is treated as zero. The preflight is advisory: `/trades/buy` reloads market state and enforces cash, slots, and the exact ratio inside the authoritative transaction. Clients must still handle `MAX_BUY_RATIO_EXCEEDED`, `INSUFFICIENT_PAPER_SOL`, and `TOKEN_SLOT_LIMIT_REACHED`.
+
+`GET /api/v1/positions` returns account valuation totals and one valuation per persisted position. Available values contain net full-exit Paper SOL, signed unrealized P&L (`exit value - remaining cost basis`), current protocol, evidence fingerprint, observation time/slot, and valuation time. Failures are explicit `UNAVAILABLE`, `STALE`, or `UNSUPPORTED_ROUTE` states with a sanitized reason. Historical origin venue is unchanged when the current execution route has migrated.
+
+No valuation cache is used. The web keeps the lightweight persisted account poll at four seconds and requests executable valuations separately every twelve seconds. With at most five token slots this bounds normal display fan-out. Preflight always performs a fresh advisory valuation, and trade execution never consumes frontend or cached valuation state.
 
 ### SELL-all example
 

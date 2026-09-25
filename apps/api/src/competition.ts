@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
-import { identifier, paperSolFromSolString } from '@paperfund/core';
+import {
+  basisPoints,
+  calculateEffectiveMaxBuy,
+  calculateMaxBuyByRatio,
+  calculatePortfolioEquity,
+  identifier,
+  paperSolBaseUnits,
+  paperSolFromSolString,
+  tokenBaseUnits,
+} from '@paperfund/core';
 import {
   enterCurrentRound,
   executePaperBuy,
@@ -13,6 +22,7 @@ import {
 } from '@paperfund/db';
 import {
   ExecutionEngineError,
+  valuePortfolioPositions,
   type ExecutionRouter,
   type MarketIdentity,
 } from '@paperfund/execution';
@@ -25,6 +35,49 @@ import {
 export interface PageOptions {
   readonly limit: number;
   readonly cursor?: string;
+}
+
+type PositionRow = {
+  id: string;
+  market_id: string;
+  mint_address: string;
+  decimals: number;
+  venue: string;
+  remaining_base_units: string;
+  cost_basis_lamports: string;
+  realized_pnl_lamports: string;
+};
+
+export type PositionValuation =
+  | {
+      readonly status: 'AVAILABLE';
+      readonly executablePaperSolLamports: bigint;
+      readonly unrealizedPnlLamports: bigint;
+      readonly currentProtocol: string;
+      readonly evidenceFingerprint: string;
+      readonly observedAt: string;
+      readonly chainSlot: bigint | null;
+      readonly valuedAt: Date;
+    }
+  | {
+      readonly status: 'UNAVAILABLE' | 'STALE' | 'UNSUPPORTED_ROUTE';
+      readonly reason: string;
+      readonly valuedAt: Date;
+    };
+
+function unavailableValuation(error: unknown, valuedAt: Date): PositionValuation {
+  const code = error instanceof ExecutionEngineError ? error.code : 'MARKET_STATE_UNAVAILABLE';
+  const unsupported = [
+    'UNSUPPORTED_PROTOCOL',
+    'UNSUPPORTED_MIGRATED_PROTOCOL',
+    'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+    'MIGRATION_DESTINATION_UNAVAILABLE',
+  ].includes(code);
+  return {
+    status: unsupported ? 'UNSUPPORTED_ROUTE' : 'UNAVAILABLE',
+    reason: code,
+    valuedAt,
+  };
 }
 
 function encodeCursor(value: object): string {
@@ -85,11 +138,12 @@ export class CompetitionService {
       realized_pnl_lamports: string;
       state: string;
       max_unique_tokens: number;
+      max_buy_ratio_bps: number;
       slots_used: number;
     }>(
       `select ca.id, ca.hourly_round_id, ca.starting_paper_sol_lamports,
               ca.paper_sol_balance_lamports, ca.realized_pnl_lamports, r.state,
-              r.max_unique_tokens,
+              r.max_unique_tokens, r.max_buy_ratio_bps,
               (select count(*)::int from competition_token_slots s where s.competition_account_id = ca.id) slots_used
        from competition_accounts ca join hourly_rounds r on r.id = ca.hourly_round_id
        where ca.user_id = $1 and r.starts_at <= $2 and r.ends_at_exclusive > $2`,
@@ -103,16 +157,7 @@ export class CompetitionService {
 
   private async getPositionsForAccount(accountId: string) {
     return (
-      await this.database.pool.query<{
-        id: string;
-        market_id: string;
-        mint_address: string;
-        decimals: number;
-        venue: string;
-        remaining_base_units: string;
-        cost_basis_lamports: string;
-        realized_pnl_lamports: string;
-      }>(
+      await this.database.pool.query<PositionRow>(
         `select p.id, p.market_id, a.mint_address, a.decimals, m.venue,
                 p.remaining_base_units, p.cost_basis_lamports, p.realized_pnl_lamports
          from positions p join assets a on a.id = p.asset_id join markets m on m.id = p.market_id
@@ -124,9 +169,143 @@ export class CompetitionService {
 
   async getPositions(userId: string) {
     const account = await this.getCurrentAccount(userId);
-    return account
-      ? { accountId: account.id, roundId: account.hourly_round_id, positions: account.positions }
+    if (!account) return null;
+    const positions = await this.valuePositions(account.positions);
+    const available = positions.every(({ valuation }) => valuation.status === 'AVAILABLE');
+    const executablePositionsLamports = available
+      ? positions.reduce(
+          (total, { valuation }) =>
+            total + (valuation.status === 'AVAILABLE' ? valuation.executablePaperSolLamports : 0n),
+          0n,
+        )
       : null;
+    const portfolioEquityLamports =
+      executablePositionsLamports === null
+        ? null
+        : BigInt(account.paper_sol_balance_lamports) + executablePositionsLamports;
+    return {
+      accountId: account.id,
+      roundId: account.hourly_round_id,
+      cashLamports: BigInt(account.paper_sol_balance_lamports),
+      startingPaperSolLamports: BigInt(account.starting_paper_sol_lamports),
+      valuationStatus: available ? ('AVAILABLE' as const) : ('UNAVAILABLE' as const),
+      executablePositionsLamports,
+      portfolioEquityLamports,
+      livePnlLamports:
+        portfolioEquityLamports === null
+          ? null
+          : portfolioEquityLamports - BigInt(account.starting_paper_sol_lamports),
+      valuedAt: this.now(),
+      positions,
+    };
+  }
+
+  private async valuePositions(positions: readonly PositionRow[]) {
+    const values: Array<PositionRow & { valuation: PositionValuation }> = [];
+    for (const position of positions) {
+      const valuedAt = this.now();
+      try {
+        const result = await valuePortfolioPositions(this.router, [
+          {
+            identity: {
+              protocolId: identifier(position.venue, 'ProtocolId'),
+              marketId: identifier(position.market_id, 'MarketId'),
+              tokenMint: identifier(position.mint_address, 'TokenMint'),
+            },
+            tokenQuantity: tokenBaseUnits(BigInt(position.remaining_base_units)),
+          },
+        ]);
+        const valued = result.positions[0]!;
+        values.push({
+          ...position,
+          valuation: {
+            status: 'AVAILABLE',
+            executablePaperSolLamports: valued.value.paperSolValue,
+            unrealizedPnlLamports:
+              valued.value.paperSolValue - BigInt(position.cost_basis_lamports),
+            currentProtocol: valued.value.identity.protocolId,
+            evidenceFingerprint: valued.evidence.fingerprint,
+            observedAt: valued.evidence.observedAt,
+            chainSlot: valued.evidence.chainSlot,
+            valuedAt,
+          },
+        });
+      } catch (error) {
+        values.push({ ...position, valuation: unavailableValuation(error, valuedAt) });
+      }
+    }
+    return values;
+  }
+
+  async buyPreflight(userId: string, mint: string) {
+    const account = await this.getCurrentAccount(userId);
+    if (!account) {
+      throw new FinancialServiceError(
+        'ENTITY_NOT_FOUND',
+        'Enter the current round before trading.',
+      );
+    }
+    const positions = await this.valuePositions(account.positions);
+    const allAvailable = positions.every(({ valuation }) => valuation.status === 'AVAILABLE');
+    const positionValues = allAvailable
+      ? positions.map(({ valuation }) =>
+          paperSolBaseUnits(
+            valuation.status === 'AVAILABLE' ? valuation.executablePaperSolLamports : 0n,
+          ),
+        )
+      : null;
+    const cash = paperSolBaseUnits(BigInt(account.paper_sol_balance_lamports));
+    const equity = positionValues ? calculatePortfolioEquity(cash, positionValues) : null;
+    const ratio = basisPoints(BigInt(account.max_buy_ratio_bps));
+    const maxByRatio = equity === null ? null : calculateMaxBuyByRatio(equity, ratio);
+    const effectiveMax = maxByRatio === null ? null : calculateEffectiveMaxBuy(cash, maxByRatio);
+    const slot = (
+      await this.database.pool.query<{ existing: number }>(
+        `select count(*)::int existing
+         from competition_token_slots s join assets a on a.id = s.asset_id
+         where s.competition_account_id = $1 and a.mint_address = $2`,
+        [account.id, mint],
+      )
+    ).rows[0];
+    let market:
+      | Awaited<ReturnType<CompetitionService['marketSupport']>>
+      | { mint: string; supported: false; reason: string };
+    try {
+      market = await this.marketSupport(mint);
+    } catch (error) {
+      market = {
+        mint,
+        supported: false,
+        reason: error instanceof ExecutionEngineError ? error.code : 'MARKET_STATE_UNAVAILABLE',
+      };
+    }
+    const targetAlreadyConsumesSlot = (slot?.existing ?? 0) > 0;
+    return {
+      accountId: account.id,
+      roundId: account.hourly_round_id,
+      cashLamports: cash,
+      executablePositionsLamports:
+        positionValues === null
+          ? null
+          : positionValues.reduce<bigint>((total, value) => total + value, 0n),
+      portfolioEquityLamports: equity,
+      maxBuyByRatioLamports: maxByRatio,
+      maxBuyLamports: effectiveMax,
+      maxBuyRatioBps: ratio,
+      slotsUsed: account.slots_used,
+      slotLimit: account.max_unique_tokens,
+      targetAlreadyConsumesSlot,
+      requiresNewSlot: !targetAlreadyConsumesSlot,
+      slotAvailable: targetAlreadyConsumesSlot || account.slots_used < account.max_unique_tokens,
+      marketSupported: market.supported,
+      protocol: market.supported ? market.executionProtocol : null,
+      marketStatus: market.supported ? market.status : market.reason,
+      valuationStatus: allAvailable ? ('AVAILABLE' as const) : ('UNAVAILABLE' as const),
+      unavailablePositionIds: positions
+        .filter(({ valuation }) => valuation.status !== 'AVAILABLE')
+        .map(({ id }) => id),
+      serverTime: this.now(),
+    };
   }
 
   private async ensurePumpMarket(mint: string): Promise<{

@@ -40,7 +40,11 @@ const account: Account = {
       tokenQuantityBaseUnits: '1000000',
       costBasisPaperSolLamports: '2000000000',
       realizedPnlLamports: '0',
-      valuation: { status: 'UNAVAILABLE' },
+      valuation: {
+        status: 'UNAVAILABLE',
+        reason: 'MARKET_STATE_UNAVAILABLE',
+        valuedAt: new Date().toISOString(),
+      },
     },
   ],
 };
@@ -55,7 +59,14 @@ function response(body: unknown, status = 200): Promise<Response> {
 }
 
 function mockApi(
-  options: { authenticated?: boolean; entered?: boolean; marketError?: string } = {},
+  options: {
+    authenticated?: boolean;
+    entered?: boolean;
+    marketError?: string;
+    preflightUnavailable?: boolean;
+    valuationAvailable?: boolean;
+    migrated?: boolean;
+  } = {},
 ) {
   let entered = options.entered ?? false;
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -78,6 +89,55 @@ function mockApi(
       return response(account);
     }
     if (url.includes('/results/hourly')) return response({ items: [], nextCursor: null });
+    if (url.includes('/trades/buy-preflight'))
+      return response({
+        accountId: account.accountId,
+        roundId: account.roundId,
+        cashLamports: account.paperSolLamports,
+        executablePositionsLamports: options.preflightUnavailable ? null : '2000000000',
+        portfolioEquityLamports: options.preflightUnavailable ? null : '10000000000',
+        maxBuyByRatioLamports: options.preflightUnavailable ? null : '2000000000',
+        maxBuyLamports: options.preflightUnavailable ? null : '2000000000',
+        maxBuyRatioBps: '2000',
+        slotsUsed: 1,
+        slotLimit: 5,
+        targetAlreadyConsumesSlot: true,
+        requiresNewSlot: false,
+        slotAvailable: true,
+        marketSupported: true,
+        protocol: 'PUMP_FUN',
+        marketStatus: 'ACTIVE_BONDING_CURVE',
+        valuationStatus: options.preflightUnavailable ? 'UNAVAILABLE' : 'AVAILABLE',
+        unavailablePositionIds: options.preflightUnavailable ? ['position-1'] : [],
+        serverTime: now.toISOString(),
+      });
+    if (url.endsWith('/positions'))
+      return response({
+        accountId: account.accountId,
+        roundId: account.roundId,
+        cashLamports: account.paperSolLamports,
+        startingPaperSolLamports: account.startingPaperSolLamports,
+        valuationStatus: options.valuationAvailable ? 'AVAILABLE' : 'UNAVAILABLE',
+        executablePositionsLamports: options.valuationAvailable ? '2100000000' : null,
+        portfolioEquityLamports: options.valuationAvailable ? '10100000000' : null,
+        livePnlLamports: options.valuationAvailable ? '100000000' : null,
+        valuedAt: now.toISOString(),
+        positions: account.positions.map((position) => ({
+          ...position,
+          valuation: options.valuationAvailable
+            ? {
+                status: 'AVAILABLE',
+                executablePaperSolLamports: '2100000000',
+                unrealizedPnlLamports: '100000000',
+                currentProtocol: options.migrated ? 'PUMP_SWAP' : 'PUMP_FUN',
+                evidenceFingerprint: 'fixture-fingerprint',
+                observedAt: now.toISOString(),
+                chainSlot: '123',
+                valuedAt: now.toISOString(),
+              }
+            : position.valuation,
+        })),
+      });
     if (url.includes('/trades') && (!init?.method || init.method === 'GET'))
       return response({ items: [], nextCursor: null });
     if (url.includes('/markets/'))
@@ -213,7 +273,7 @@ describe('Paperfund web app', () => {
     fetchMock.mockImplementationOnce(() =>
       response({ error: { code: 'MAX_BUY_RATIO_EXCEEDED', message: 'Rejected.' } }, 409),
     );
-    await userEvent.type(screen.getByLabelText('Paper SOL amount'), '9');
+    await userEvent.type(screen.getByLabelText('Paper SOL amount'), '1');
     await userEvent.click(screen.getByRole('button', { name: 'Buy with Paper SOL' }));
     expect(await screen.findByText('Buy exceeds the 20% per-order limit.')).toBeInTheDocument();
   });
@@ -221,7 +281,7 @@ describe('Paperfund web app', () => {
   it('renders positions and supports exact partial SELL and SELL ALL', async () => {
     const fetchMock = mockApi({ authenticated: true, entered: true });
     renderApp();
-    expect(await screen.findByText('Valuation unavailable')).toBeInTheDocument();
+    expect((await screen.findAllByText('Valuation unavailable')).length).toBeGreaterThan(0);
     const sellInput = screen.getByLabelText('Token base units to sell');
     const position = sellInput.closest('article')!;
     await userEvent.click(within(position).getByRole('button', { name: '25%' }));
@@ -234,6 +294,36 @@ describe('Paperfund web app', () => {
         fetchMock.mock.calls.some(([, init]) => String(init?.body).includes('"quantity":"ALL"')),
       ).toBe(true),
     );
+  });
+
+  it('uses the exact backend max and disables BUY when preflight cannot value equity', async () => {
+    mockApi({ authenticated: true, entered: true });
+    const { unmount } = renderApp();
+    await userEvent.type(await screen.findByLabelText('Token mint'), account.positions[0]!.mint);
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect' }));
+    await screen.findByText('Supported market');
+    await userEvent.click(await screen.findByRole('button', { name: 'MAX' }));
+    expect(screen.getByLabelText('Paper SOL amount')).toHaveValue('2');
+    await userEvent.clear(screen.getByLabelText('Paper SOL amount'));
+    await userEvent.type(screen.getByLabelText('Paper SOL amount'), '2.000000001');
+    expect(screen.getByText('Exceeds 20% maximum for this order.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buy with Paper SOL' })).toBeDisabled();
+
+    unmount();
+    mockApi({ authenticated: true, entered: true, preflightUnavailable: true });
+    renderApp();
+    await userEvent.type(await screen.findByLabelText('Token mint'), account.positions[0]!.mint);
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect' }));
+    expect(await screen.findByRole('button', { name: 'MAX' })).toBeDisabled();
+  });
+
+  it('renders exact live equity, P&L, executable value, and a migrated current venue', async () => {
+    mockApi({ authenticated: true, entered: true, valuationAvailable: true, migrated: true });
+    renderApp();
+    expect(await screen.findByText('10.1 SOL')).toBeInTheDocument();
+    expect((await screen.findAllByText('+0.1 SOL')).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('2.1 SOL')).toBeInTheDocument();
+    expect(screen.getByText(/PumpSwap current/)).toBeInTheDocument();
   });
 
   it('renders backend ranks and tie metadata on hourly and daily boards', async () => {

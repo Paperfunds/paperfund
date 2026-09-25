@@ -41,15 +41,17 @@ Each BUY or SELL click creates a fresh cryptographically generated UUID for `Ide
 
 Authoritative lamports and token base units stay as strings at the API boundary and become `BigInt` only for exact client-side operations. JavaScript floating point is not used for financial decisions. Display formatting performs integer division and truncation. Partial SELL percentages floor integer base units, while 100% uses the exact stored quantity. SELL ALL sends the dedicated `"ALL"` intent so the server locks and snapshots the current position.
 
-The backend does not yet expose an authoritative read-only max-buy field. The MAX shortcut therefore uses a conservative 20% of current cash, which cannot exceed 20% of equity because position executable values are non-negative. This may be lower than the true permitted maximum when positions have value. The backend always reloads live position values and enforces the exact cap at submission; `MAX_BUY_RATIO_EXCEEDED` is handled explicitly.
+After a supported token is inspected, the browser loads `/api/v1/trades/buy-preflight`. The ticket displays cash, executable portfolio equity, the exact backend-provided maximum, current venue, and slot impact. MAX copies that exact value; the browser does not derive an authoritative cap. An amount above the snapshot maximum is disabled with **Exceeds 20% maximum for this order.** Preflight remains advisory, so typed cash, ratio, and slot rejections from the transactional BUY are still presented after a race.
 
-The UI does not invent quotes, token metadata, prices, or unrealized P&L. When the account endpoint provides no valuation it says **Valuation unavailable**. Market support and the current Pump.fun/PumpSwap venue come only from `/api/v1/markets/:mint`.
+The positions query exposes the realistic net proceeds of a full exit through the position's current Pump.fun or PumpSwap route. The UI labels this **Executable value**, calculates no price locally, displays exact signed unrealized Paper P&L from the API, and keeps entry venue separate from current venue. The account strip shows cash, exact portfolio equity, and **Live Paper P&L** (`equity - starting Paper SOL`) only when every position is available. These are provisional displays, not a persisted or finalized hourly result. Any missing valuation makes total equity unavailable rather than presenting a partial total.
 
 ## Round timing, reset, and polling
 
 The current-round response includes server time. The browser records an offset from the response and advances the display countdown using local elapsed time, rather than trusting the local wall clock as authority. Trade controls close when persisted state is not `OPEN` or the server-offset countdown reaches zero. The backend remains final authority at every cutoff.
 
 - round and current account: every 4 seconds;
+- executable positions/account equity: after mutations and every 12 seconds;
+- BUY preflight for the inspected mint: after mutations and every 12 seconds;
 - hourly and daily leaderboards: every 8 seconds;
 - trade history: after mutations and every 15 seconds;
 - result history: on entry and explicit pagination.
@@ -58,15 +60,15 @@ When the current round ID differs from the displayed account round, the UI shows
 
 ## Testing
 
-Component tests use a mocked injected wallet and mocked HTTP API. Coverage includes unauthenticated and connected-but-unsigned states, entering a round, the BUY form and typed error, position rendering, exact partial SELL, SELL ALL, round transition, hourly ranks, daily ranks, and tie metadata. Exact-unit utilities have separate tests.
+Component tests use a mocked injected wallet and mocked HTTP API. Coverage includes authentication states, round entry, exact backend MAX, unavailable preflight, race rejection, available/unavailable and migrated valuation, live P&L, partial SELL, SELL ALL, round transition, and leaderboard/tie rendering.
 
-A browser E2E smoke test is deferred. Adding Playwright plus a complete fake API/wallet runtime would materially enlarge this phase; the component flow exercises the same browser interactions without live Solana RPC. No test or runtime path requires live RPC.
+`npm run test:e2e` builds the app and runs one Chromium smoke flow through the real API and competition services. It creates a disposable PostgreSQL database, runs migrations and the lifecycle tick, uses in-memory ephemeral session storage, and supplies recorded Pump market state. A deterministic test-only Ed25519 wallet is injected before page load. The browser aborts non-local requests, so the flow needs no Phantom installation, mainnet RPC, real credentials, SOL, or external network. Docker PostgreSQL and the repository `.env` are prerequisites; install the browser runtime once with `npx playwright install chromium`.
 
 ## Known MVP limitations
 
 - Injected message-signing wallets are supported; a wallet-selection modal is not included.
-- The backend currently returns no authoritative position valuation, so executable value and unrealized P&L remain unavailable.
-- MAX is intentionally conservative until a read-only authoritative preflight API exists.
+- Valuation freshness thresholds remain TBD; observation metadata is exposed and failures are explicit, but no invented stale cutoff is applied.
+- The five-position valuation path is intentionally sequential and uncached; a later scale phase may add request coalescing without making cached values authoritative.
 - Token name/symbol metadata is not invented; the mint is shortened for display.
 - Live updates use polling, not WebSockets.
 - Prize pools, rewards, payouts, browser extension, terminal overlay, admin tooling, real swaps, and deposits remain out of scope.

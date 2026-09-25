@@ -160,6 +160,22 @@ describe('Phase 4A complete backend vertical slice', () => {
     ).json();
     expect(entered.paperSolBalanceLamports).toBe('10000000000');
 
+    const emptyPreflight = (
+      await app.inject({
+        method: 'GET',
+        url: `/api/v1/trades/buy-preflight?mint=${RECORDED_PUMP_FIXTURES.developed.mint}`,
+        headers,
+      })
+    ).json();
+    expect(emptyPreflight).toMatchObject({
+      cashLamports: '10000000000',
+      executablePositionsLamports: '0',
+      portfolioEquityLamports: '10000000000',
+      maxBuyLamports: '2000000000',
+      slotAvailable: true,
+      valuationStatus: 'AVAILABLE',
+    });
+
     const buyOne = await app.inject({
       method: 'POST',
       url: '/api/v1/trades/buy',
@@ -168,6 +184,31 @@ describe('Phase 4A complete backend vertical slice', () => {
     });
     expect(buyOne.statusCode).toBe(200);
     const firstQuantity = BigInt(buyOne.json().tokenQuantityReceivedBaseUnits);
+    const valuedPortfolio = (
+      await app.inject({ method: 'GET', url: '/api/v1/positions', headers })
+    ).json();
+    expect(valuedPortfolio.valuationStatus).toBe('AVAILABLE');
+    expect(valuedPortfolio.positions[0].valuation).toMatchObject({
+      status: 'AVAILABLE',
+      currentProtocol: 'PUMP_FUN',
+    });
+    expect(BigInt(valuedPortfolio.portfolioEquityLamports)).toBeGreaterThan(0n);
+    const heldPreflight = (
+      await app.inject({
+        method: 'GET',
+        url: `/api/v1/trades/buy-preflight?mint=${RECORDED_PUMP_FIXTURES.developed.mint}`,
+        headers,
+      })
+    ).json();
+    expect(heldPreflight).toMatchObject({
+      targetAlreadyConsumesSlot: true,
+      requiresNewSlot: false,
+      slotAvailable: true,
+      valuationStatus: 'AVAILABLE',
+    });
+    expect(BigInt(heldPreflight.maxBuyLamports)).toBeLessThanOrEqual(
+      BigInt(heldPreflight.cashLamports),
+    );
     const buyTwo = await app.inject({
       method: 'POST',
       url: '/api/v1/trades/buy',

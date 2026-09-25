@@ -19,6 +19,7 @@ import type {
   LeaderboardEntry,
   MarketSupport,
   Position,
+  PositionValuationResponse,
   Round,
   Trade,
   User,
@@ -309,6 +310,13 @@ function TradePage({
     enabled: Boolean(user),
     queryFn: async () => (await api.results()).items[0] ?? null,
   });
+  const valuations = useQuery({
+    queryKey: ['positions', user?.id, account?.roundId],
+    enabled: Boolean(user && account && account.roundId === round?.id),
+    queryFn: api.positions,
+    refetchInterval: 12_000,
+    retry: false,
+  });
 
   if (!user)
     return (
@@ -357,7 +365,7 @@ function TradePage({
   return (
     <PageFrame>
       {notice && <NoticeCard notice={notice} />}
-      <AccountStrip account={account} round={round} />
+      <AccountStrip account={account} round={round} valuations={valuations.data} />
       <div className="trade-layout">
         <section className="panel order-panel">
           <PanelHead
@@ -368,8 +376,16 @@ function TradePage({
           <OrderTicket account={account} tradingOpen={tradingOpen} onNotice={setNotice} />
         </section>
         <section className="panel positions-panel">
-          <PanelHead eyebrow="PORTFOLIO" title="Open positions" count={account.positions.length} />
-          <Positions account={account} tradingOpen={tradingOpen} onNotice={setNotice} />
+          <PanelHead
+            eyebrow="PORTFOLIO"
+            title="Open positions"
+            count={(valuations.data?.positions ?? account.positions).length}
+          />
+          <Positions
+            positions={valuations.data?.positions ?? account.positions}
+            tradingOpen={tradingOpen}
+            onNotice={setNotice}
+          />
         </section>
       </div>
       <TradeHistory user={user} />
@@ -440,15 +456,32 @@ function EnterRound({
   );
 }
 
-function AccountStrip({ account, round }: { account: Account; round: Round }) {
+function AccountStrip({
+  account,
+  round,
+  valuations,
+}: {
+  account: Account;
+  round: Round;
+  valuations?: PositionValuationResponse | undefined;
+}) {
   return (
     <section className="account-strip">
-      <Metric label="Available Paper SOL" value={formatSol(account.paperSolLamports, 3)} accent />
-      <Metric label="Starting balance" value={formatSol(account.startingPaperSolLamports, 2)} />
+      <Metric label="Available cash" value={formatSol(account.paperSolLamports, 3)} accent />
       <Metric
-        label="Realized P&L"
-        value={signedSol(account.realizedPnlLamports)}
-        className={pnlClass(account.realizedPnlLamports)}
+        label="Portfolio equity"
+        value={
+          valuations?.portfolioEquityLamports
+            ? formatSol(valuations.portfolioEquityLamports, 3)
+            : 'Unavailable'
+        }
+        note="Executable exit value"
+      />
+      <Metric
+        label="Live Paper P&L"
+        value={valuations?.livePnlLamports ? signedSol(valuations.livePnlLamports) : 'Unavailable'}
+        className={pnlClass(valuations?.livePnlLamports ?? '0')}
+        note="Provisional until round close"
       />
       <Metric
         label="Token slots"
@@ -479,6 +512,13 @@ function OrderTicket({
     queryFn: () => api.market(checkedMint),
     retry: false,
   });
+  const preflight = useQuery({
+    queryKey: ['buy-preflight', checkedMint, account.roundId],
+    enabled: Boolean(checkedMint && market.data?.supported),
+    queryFn: () => api.buyPreflight(checkedMint),
+    refetchInterval: 12_000,
+    retry: false,
+  });
   const buy = useMutation({
     mutationFn: () => api.buy(checkedMint, amount, requestKey()),
     onSuccess: async (result) => {
@@ -486,6 +526,8 @@ function OrderTicket({
       setAmount('');
       await Promise.all([
         client.invalidateQueries({ queryKey: ['account'] }),
+        client.invalidateQueries({ queryKey: ['positions'] }),
+        client.invalidateQueries({ queryKey: ['buy-preflight'] }),
         client.invalidateQueries({ queryKey: ['trades'] }),
       ]);
     },
@@ -493,13 +535,19 @@ function OrderTicket({
       onNotice({ tone: 'error', title: 'Buy rejected', body: errorMessage(error) }),
   });
   const exactAmount = solTextToLamports(amount);
+  const exactMax = preflight.data?.maxBuyLamports ? BigInt(preflight.data.maxBuyLamports) : null;
+  const exceedsMax = exactAmount !== null && exactMax !== null && exactAmount > exactMax;
   const canBuy =
     tradingOpen &&
     market.data?.supported &&
+    preflight.data?.valuationStatus === 'AVAILABLE' &&
+    preflight.data.marketSupported &&
+    preflight.data.slotAvailable &&
+    exactMax !== null &&
     exactAmount !== null &&
     exactAmount > 0n &&
+    !exceedsMax &&
     !buy.isPending;
-  const safeMax = (BigInt(account.paperSolLamports) * 2n) / 10n;
   function inspect(event: FormEvent) {
     event.preventDefault();
     setCheckedMint(mint.trim());
@@ -527,6 +575,10 @@ function OrderTicket({
       {market.isFetching && <div className="market-status">Loading authoritative market…</div>}
       {market.error && <div className="market-status error">{errorMessage(market.error)}</div>}
       {market.data && <MarketCard market={market.data} />}
+      {preflight.isFetching && <div className="market-status">Calculating exact maximum…</div>}
+      {preflight.error && (
+        <div className="market-status error">{errorMessage(preflight.error)}</div>
+      )}
       <div className="divider" />
       <label htmlFor="buy-amount">Paper SOL amount</label>
       <div className="amount-input">
@@ -540,29 +592,66 @@ function OrderTicket({
         <span>SOL</span>
       </div>
       <div className="quick-row">
-        <button onClick={() => setAmount(lamportsToSolInput(safeMax / 4n))}>25%</button>
-        <button onClick={() => setAmount(lamportsToSolInput(safeMax / 2n))}>50%</button>
         <button
-          onClick={() => setAmount(lamportsToSolInput(safeMax))}
-          title="Safe maximum based on current cash; the server validates authoritative portfolio equity."
+          disabled={exactMax === null}
+          onClick={() => setAmount(lamportsToSolInput(exactMax! / 4n))}
+        >
+          25%
+        </button>
+        <button
+          disabled={exactMax === null}
+          onClick={() => setAmount(lamportsToSolInput(exactMax! / 2n))}
+        >
+          50%
+        </button>
+        <button
+          disabled={exactMax === null}
+          onClick={() => setAmount(lamportsToSolInput(exactMax!))}
         >
           MAX
         </button>
       </div>
+      {exceedsMax && <div className="market-status error">Exceeds 20% maximum for this order.</div>}
       <div className="ticket-review">
-        <span>Token</span>
-        <strong>{checkedMint ? shorten(checkedMint, 7) : '—'}</strong>
-        <span>Venue</span>
-        <strong>{venueName(market.data?.executionProtocol)}</strong>
+        <span>Available cash</span>
+        <strong>{formatSol(preflight.data?.cashLamports ?? account.paperSolLamports)}</strong>
+        <span>Portfolio equity</span>
+        <strong>
+          {preflight.data?.portfolioEquityLamports
+            ? formatSol(preflight.data.portfolioEquityLamports)
+            : 'Unavailable'}
+        </strong>
+        <span>Maximum allowed</span>
+        <strong>
+          {preflight.data?.maxBuyLamports
+            ? formatSol(preflight.data.maxBuyLamports)
+            : 'Unavailable'}
+        </strong>
         <span>Requested</span>
         <strong>{exactAmount && exactAmount > 0n ? formatSol(exactAmount) : '—'}</strong>
+        <span>Current venue</span>
+        <strong>{venueName(preflight.data?.protocol ?? market.data?.executionProtocol)}</strong>
+        <span>Slots</span>
+        <strong>
+          {preflight.data ? `${preflight.data.slotsUsed} / ${preflight.data.slotLimit}` : '—'}
+        </strong>
+        <span>Slot impact</span>
+        <strong>
+          {preflight.data
+            ? preflight.data.targetAlreadyConsumesSlot
+              ? 'Existing slot'
+              : preflight.data.slotAvailable
+                ? 'Uses new slot'
+                : 'No slots available'
+            : '—'}
+        </strong>
       </div>
       <button className="button buy-button" onClick={() => buy.mutate()} disabled={!canBuy}>
         {buy.isPending ? 'Submitting…' : tradingOpen ? 'Buy with Paper SOL' : 'Round closed'}
       </button>
       <p className="fine-print">
-        MAX is a conservative cash-based shortcut. The backend recalculates the exact 20% equity cap
-        against live authoritative markets before every fill.
+        This advisory snapshot uses executable exit values. The server revalues the portfolio
+        transactionally before every fill, so the final limit may move.
       </p>
     </div>
   );
@@ -593,15 +682,15 @@ function MarketCard({ market }: { market: MarketSupport }) {
 }
 
 function Positions({
-  account,
+  positions,
   tradingOpen,
   onNotice,
 }: {
-  account: Account;
+  positions: Position[];
   tradingOpen: boolean;
   onNotice(notice: Notice): void;
 }) {
-  if (!account.positions.length)
+  if (!positions.length)
     return (
       <EmptyState
         title="No active positions"
@@ -611,7 +700,7 @@ function Positions({
     );
   return (
     <div className="position-list">
-      {account.positions.map((position) => (
+      {positions.map((position) => (
         <PositionRow
           key={position.id}
           position={position}
@@ -645,6 +734,8 @@ function PositionRow({
       setQuantity('');
       await Promise.all([
         client.invalidateQueries({ queryKey: ['account'] }),
+        client.invalidateQueries({ queryKey: ['positions'] }),
+        client.invalidateQueries({ queryKey: ['buy-preflight'] }),
         client.invalidateQueries({ queryKey: ['trades'] }),
       ]);
     },
@@ -659,7 +750,12 @@ function PositionRow({
         <div className="token-avatar">{position.mint.slice(0, 2).toUpperCase()}</div>
         <div>
           <strong>{shorten(position.mint, 7)}</strong>
-          <small>{venueName(position.originProtocol)} origin</small>
+          <small>
+            {venueName(position.originProtocol)} entry
+            {position.valuation.status === 'AVAILABLE'
+              ? ` · ${venueName(position.valuation.currentProtocol)} current`
+              : ''}
+          </small>
         </div>
         <div className="position-quantity">
           <span>QUANTITY</span>
@@ -677,6 +773,22 @@ function PositionRow({
             {position.valuation.status === 'AVAILABLE'
               ? formatSol(position.valuation.executablePaperSolLamports)
               : 'Valuation unavailable'}
+          </strong>
+        </div>
+        <div>
+          <span>Unrealized P&amp;L</span>
+          <strong
+            className={
+              position.valuation.status === 'AVAILABLE'
+                ? pnlClass(position.valuation.unrealizedPnlLamports)
+                : undefined
+            }
+          >
+            {position.valuation.status === 'AVAILABLE'
+              ? signedSol(position.valuation.unrealizedPnlLamports)
+              : position.valuation.status === 'UNSUPPORTED_ROUTE'
+                ? 'Route unavailable'
+                : 'Valuation unavailable'}
           </strong>
         </div>
       </div>

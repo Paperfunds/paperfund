@@ -1,9 +1,11 @@
 import type {
   Account,
+  BuyPreflight,
   HourlyResult,
   LeaderboardEntry,
   MarketSupport,
   Page,
+  PositionValuationResponse,
   Round,
   Trade,
   User,
@@ -31,7 +33,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       credentials: 'include',
-      headers: { 'content-type': 'application/json', ...init.headers },
+      headers: {
+        ...(init.body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...init.headers,
+      },
     });
   } catch {
     throw new ApiError(
@@ -85,6 +90,9 @@ export const api = {
   enterRound: () => request<Account>('/api/v1/rounds/current/enter', { method: 'POST' }),
   account: () => request<Account>('/api/v1/rounds/current/account'),
   market: (mint: string) => request<MarketSupport>(`/api/v1/markets/${encodeURIComponent(mint)}`),
+  buyPreflight: (mint: string) =>
+    request<BuyPreflight>(`/api/v1/trades/buy-preflight?mint=${encodeURIComponent(mint)}`),
+  positions: () => request<PositionValuationResponse>('/api/v1/positions'),
   buy: (mint: string, paperSol: string, key: string) =>
     request<BuyResult>('/api/v1/trades/buy', {
       method: 'POST',

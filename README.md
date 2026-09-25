@@ -10,6 +10,7 @@ The current development baseline includes:
 - the Phase 3 Pump.fun/PumpSwap authoritative execution and forced-settlement engine;
 - the Phase 4A wallet-authenticated competition API and automatic hourly lifecycle worker;
 - the Phase 4B React web trading application;
+- the Phase 4C authoritative BUY preflight, executable portfolio valuation, and browser smoke;
 - validated local PostgreSQL and Redis development infrastructure.
 
 See [Phase 2 ledger and schema](./docs/PHASE_2_LEDGER_AND_SCHEMA.md),
@@ -45,8 +46,11 @@ Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:3000`; the r
 | `npm run format`       | Apply Prettier formatting                        |
 | `npm run format:check` | Check formatting                                 |
 | `npm test`             | Run Vitest tests                                 |
+| `npm run test:e2e`     | Run deterministic Playwright trading smoke       |
 | `npm run db:generate`  | Generate a Drizzle migration from schema changes |
 | `npm run db:migrate`   | Apply committed database migrations              |
 | `npm run db:check`     | Check database connectivity                      |
 
 Unit tests and static validation do not require Docker. Infrastructure readiness and migrations require the local services and values from `.env`.
+
+The Playwright smoke also requires local PostgreSQL from `docker compose up -d` and a one-time `npx playwright install chromium`. It creates and drops its own database, uses recorded market fixtures and a test-only wallet, and makes no external RPC or wallet request.

@@ -20,12 +20,15 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "test:e2e": "npm run build && playwright test",
+    "e2e:server": "tsx apps/api/test/e2e-server.ts",
     "db:generate": "npm run db:generate --workspace @paperfund/db",
     "db:migrate": "npm run build && npm run db:migrate --workspace @paperfund/db",
     "db:check": "npm run build && npm run db:check --workspace @paperfund/db"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22.0.0",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",

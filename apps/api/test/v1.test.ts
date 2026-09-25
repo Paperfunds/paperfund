@@ -36,6 +36,16 @@ function services() {
             remaining_base_units: quantity.toString(),
             cost_basis_lamports: '2000000000',
             realized_pnl_lamports: '0',
+            valuation: {
+              status: 'AVAILABLE' as const,
+              executablePaperSolLamports: 2_100_000_000n,
+              unrealizedPnlLamports: 100_000_000n,
+              currentProtocol: 'PUMP_FUN',
+              evidenceFingerprint: 'fingerprint',
+              observedAt: now.toISOString(),
+              chainSlot: 1n,
+              valuedAt: now,
+            },
           },
         ]
       : [];
@@ -110,7 +120,41 @@ function services() {
       };
     },
     async getPositions() {
-      return { accountId: 'account:one', roundId: 'round:one', positions: position() };
+      return {
+        accountId: 'account:one',
+        roundId: 'round:one',
+        cashLamports: 8_000_000_000n,
+        startingPaperSolLamports: 10_000_000_000n,
+        valuationStatus: 'AVAILABLE',
+        executablePositionsLamports: quantity > 0n ? 2_100_000_000n : 0n,
+        portfolioEquityLamports: quantity > 0n ? 10_100_000_000n : 8_000_000_000n,
+        livePnlLamports: quantity > 0n ? 100_000_000n : -2_000_000_000n,
+        valuedAt: now,
+        positions: position(),
+      };
+    },
+    async buyPreflight() {
+      return {
+        accountId: 'account:one',
+        roundId: 'round:one',
+        cashLamports: 8_000_000_000n,
+        executablePositionsLamports: quantity > 0n ? 2_100_000_000n : 0n,
+        portfolioEquityLamports: quantity > 0n ? 10_100_000_000n : 8_000_000_000n,
+        maxBuyByRatioLamports: quantity > 0n ? 2_020_000_000n : 1_600_000_000n,
+        maxBuyLamports: quantity > 0n ? 2_020_000_000n : 1_600_000_000n,
+        maxBuyRatioBps: 2000n,
+        slotsUsed: quantity > 0n ? 1 : 0,
+        slotLimit: 5,
+        targetAlreadyConsumesSlot: quantity > 0n,
+        requiresNewSlot: quantity === 0n,
+        slotAvailable: true,
+        marketSupported: true,
+        protocol: 'PUMP_FUN',
+        marketStatus: 'ACTIVE_BONDING_CURVE',
+        valuationStatus: 'AVAILABLE',
+        unavailablePositionIds: [],
+        serverTime: now,
+      };
     },
     async trades() {
       return { items: [], nextCursor: null };
@@ -163,6 +207,17 @@ describe('V1 competition API', () => {
     });
     apps.push(app);
     const headers = { authorization: 'Bearer valid' };
+    const preflight = await app.inject({
+      method: 'GET',
+      url: '/api/v1/trades/buy-preflight?mint=11111111111111111111111111111111',
+      headers,
+    });
+    expect(preflight.statusCode).toBe(200);
+    expect(preflight.json()).toMatchObject({
+      portfolioEquityLamports: '8000000000',
+      maxBuyLamports: '1600000000',
+      slotAvailable: true,
+    });
     expect(
       (await app.inject({ method: 'POST', url: '/api/v1/rounds/current/enter', headers })).json()
         .paperSolBalanceLamports,
