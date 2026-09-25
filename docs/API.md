@@ -7,10 +7,12 @@ The product API is rooted at `/api/v1`. `GET /health` and `GET /ready` remain un
 1. `POST /api/v1/auth/challenge` with `{ "walletAddress": "..." }`.
 2. Sign the returned UTF-8 `message` bytes with the named Solana wallet. Do not sign a transaction.
 3. `POST /api/v1/auth/verify` with `walletAddress`, `challengeId`, the exact `message`, and a 64-byte base58 or base64 `signature`.
-4. The server returns the user and sets `paperfund_session`, an opaque Redis-backed HttpOnly cookie. A bearer token is also accepted by the server for non-browser clients, but the verify response deliberately does not expose the cookie token in JSON.
+4. The server returns the user and sets `paperfund_session`, an opaque Redis-backed HttpOnly cookie. A bearer token is also accepted by the server. The normal web response does not expose the cookie token in JSON. A signature-verified client may explicitly send `"transport":"extension"`; only that response includes `sessionToken` so the MV3 service worker can keep the opaque token in extension session storage and use bearer transport.
 5. `GET /api/v1/auth/me` reads the session. `POST /api/v1/auth/logout` revokes it.
 
 Challenges contain the Paperfund identifier, purpose, wallet, random nonce, issued time, and expiry. They are wallet-bound, short-lived, consumed atomically, and cannot be replayed. Sessions are high-entropy, expire, and are revocable. Production must set `COOKIE_SECURE=true`; local HTTP development uses `false`. `COOKIE_SAME_SITE` defaults to `lax`.
+
+The extension token never enters the Axiom page world or content-script UI state. It lives in `chrome.storage.session`, is read only by the background service worker, and is removed on logout or a `401`. This avoids dependence on third-party-cookie behavior without creating a second authentication system.
 
 ## Exact units and errors
 

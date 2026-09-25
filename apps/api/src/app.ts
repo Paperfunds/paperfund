@@ -256,19 +256,34 @@ export function buildApp(dependencies: AppDependencies) {
 
   app.post('/api/v1/auth/verify', { preHandler: rateLimit('auth') }, async (request, reply) => {
     try {
+      const transport =
+        request.body && typeof request.body === 'object'
+          ? (request.body as Record<string, unknown>)['transport']
+          : undefined;
+      if (transport !== undefined && transport !== 'extension') {
+        throw new ApiError('INVALID_REQUEST', 'transport is invalid.');
+      }
       const result = await auth.verifyChallenge({
         walletAddress: stringField(request.body, 'walletAddress', 64),
         challengeId: stringField(request.body, 'challengeId', 64),
         message: stringField(request.body, 'message', 2_048),
         signature: stringField(request.body, 'signature', 128),
       });
-      const sameSite = fullConfig.COOKIE_SAME_SITE ?? 'lax';
-      const secure = fullConfig.COOKIE_SECURE === true;
-      reply.header(
-        'set-cookie',
-        `paperfund_session=${encodeURIComponent(result.token)}; Path=/; HttpOnly; Max-Age=${fullConfig.AUTH_SESSION_TTL_SECONDS ?? 86_400}; SameSite=${sameSite}${secure ? '; Secure' : ''}`,
+      if (transport !== 'extension') {
+        const sameSite = fullConfig.COOKIE_SAME_SITE ?? 'lax';
+        const secure = fullConfig.COOKIE_SECURE === true;
+        reply.header(
+          'set-cookie',
+          `paperfund_session=${encodeURIComponent(result.token)}; Path=/; HttpOnly; Max-Age=${fullConfig.AUTH_SESSION_TTL_SECONDS ?? 86_400}; SameSite=${sameSite}${secure ? '; Secure' : ''}`,
+        );
+      }
+      return reply.send(
+        exactJson({
+          user: result.user,
+          expiresAt: result.expiresAt,
+          ...(transport === 'extension' ? { sessionToken: result.token } : {}),
+        }),
       );
-      return reply.send(exactJson({ user: result.user, expiresAt: result.expiresAt }));
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError(

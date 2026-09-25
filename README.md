@@ -11,11 +11,13 @@ The current development baseline includes:
 - the Phase 4A wallet-authenticated competition API and automatic hourly lifecycle worker;
 - the Phase 4B React web trading application;
 - the Phase 4C authoritative BUY preflight, executable portfolio valuation, and browser smoke;
+- the Phase 4D Chromium MV3 Axiom trading overlay;
 - validated local PostgreSQL and Redis development infrastructure.
 
 See [Phase 2 ledger and schema](./docs/PHASE_2_LEDGER_AND_SCHEMA.md),
 [Phase 3 execution engine](./docs/PHASE_3_EXECUTION_ENGINE.md), and
-[V1 API](./docs/API.md), and [web application](./docs/WEB_APP.md) for implementation details.
+[V1 API](./docs/API.md), [web application](./docs/WEB_APP.md), and
+[Axiom extension](./docs/EXTENSION.md) for implementation details.
 
 ## Prerequisites
 
@@ -37,20 +39,27 @@ Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:3000`; the r
 
 ## Important commands
 
-| Command                | Purpose                                          |
-| ---------------------- | ------------------------------------------------ |
-| `npm run dev`          | Run API, worker, and web app in watch mode       |
-| `npm run build`        | Compile workspaces and build the production web  |
-| `npm run typecheck`    | Type-check the monorepo                          |
-| `npm run lint`         | Run ESLint                                       |
-| `npm run format`       | Apply Prettier formatting                        |
-| `npm run format:check` | Check formatting                                 |
-| `npm test`             | Run Vitest tests                                 |
-| `npm run test:e2e`     | Run deterministic Playwright trading smoke       |
-| `npm run db:generate`  | Generate a Drizzle migration from schema changes |
-| `npm run db:migrate`   | Apply committed database migrations              |
-| `npm run db:check`     | Check database connectivity                      |
+| Command                   | Purpose                                          |
+| ------------------------- | ------------------------------------------------ |
+| `npm run dev`             | Run API, worker, and web app in watch mode       |
+| `npm run build`           | Compile workspaces and build the production web  |
+| `npm run typecheck`       | Type-check the monorepo                          |
+| `npm run lint`            | Run ESLint                                       |
+| `npm run format`          | Apply Prettier formatting                        |
+| `npm run format:check`    | Check formatting                                 |
+| `npm test`                | Run Vitest tests                                 |
+| `npm run test:e2e`        | Run deterministic Playwright trading smoke       |
+| `npm run build:extension` | Build the unpacked Chromium extension            |
+| `npm run dev:extension`   | Rebuild the extension in watch mode              |
+| `npm run test:extension`  | Run adapter, overlay, and fixture-harness tests  |
+| `npm run db:generate`     | Generate a Drizzle migration from schema changes |
+| `npm run db:migrate`      | Apply committed database migrations              |
+| `npm run db:check`        | Check database connectivity                      |
 
 Unit tests and static validation do not require Docker. Infrastructure readiness and migrations require the local services and values from `.env`.
 
 The Playwright smoke also requires local PostgreSQL from `docker compose up -d` and a one-time `npx playwright install chromium`. It creates and drops its own database, uses recorded market fixtures and a test-only wallet, and makes no external RPC or wallet request.
+
+## Axiom extension
+
+Run `npm run build:extension`, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select `apps/extension/build`. The checked-in manifest key gives development installs the stable extension ID `lcnpjpkojoadojibfbjfohpjepkfmdln`. The build defaults to the local API and web app; set `PAPERFUND_API_BASE_URL` and `PAPERFUND_APP_URL` in the build environment for another deployment. Rebuild and reload the extension after changing either value.

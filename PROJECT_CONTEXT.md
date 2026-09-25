@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 4C implementation record
-**Product status:** Web MVP with authoritative preflight, live executable valuation, and browser smoke complete
+**Document status:** Canonical specification with Phase 4D implementation record
+**Product status:** Web MVP and Axiom Chromium overlay with authoritative trading complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-25
 
@@ -990,3 +990,45 @@ blocks all non-local requests. It proves connect, challenge signing, entry, 10 P
 BUY, executable valuation, SELL ALL, and trade-history update without Phantom, mainnet RPC, real SOL,
 or external network. No schema migration was required. Detailed contracts and operation are recorded
 in `docs/API.md` and `docs/WEB_APP.md`.
+
+## 30. Phase 4D implementation record
+
+Phase 4D replaces the browser-extension placeholder with a Chromium Manifest V3 overlay for Axiom.
+Research on 2026-09-25 verified `axiom.trade` as the production host and the current Solana trading
+route as `/meme/<mint>`, with an optional referral suffix and `chain=sol` query. The adapter rejects
+the non-Solana `/token/` route and validates the path mint by decoding it as an exact 32-byte base58
+Solana public key. It does not scrape token names, symbols, chart text, or hashed CSS classes.
+
+`AxiomTerminalAdapter` is separate from every `ProtocolAdapter`: it observes page navigation and
+returns only the currently viewed token mint. A small page-context bridge reports push/replace-state,
+popstate, and hash navigation and exposes only wallet public-key lookup, connect, and authentication
+message signing. It has no generic provider RPC and no transaction-signing operation. The overlay is
+rendered in a Shadow DOM and uses a background service worker for all Paperfund API calls.
+
+Extension authentication reuses the existing Ed25519 challenge/session system. An explicitly
+requested extension verify response returns the same opaque Redis session token to the signing
+client; the MV3 service worker stores it only in `chrome.storage.session` and sends bearer requests.
+The token never enters the Axiom page context, DOM, or locally persisted preferences. The existing
+web app continues to use its HttpOnly cookie response unchanged.
+
+The compact overlay implements explicit connect/sign-in, current round and server-offset countdown,
+entry, cash/equity/slots, backend-resolved market venue, authoritative BUY preflight/MAX, BUY,
+current-position executable valuation, exact integer percentage SELL, authoritative `ALL`, recent
+activity, previous-round feedback, collapse, local enable/disable, and a full-app link. Round/account
+polling runs every 4.5 seconds and current-market/preflight refresh every 10 seconds while visible;
+hidden tabs pause polling and refresh on return.
+
+Mint changes immediately clear old market and preflight state. Async results are accepted only when
+their captured mint still matches the current terminal mint, and every trade control requires the
+currently detected mint to equal the fully loaded mint. Unsupported or drifted routes therefore
+fail closed and never retain a prior token. Financial values remain exact strings/`BigInt`; all
+financial authority, execution routing, rule checks, positions, fills, settlement, and results remain
+on the existing backend.
+
+The manifest requests only `storage`, an exact build-time Paperfund API host, and the
+`https://axiom.trade/*` content/bridge scope. Its CSP permits local extension scripts only. A minimal
+toolbar popup controls overlay visibility and links to the web app. Deterministic adapter/component
+tests plus a fixture Axiom page, message-only wallet, and in-memory API harness cover the full overlay
+lifecycle without live Axiom, an injected production wallet, RPC, or real SOL. Full MV3 Playwright
+bundle loading is deferred; detailed architecture, permissions, build/install steps, tests, security
+review, and limitations are in `docs/EXTENSION.md`.

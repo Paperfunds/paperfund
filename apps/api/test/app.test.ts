@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { buildApp } from '../src/app.js';
+import type { AuthService } from '../src/auth.js';
+import type { CompetitionService } from '../src/competition.js';
 
 const secretDatabaseUrl = 'postgresql://secret-user:secret-password@database/private';
 const secretRedisUrl = 'redis://:secret-password@redis:6379';
@@ -65,5 +67,40 @@ describe('API health endpoints', () => {
       status: 'unavailable',
       services: { database: 'unavailable', redis: 'ok' },
     });
+  });
+
+  it('exposes the opaque session only for explicitly requested extension transport', async () => {
+    const auth = {
+      async verifyChallenge() {
+        return {
+          token: 'opaque-extension-session',
+          user: { id: 'user:one', walletAddress: '11111111111111111111111111111111' },
+          expiresAt: new Date('2099-01-01T00:00:00.000Z'),
+        };
+      },
+    } as unknown as AuthService;
+    const app = buildApp({
+      config: { LOG_LEVEL: 'silent' },
+      database: { healthCheck: async () => true },
+      redis: { healthCheck: async () => true },
+      auth,
+      competition: {} as CompetitionService,
+      logger: false,
+    });
+    apps.push(app);
+    const body = {
+      walletAddress: '11111111111111111111111111111111',
+      challengeId: 'challenge',
+      message: 'message',
+      signature: 'signature',
+    };
+    const web = await app.inject({ method: 'POST', url: '/api/v1/auth/verify', payload: body });
+    const extension = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/verify',
+      payload: { ...body, transport: 'extension' },
+    });
+    expect(web.json()).not.toHaveProperty('sessionToken');
+    expect(extension.json()).toMatchObject({ sessionToken: 'opaque-extension-session' });
   });
 });
