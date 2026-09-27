@@ -61,9 +61,9 @@ const valuation: PositionValuationResponse = {
   positions: [],
 };
 
-function terminal(mint: string | null = MINT) {
+function terminal(mint: string | null = MINT, id: 'AXIOM' | 'GMGN' | 'TERMINAL' = 'AXIOM') {
   return {
-    terminal: 'AXIOM' as const,
+    terminal: id,
     mint,
     status: mint ? ('SUPPORTED_ROUTE' as const) : ('NO_MARKET' as const),
     url: 'https://axiom.trade/',
@@ -260,39 +260,48 @@ describe('Paperfund overlay', () => {
     expect(screen.queryByText('Paperfund API is unavailable.')).not.toBeInTheDocument();
   });
 
-  it('immediately invalidates old-token controls on a mint change', async () => {
-    let resolveOld: ((value: unknown) => void) | undefined;
-    apiRequest.mockImplementation((operation: string, payload?: { mint?: string }) => {
-      if (operation === 'ME') return Promise.resolve({ user: { id: 'u', walletAddress: MINT } });
-      if (operation === 'CURRENT_ROUND')
-        return Promise.resolve({ round, serverTime: '2099-01-01T18:30:00.000Z' });
-      if (operation === 'ACCOUNT') return Promise.resolve(account);
-      if (operation === 'POSITIONS') return Promise.resolve(valuation);
-      if (operation === 'TRADES' || operation === 'RESULTS')
-        return Promise.resolve({ items: [], nextCursor: null });
-      if (operation === 'MARKET' && payload?.mint === MINT)
-        return new Promise((resolve) => {
-          resolveOld = resolve;
-        });
-      if (operation === 'MARKET') return Promise.resolve({ mint: payload?.mint, supported: false });
-      throw new Error(`Unexpected ${operation}`);
-    });
-    const view = render(
-      <Overlay terminal={terminal()} collapsed={false} onCollapsed={vi.fn()} onDisable={vi.fn()} />,
-    );
-    const other = '6pobtrZo2hS8ntAwXsP7283ye6oTGdrVj7RqghYQpump';
-    view.rerender(
-      <Overlay
-        terminal={terminal(other)}
-        collapsed={false}
-        onCollapsed={vi.fn()}
-        onDisable={vi.fn()}
-      />,
-    );
-    resolveOld?.({ mint: MINT, supported: true, executionProtocol: 'PUMP_FUN' });
-    expect(await screen.findByText('Not supported by Paperfund yet')).toBeVisible();
-    expect(screen.queryByText('Pump.fun')).not.toBeInTheDocument();
-  });
+  it.each(['AXIOM', 'GMGN', 'TERMINAL'] as const)(
+    'immediately invalidates old-token controls on a mint change for %s',
+    async (terminalId) => {
+      let resolveOld: ((value: unknown) => void) | undefined;
+      apiRequest.mockImplementation((operation: string, payload?: { mint?: string }) => {
+        if (operation === 'ME') return Promise.resolve({ user: { id: 'u', walletAddress: MINT } });
+        if (operation === 'CURRENT_ROUND')
+          return Promise.resolve({ round, serverTime: '2099-01-01T18:30:00.000Z' });
+        if (operation === 'ACCOUNT') return Promise.resolve(account);
+        if (operation === 'POSITIONS') return Promise.resolve(valuation);
+        if (operation === 'TRADES' || operation === 'RESULTS')
+          return Promise.resolve({ items: [], nextCursor: null });
+        if (operation === 'MARKET' && payload?.mint === MINT)
+          return new Promise((resolve) => {
+            resolveOld = resolve;
+          });
+        if (operation === 'MARKET')
+          return Promise.resolve({ mint: payload?.mint, supported: false });
+        throw new Error(`Unexpected ${operation}`);
+      });
+      const view = render(
+        <Overlay
+          terminal={terminal(MINT, terminalId)}
+          collapsed={false}
+          onCollapsed={vi.fn()}
+          onDisable={vi.fn()}
+        />,
+      );
+      const other = '6pobtrZo2hS8ntAwXsP7283ye6oTGdrVj7RqghYQpump';
+      view.rerender(
+        <Overlay
+          terminal={terminal(other, terminalId)}
+          collapsed={false}
+          onCollapsed={vi.fn()}
+          onDisable={vi.fn()}
+        />,
+      );
+      resolveOld?.({ mint: MINT, supported: true, executionProtocol: 'PUMP_FUN' });
+      expect(await screen.findByText('Not supported by Paperfund yet')).toBeVisible();
+      expect(screen.queryByText('Pump.fun')).not.toBeInTheDocument();
+    },
+  );
 
   it('shows a valued current position and submits exact partial SELL and SELL ALL intents', async () => {
     const position = {

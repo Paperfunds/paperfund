@@ -298,7 +298,9 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
           <span>P</span>
           <div>
             <strong>Paperfund</strong>
-            <small>PAPER TRADING ONLY</small>
+            <small>
+              PAPER TRADING ONLY <span className="pf-terminal">· {terminal.terminal}</span>
+            </small>
           </div>
         </div>
         <div className="pf-head-actions">
@@ -335,9 +337,7 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
           {notice && <div className={`pf-notice ${notice.tone}`}>{notice.text}</div>}
           {!user ? (
             <div className="pf-auth">
-              <p>
-                Compete on Axiom with simulated Paper SOL. No deposits and no transaction signing.
-              </p>
+              <p>Compete with simulated Paper SOL. No deposits and no transaction signing.</p>
               {!wallet ? (
                 <button
                   className="primary"
@@ -614,7 +614,7 @@ function MarketState({
   loading: boolean;
 }) {
   if (terminal.status === 'NO_MARKET')
-    return <div className="pf-market empty">Open a Solana token on Axiom.</div>;
+    return <div className="pf-market empty">Open a supported Solana token page.</div>;
   if (terminal.status === 'DETECTION_UNAVAILABLE' || !terminal.mint)
     return <div className="pf-market error">Token detection unavailable</div>;
   if (loading)

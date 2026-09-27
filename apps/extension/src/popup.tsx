@@ -36,6 +36,12 @@ function Popup() {
           <dd>{round}</dd>
         </div>
       </dl>
+      <section aria-label="Supported terminals">
+        <strong>Supported terminals</strong>
+        <span>✓ Axiom</span>
+        <span>✓ GMGN</span>
+        <span>✓ Terminal</span>
+      </section>
       <label>
         <input
           type="checkbox"
@@ -45,7 +51,7 @@ function Popup() {
             void chrome.storage.local.set({ overlayEnabled: event.target.checked });
           }}
         />{' '}
-        Show overlay on Axiom
+        Overlay enabled
       </label>
       <a href={PAPERFUND_APP_URL} target="_blank">
         Open Paperfund ↗
@@ -55,6 +61,6 @@ function Popup() {
 }
 
 const css = document.createElement('style');
-css.textContent = `*{box-sizing:border-box}body{margin:0;width:280px;background:#0b0f11;color:#e9eef0;font:12px system-ui,sans-serif}main{padding:16px}h1{display:flex;align-items:center;gap:8px;margin:0;font-size:16px}h1 span{display:grid;place-items:center;width:25px;height:25px;border-radius:5px;background:#76f4b1;color:#07140d}p{margin:5px 0 15px;color:#6f7d82;font-size:9px;text-transform:uppercase;letter-spacing:.1em}dl{border:1px solid #253036;margin:0 0 14px}dl div{display:flex;justify-content:space-between;padding:9px}dl div+div{border-top:1px solid #253036}dt{color:#748287}dd{margin:0;font-family:monospace}label{display:flex;gap:8px;align-items:center;color:#aeb9bc}a{display:block;margin-top:14px;padding:10px;background:#76f4b1;color:#07140d;text-align:center;text-decoration:none;font-weight:800;border-radius:5px}`;
+css.textContent = `*{box-sizing:border-box}body{margin:0;width:280px;background:#0b0f11;color:#e9eef0;font:12px system-ui,sans-serif}main{padding:16px}h1{display:flex;align-items:center;gap:8px;margin:0;font-size:16px}h1 span{display:grid;place-items:center;width:25px;height:25px;border-radius:5px;background:#76f4b1;color:#07140d}p{margin:5px 0 15px;color:#6f7d82;font-size:9px;text-transform:uppercase;letter-spacing:.1em}dl{border:1px solid #253036;margin:0 0 12px}dl div{display:flex;justify-content:space-between;padding:9px}dl div+div{border-top:1px solid #253036}dt{color:#748287}dd{margin:0;font-family:monospace}section{display:grid;grid-template-columns:1fr 1fr;margin:0 0 13px;padding:9px;border:1px solid #253036;gap:5px;color:#aeb9bc}section strong{grid-column:1/-1;color:#748287;font-size:10px}section span{color:#76f4b1;font-size:10px}label{display:flex;gap:8px;align-items:center;color:#aeb9bc}a{display:block;margin-top:14px;padding:10px;background:#76f4b1;color:#07140d;text-align:center;text-decoration:none;font-weight:800;border-radius:5px}`;
 document.head.append(css);
 createRoot(document.getElementById('root')!).render(<Popup />);

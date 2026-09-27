@@ -48,9 +48,9 @@ export default defineConfig(({ mode }) => {
             source: JSON.stringify(
               {
                 manifest_version: 3,
-                name: 'Paperfund for Axiom',
+                name: 'Paperfund Trading Overlay',
                 version: extensionPackage.version,
-                description: 'Paper-only Solana competition trading inside Axiom.',
+                description: 'Paper-only Solana competition trading on supported terminals.',
                 key: stableKey,
                 permissions: ['storage'],
                 action: { default_title: 'Paperfund', default_popup: 'popup.html' },
@@ -58,13 +58,21 @@ export default defineConfig(({ mode }) => {
                 background: { service_worker: 'background.js', type: 'module' },
                 content_scripts: [
                   {
-                    matches: ['https://axiom.trade/*'],
+                    matches: [
+                      'https://axiom.trade/*',
+                      'https://gmgn.ai/*',
+                      'https://www.theterminal.trade/*',
+                    ],
                     js: ['page-bridge.js'],
                     run_at: 'document_start',
                     world: 'MAIN',
                   },
                   {
-                    matches: ['https://axiom.trade/*'],
+                    matches: [
+                      'https://axiom.trade/*',
+                      'https://gmgn.ai/*',
+                      'https://www.theterminal.trade/*',
+                    ],
                     js: ['content-loader.js'],
                     run_at: 'document_start',
                   },
@@ -72,7 +80,11 @@ export default defineConfig(({ mode }) => {
                 web_accessible_resources: [
                   {
                     resources: ['content.js', 'chunks/*.js'],
-                    matches: ['https://axiom.trade/*'],
+                    matches: [
+                      'https://axiom.trade/*',
+                      'https://gmgn.ai/*',
+                      'https://www.theterminal.trade/*',
+                    ],
                   },
                 ],
                 content_security_policy: {

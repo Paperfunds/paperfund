@@ -391,7 +391,7 @@ Potential venues include Pump-style bonding curves, migrated AMMs, Bags, Bonk-re
 
 ### 10.4 Terminal adapters
 
-A `TerminalAdapter` detects the current token/market in a supported browser terminal, attaches the overlay, reacts to page navigation, and maps page context to internal market identifiers. It must not contain authoritative financial math. Exact Day-1 terminal support is **TBD**.
+A `TerminalAdapter` identifies the supported terminal/page and current Solana mint, attaches the overlay, and reacts to page navigation. Initial supported terminals are **Axiom, GMGN.ai, and Terminal.trade**. A terminal adapter must never contain pricing, AMM, bonding-curve, slippage, fee, P&L, or portfolio-accounting logic. A separate server-side `ProtocolAdapter` determines the actual market mechanics and realistic Paperfund execution.
 
 ### 10.5 Browser overlay
 
@@ -1092,3 +1092,30 @@ Events discovered after freeze are retained as `LATE_AFTER_FREEZE` with an expli
 record and never mutate a frozen pool. Public read endpoints expose exact-string provisional versus
 frozen hourly/daily values and an audit response with events, baseline inputs, movements, and
 conservation. Detailed contracts and limitations are in `docs/REWARDS.md` and `docs/API.md`.
+
+## 33. Phase 5B implementation record
+
+Phase 5B expands the one Manifest V3 extension and one shared Paperfund overlay to the initial
+supported trading terminals: **Axiom, GMGN.ai, and Terminal.trade**. Each content-script instance
+owns only its tab's terminal and current-mint context. Authentication, hourly account, Paper SOL,
+slots, positions, trades, results, and polling remain shared and server-authoritative. The background
+worker stores no global mint. A trade on one tab appears in the others through the existing
+authoritative refresh cycle.
+
+The terminal registry resolves exactly one host-specific adapter and throws on ambiguous matches in
+development/tests. Unsupported hosts receive no content script; unsupported pages, malformed mints,
+and non-Solana contexts clear the current mint. The adapters recognize only current verified URL
+contracts: Axiom `https://axiom.trade/meme/<mint>[/@referrer]?chain=sol`, GMGN
+`https://gmgn.ai/sol/token/<mint>`, and Terminal
+`https://www.theterminal.trade/token/<mint>?network=solana`. Shared history hooks cover
+`pushState`, `replaceState`, `popstate`, and `hashchange`; a coalesced mutation observer detects
+framework navigation fallback without site-specific polling or text scraping.
+
+`TerminalAdapter` identifies the terminal/page/current Solana mint only. `ProtocolAdapter` remains
+the server-side authority that selects Pump.fun or PumpSwap and performs pricing, curve/AMM math,
+slippage, fee, P&L, and portfolio accounting. The terminal never selects execution mechanics.
+
+The approved primary Paperfund brand asset is the **black interlocking PF mark with a green
+horizontal accent**. It is user-approved and must not be invented, redrawn, recolored, or distorted.
+The binary asset was not present in the repository during Phase 5B, so asset wiring is deferred to a
+later branding pass and does not block terminal support.

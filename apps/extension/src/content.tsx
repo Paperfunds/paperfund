@@ -2,7 +2,7 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { Overlay } from './overlay.js';
-import { AxiomTerminalAdapter, type TerminalTokenState } from './terminal.js';
+import { TerminalAdapterRegistry, type TerminalTokenState } from './terminal.js';
 
 const host = document.createElement('div');
 host.id = 'paperfund-extension-root';
@@ -21,7 +21,7 @@ style.textContent = `
   .pf-header { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; min-height:52px; padding:10px 12px; background:#0d1214f5; border-bottom:1px solid #20282c; }
   .pf-brand { display:flex; align-items:center; gap:9px; }
   .pf-brand>span { width:26px; height:26px; display:grid; place-items:center; border-radius:5px; background:#76f4b1; color:#07140d; font-weight:800; }
-  .pf-brand>div { display:grid; gap:2px; }.pf-brand strong { font-size:13px; }.pf-brand small,.pf-section-title,small { color:#6d7a80; font:600 8px ui-monospace,SFMono-Regular,monospace; letter-spacing:.11em; }
+  .pf-brand>div { display:grid; gap:2px; }.pf-brand strong { font-size:13px; }.pf-brand small,.pf-section-title,small { color:#6d7a80; font:600 8px ui-monospace,SFMono-Regular,monospace; letter-spacing:.11em; }.pf-terminal{color:#76f4b1!important;margin-left:5px}
   .pf-head-actions { display:flex; gap:2px; }.pf-head-actions button,.pf-wallet-row button { background:transparent; border:0; color:#77858a; padding:5px 7px; }
   .pf-head-actions button:hover,.pf-wallet-row button:hover { color:#fff; }
   .pf-collapsed { display:flex; justify-content:space-between; padding:10px 13px; }.pf-collapsed span,.green { color:#76f4b1!important; }.red { color:#ff7c84!important; }
@@ -46,13 +46,15 @@ shadow.append(style);
 const mount = document.createElement('div');
 shadow.append(mount);
 const reactRoot = createRoot(mount);
-const adapter = new AxiomTerminalAdapter();
+const registry = new TerminalAdapterRegistry();
 
 function ContentApp() {
-  const [terminal, setTerminal] = useState<TerminalTokenState>(() => adapter.detect(location.href));
+  const [terminal, setTerminal] = useState<TerminalTokenState | null>(() =>
+    registry.detect(location.href),
+  );
   const [enabled, setEnabled] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => adapter.observe(setTerminal), []);
+  useEffect(() => registry.observe(setTerminal), []);
   useEffect(() => {
     void chrome.storage.local
       .get({ overlayEnabled: true, overlayCollapsed: false })
@@ -68,7 +70,7 @@ function ContentApp() {
     chrome.storage.onChanged.addListener(changed);
     return () => chrome.storage.onChanged.removeListener(changed);
   }, []);
-  if (!enabled) return null;
+  if (!enabled || !terminal) return null;
   return (
     <Overlay
       terminal={terminal}
