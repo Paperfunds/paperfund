@@ -136,8 +136,13 @@ function sourceSnapshot(leaderboard: Leaderboard<RankedScore>) {
 async function sourceAndPool(client: PoolClient, type: PayoutCompetitionType, sourceId: string) {
   if (type === 'HOURLY') {
     const row = (
-      await client.query<{ source_state: string; pool_state: string; prize_pool: string }>(
-        `select r.state source_state,p.status pool_state,p.final_hourly_prize_lamports::text prize_pool
+      await client.query<{
+        source_state: string;
+        pool_state: string;
+        prize_pool: string;
+        pool_id: string;
+      }>(
+        `select r.state source_state,p.status pool_state,p.final_hourly_prize_lamports::text prize_pool,p.id pool_id
          from hourly_rounds r join hourly_reward_pools p on p.hourly_round_id=r.id
          where r.id=$1 for update of r,p`,
         [sourceId],
@@ -157,8 +162,13 @@ async function sourceAndPool(client: PoolClient, type: PayoutCompetitionType, so
     return row;
   }
   const row = (
-    await client.query<{ source_state: string; pool_state: string; prize_pool: string }>(
-      `select d.state source_state,p.status pool_state,p.accumulated_lamports::text prize_pool
+    await client.query<{
+      source_state: string;
+      pool_state: string;
+      prize_pool: string;
+      pool_id: string;
+    }>(
+      `select d.state source_state,p.status pool_state,p.accumulated_lamports::text prize_pool,p.id pool_id
        from daily_competitions d join daily_reward_pools p on p.daily_competition_id=d.id
        where d.id=$1 for update of d,p`,
       [sourceId],
@@ -423,25 +433,144 @@ export function generateDailyShadowPayoutPlan(
   });
 }
 
+export async function carryZeroParticipantPoolToRewardBuffer(
+  database: DatabaseService,
+  input: {
+    readonly competitionType: PayoutCompetitionType;
+    readonly sourceId: string;
+    readonly now: Date;
+  },
+) {
+  const outcomeId = `no-participants:${input.competitionType.toLowerCase()}:${input.sourceId}`;
+  const client = await database.pool.connect();
+  try {
+    await client.query('begin');
+    await client.query('select pg_advisory_xact_lock(hashtext($1))', [outcomeId]);
+    const existing = (
+      await client.query<{ carried_lamports: string }>(
+        'select carried_lamports::text from no_participant_reward_outcomes where id=$1',
+        [outcomeId],
+      )
+    ).rows[0];
+    if (existing) {
+      await client.query('commit');
+      return { id: outcomeId, carriedLamports: BigInt(existing.carried_lamports), created: false };
+    }
+    const source = await sourceAndPool(client, input.competitionType, input.sourceId);
+    const participants = await sourceRows(client, input.competitionType, input.sourceId);
+    if (participants.length !== 0)
+      throw new PayoutPlanError(
+        'PAYOUT_PARTICIPANTS_PRESENT',
+        'Competition has payout participants.',
+      );
+    const carried = BigInt(source.prize_pool);
+    await client.query(
+      `insert into reward_buffer_state (id,balance_lamports) values ('PRIMARY',0)
+       on conflict (id) do nothing`,
+    );
+    const buffer = (
+      await client.query<{ balance_lamports: string }>(
+        `select balance_lamports::text from reward_buffer_state where id='PRIMARY' for update`,
+      )
+    ).rows[0]!;
+    const starting = BigInt(buffer.balance_lamports);
+    const ending = starting + carried;
+    const movementId =
+      carried > 0n
+        ? `buffer:${input.competitionType.toLowerCase()}:${input.sourceId}:ZERO_PARTICIPANT_CARRY_FORWARD`
+        : null;
+    if (movementId) {
+      await client.query(
+        input.competitionType === 'HOURLY'
+          ? `insert into reward_buffer_movements
+             (id,hourly_reward_pool_id,reason,amount_lamports,starting_balance_lamports,ending_balance_lamports,created_at)
+             values ($1,$2,'ZERO_PARTICIPANT_CARRY_FORWARD',$3,$4,$5,$6)`
+          : `insert into reward_buffer_movements
+             (id,daily_reward_pool_id,reason,amount_lamports,starting_balance_lamports,ending_balance_lamports,created_at)
+             values ($1,$2,'ZERO_PARTICIPANT_CARRY_FORWARD',$3,$4,$5,$6)`,
+        [
+          movementId,
+          source.pool_id,
+          carried.toString(),
+          starting.toString(),
+          ending.toString(),
+          input.now,
+        ],
+      );
+      await client.query(
+        `update reward_buffer_state set balance_lamports=$1,updated_at=$2 where id='PRIMARY'`,
+        [ending.toString(), input.now],
+      );
+    }
+    await client.query(
+      `insert into no_participant_reward_outcomes
+       (id,competition_type,hourly_round_id,daily_competition_id,carried_lamports,reward_buffer_movement_id,recorded_at)
+       values ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        outcomeId,
+        input.competitionType,
+        input.competitionType === 'HOURLY' ? input.sourceId : null,
+        input.competitionType === 'DAILY' ? input.sourceId : null,
+        carried.toString(),
+        movementId,
+        input.now,
+      ],
+    );
+    await client.query('commit');
+    return { id: outcomeId, carriedLamports: carried, created: true };
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function runPayoutPlanGenerationTick(database: DatabaseService, now: Date) {
   const hourly = await database.pool.query<{ id: string }>(
     `select r.id from hourly_rounds r join hourly_reward_pools p on p.hourly_round_id=r.id
      where r.state='FINALIZED' and p.status in ('FROZEN','FINAL')
        and not exists (select 1 from payout_plans x where x.hourly_round_id=r.id)
+       and not exists (select 1 from no_participant_reward_outcomes x where x.hourly_round_id=r.id)
      order by r.starts_at`,
   );
   const daily = await database.pool.query<{ id: string }>(
     `select d.id from daily_competitions d join daily_reward_pools p on p.daily_competition_id=d.id
      where d.state='FINALIZED' and p.status in ('FROZEN','FINAL')
        and not exists (select 1 from payout_plans x where x.daily_competition_id=d.id)
+       and not exists (select 1 from no_participant_reward_outcomes x where x.daily_competition_id=d.id)
      order by d.starts_at`,
   );
   const generated: string[] = [];
   for (const row of hourly.rows) {
+    const participants = await database.pool.query<{ count: string }>(
+      'select count(*)::text count from hourly_results where hourly_round_id=$1',
+      [row.id],
+    );
+    if (participants.rows[0]!.count === '0') {
+      await carryZeroParticipantPoolToRewardBuffer(database, {
+        competitionType: 'HOURLY',
+        sourceId: row.id,
+        now,
+      });
+      continue;
+    }
     const plan = await generateHourlyShadowPayoutPlan(database, { hourlyRoundId: row.id, now });
     generated.push(plan.id);
   }
   for (const row of daily.rows) {
+    const participants = await database.pool.query<{ count: string }>(
+      'select count(*)::text count from daily_results where daily_competition_id=$1',
+      [row.id],
+    );
+    if (participants.rows[0]!.count === '0') {
+      await carryZeroParticipantPoolToRewardBuffer(database, {
+        competitionType: 'DAILY',
+        sourceId: row.id,
+        now,
+      });
+      continue;
+    }
     const plan = await generateDailyShadowPayoutPlan(database, { dailyCompetitionId: row.id, now });
     generated.push(plan.id);
   }
@@ -645,7 +774,18 @@ export async function validatePayoutPlan(database: DatabaseService, planId: stri
     sourcePrizeMatches: BigInt(source.rows[0]?.prize_pool ?? -1) === audit.prizePoolLamports,
     sourceSnapshotMatches:
       JSON.stringify(currentSourceSnapshot) === JSON.stringify(persistedSourceSnapshot),
-    planStateValid: ['CALCULATED', 'FROZEN', 'VALIDATED', 'APPROVED'].includes(audit.state),
+    planStateValid: [
+      'CALCULATED',
+      'FROZEN',
+      'VALIDATED',
+      'APPROVED',
+      'SIGNED',
+      'BROADCAST',
+      'VERIFIED',
+      'FAILED_RETRYABLE',
+      'FAILED_FINAL',
+      'RECONCILIATION_REQUIRED',
+    ].includes(audit.state),
     curveVersionKnown: audit.curveVersion === curve.version,
     tiePolicyVersionKnown: audit.tiePolicyVersion === PAYOUT_TIE_POLICY_VERSION,
     participantCountMatches: audit.participantCount === rows.length,
@@ -709,9 +849,17 @@ export async function getUserRewardAllocations(database: DatabaseService, userId
         won: Boolean(allocation),
         rewardAllocationLamports: allocation?.allocatedLamports ?? 0n,
         status: allocation
-          ? audit.state === 'APPROVED'
-            ? 'ALLOCATED'
-            : 'PENDING'
+          ? audit.state === 'VERIFIED'
+            ? 'PAID'
+            : ['SIGNED', 'BROADCAST'].includes(audit.state)
+              ? 'PROCESSING'
+              : ['FAILED_RETRYABLE', 'FAILED_FINAL', 'RECONCILIATION_REQUIRED'].includes(
+                    audit.state,
+                  )
+                ? 'FAILED_REVIEW'
+                : audit.state === 'APPROVED'
+                  ? 'APPROVED'
+                  : 'PENDING'
           : 'NOT_A_WINNER',
         payoutPlanState: audit.state,
       });

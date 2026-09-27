@@ -43,6 +43,13 @@
       "when": 1790514546310,
       "tag": "0005_past_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790540000000,
+      "tag": "0006_secure_payout_execution",
+      "breakpoints": true
     }
   ]
 }

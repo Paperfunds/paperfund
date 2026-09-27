@@ -17,6 +17,7 @@ export {
 export * from './identifiers.js';
 export * from './money.js';
 export * from './payout-allocation.js';
+export * from './payout-execution.js';
 export * from './percentages.js';
 export * from './portfolio.js';
 export * from './reward-economics.js';

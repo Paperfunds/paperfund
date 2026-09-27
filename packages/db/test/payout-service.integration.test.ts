@@ -3,17 +3,25 @@ import { resolve } from 'node:path';
 import { config as loadDotEnv } from 'dotenv';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
+import { Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  carryZeroParticipantPoolToRewardBuffer,
+  approvePayoutPlan,
   createDatabase,
+  dryRunPayoutExecution,
+  executeApprovedPayoutPlan,
   finalizeDailyRewardPool,
   generateDailyShadowPayoutPlan,
   generateHourlyShadowPayoutPlan,
   getPayoutPlanAudit,
   getUserRewardAllocations,
+  retryPayoutExecution,
   validatePayoutPlan,
   type DatabaseService,
+  type PayoutRpc,
+  type PayoutSigner,
 } from '../src/index.js';
 
 loadDotEnv({ path: resolve(process.cwd(), '.env'), quiet: true });
@@ -21,6 +29,32 @@ const sourceDatabaseUrl = process.env.DATABASE_URL;
 const databaseName = `paperfund_p5c_${process.pid}_${Date.now()}`;
 let database: DatabaseService;
 let adminPool: Pool;
+
+function mockPreparedTransaction(
+  treasury: string,
+  recipients: readonly { destination: string; lamports: bigint }[],
+) {
+  const recentBlockhash = Keypair.generate().publicKey.toBase58();
+  const transaction = new Transaction({
+    feePayer: new PublicKey(treasury),
+    recentBlockhash,
+  });
+  for (const recipient of recipients)
+    transaction.add(
+      SystemProgram.transfer({
+        fromPubkey: new PublicKey(treasury),
+        toPubkey: new PublicKey(recipient.destination),
+        lamports: recipient.lamports,
+      }),
+    );
+  return {
+    unsignedTransaction: transaction.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false,
+    }),
+    recentBlockhash,
+  };
+}
 
 async function addUsers(prefix: string, scores: readonly bigint[]) {
   const users = scores.map((score, index) => ({ id: `${prefix}-user-${index + 1}`, score }));
@@ -129,6 +163,26 @@ async function seedDaily(prefix: string, scores: readonly bigint[], prizePool: b
     [`${prefix}-daily-reward`, dailyId, prizePool.toString(), endsAt],
   );
   return { dailyId, users };
+}
+
+async function seedApprovedHourly(prefix: string, scores: readonly bigint[], prizePool: bigint) {
+  const source = await seedHourly(prefix, scores, prizePool);
+  const wallets = source.users.map(() => Keypair.generate().publicKey.toBase58());
+  for (const [index, user] of source.users.entries())
+    await database.pool.query('update users set wallet_address=$2 where id=$1', [
+      user.id,
+      wallets[index],
+    ]);
+  const plan = await generateHourlyShadowPayoutPlan(database, {
+    hourlyRoundId: source.roundId,
+    now: new Date(),
+  });
+  await approvePayoutPlan(database, {
+    planId: plan.id,
+    approverIdentifier: 'test-operator',
+    now: new Date(),
+  });
+  return { source, plan, wallets };
 }
 
 describe('Phase 5C shadow payout persistence', () => {
@@ -278,5 +332,397 @@ describe('Phase 5C shadow payout persistence', () => {
       prizePoolLamports: 17n,
       holds: true,
     });
+  });
+
+  it('carries zero-participant hourly and daily prizes into the Reward Buffer exactly once', async () => {
+    const hourly = await seedHourly('hour-07', [], 700n);
+    const daily = await seedDaily('day-08', [], 800n);
+    const now = new Date('2026-09-22T00:00:00.000Z');
+    await expect(
+      carryZeroParticipantPoolToRewardBuffer(database, {
+        competitionType: 'HOURLY',
+        sourceId: hourly.roundId,
+        now,
+      }),
+    ).resolves.toMatchObject({ carriedLamports: 700n, created: true });
+    await expect(
+      carryZeroParticipantPoolToRewardBuffer(database, {
+        competitionType: 'HOURLY',
+        sourceId: hourly.roundId,
+        now,
+      }),
+    ).resolves.toMatchObject({ carriedLamports: 700n, created: false });
+    await expect(
+      carryZeroParticipantPoolToRewardBuffer(database, {
+        competitionType: 'DAILY',
+        sourceId: daily.dailyId,
+        now,
+      }),
+    ).resolves.toMatchObject({ carriedLamports: 800n, created: true });
+    const buffer = await database.pool.query<{ balance: string }>(
+      `select balance_lamports::text balance from reward_buffer_state where id='PRIMARY'`,
+    );
+    expect(buffer.rows[0]!.balance).toBe('1500');
+    const plans = await database.pool.query<{ count: string }>(
+      `select count(*)::text count from payout_plans
+       where hourly_round_id=$1 or daily_competition_id=$2`,
+      [hourly.roundId, daily.dailyId],
+    );
+    expect(plans.rows[0]!.count).toBe('0');
+  });
+
+  it('requires approval, dry-runs without signing, batches, and marks only verified transfers paid', async () => {
+    const source = await seedHourly('hour-09', [3n, 2n, 1n], 999n);
+    const wallets = source.users.map(() => Keypair.generate().publicKey.toBase58());
+    for (const [index, user] of source.users.entries())
+      await database.pool.query('update users set wallet_address=$2 where id=$1', [
+        user.id,
+        wallets[index],
+      ]);
+    const plan = await generateHourlyShadowPayoutPlan(database, {
+      hourlyRoundId: source.roundId,
+      now: new Date(),
+    });
+    const treasury = Keypair.generate().publicKey.toBase58();
+    const prepared = new Map<number, readonly { destination: string; lamports: bigint }[]>();
+    const preparedIds = new Map<string, number>();
+    let prepareCount = 0;
+    let sendCount = 0;
+    let signCount = 0;
+    const broadcast = new Set<string>();
+    const rpc: PayoutRpc = {
+      async assertNetwork() {},
+      async getBalance() {
+        return 10_000n;
+      },
+      async prepareTransaction(treasuryAddress, recipients) {
+        const id = ++prepareCount;
+        prepared.set(id, recipients);
+        const transaction = mockPreparedTransaction(treasuryAddress, recipients);
+        preparedIds.set(Buffer.from(transaction.unsignedTransaction).toString('base64'), id);
+        return {
+          unsignedTransaction: transaction.unsignedTransaction,
+          feeLamports: 5n,
+          recentBlockhash: transaction.recentBlockhash,
+          lastValidBlockHeight: 100n,
+        };
+      },
+      async sendSignedTransaction(bytes) {
+        sendCount += 1;
+        const signature = `sig-${bytes[0]}`;
+        broadcast.add(signature);
+        if (sendCount === 1) throw new Error('simulated response loss after acceptance');
+        return signature;
+      },
+      async getBlockHeight() {
+        return 50n;
+      },
+      async getSignatureStatus(signature) {
+        return broadcast.has(signature)
+          ? { confirmationStatus: 'finalized', error: null, slot: 42n }
+          : null;
+      },
+      async getFinalizedTransfers(signature) {
+        const id = Number(signature.slice(4));
+        return {
+          error: null,
+          slot: 42n,
+          transfers: (prepared.get(id) ?? []).map((recipient) => ({
+            source: treasury,
+            ...recipient,
+          })),
+        };
+      },
+    };
+    const signer: PayoutSigner = {
+      type: 'MOCK',
+      publicKey: treasury,
+      async signTransaction(bytes) {
+        signCount += 1;
+        const id = preparedIds.get(Buffer.from(bytes).toString('base64'))!;
+        return {
+          signedTransaction: Uint8Array.from([id, 99]),
+          signature: `sig-${id}`,
+        };
+      },
+    };
+    const config = {
+      enabled: true,
+      network: 'localnet' as const,
+      mainnetConfirmed: false,
+      treasuryAddress: treasury,
+      maxRecipientsPerBatch: 1,
+    };
+    await expect(
+      dryRunPayoutExecution(database, { planId: plan.id, config, rpc }),
+    ).rejects.toMatchObject({
+      code: 'PAYOUT_PLAN_NOT_APPROVED',
+    });
+    await approvePayoutPlan(database, {
+      planId: plan.id,
+      approverIdentifier: 'test-operator',
+      now: new Date(),
+    });
+    const preview = await dryRunPayoutExecution(database, { planId: plan.id, config, rpc });
+    expect(preview.batches).toHaveLength(3);
+    expect(preview.requiredLamports).toBe(1_014n);
+    expect(signCount).toBe(0);
+    expect(sendCount).toBe(0);
+    const executed = await executeApprovedPayoutPlan(database, {
+      planId: plan.id,
+      config,
+      rpc,
+      signer,
+      now: new Date(),
+    });
+    expect(executed.state).toBe('VERIFIED');
+    expect(signCount).toBe(3);
+    expect(sendCount).toBe(3);
+    await executeApprovedPayoutPlan(database, {
+      planId: plan.id,
+      config,
+      rpc,
+      signer,
+      now: new Date(),
+    });
+    expect(signCount).toBe(3);
+    expect(sendCount).toBe(3);
+    await expect(
+      executeApprovedPayoutPlan(database, {
+        planId: plan.id,
+        config: { ...config, enabled: false },
+        rpc,
+        signer,
+        now: new Date(),
+      }),
+    ).rejects.toMatchObject({ code: 'PAYOUT_EXECUTION_DISABLED' });
+    await expect(getUserRewardAllocations(database, source.users[0]!.id)).resolves.toEqual([
+      expect.objectContaining({ status: 'PAID', payoutPlanState: 'VERIFIED' }),
+    ]);
+  });
+
+  it('fails before signing when the treasury cannot cover payouts plus fees', async () => {
+    const source = await seedHourly('hour-10', [1n], 500n);
+    const wallet = Keypair.generate().publicKey.toBase58();
+    await database.pool.query('update users set wallet_address=$2 where id=$1', [
+      source.users[0]!.id,
+      wallet,
+    ]);
+    const plan = await generateHourlyShadowPayoutPlan(database, {
+      hourlyRoundId: source.roundId,
+      now: new Date(),
+    });
+    await approvePayoutPlan(database, {
+      planId: plan.id,
+      approverIdentifier: 'test-operator',
+      now: new Date(),
+    });
+    const treasury = Keypair.generate().publicKey.toBase58();
+    let signCount = 0;
+    const signer: PayoutSigner = {
+      type: 'MOCK',
+      publicKey: treasury,
+      async signTransaction() {
+        signCount += 1;
+        return { signedTransaction: new Uint8Array(), signature: 'unused' };
+      },
+    };
+    const rpc: PayoutRpc = {
+      async assertNetwork() {},
+      async getBalance() {
+        return 504n;
+      },
+      async prepareTransaction(treasuryAddress, recipients) {
+        const transaction = mockPreparedTransaction(treasuryAddress, recipients);
+        return {
+          unsignedTransaction: transaction.unsignedTransaction,
+          feeLamports: 5n,
+          recentBlockhash: transaction.recentBlockhash,
+          lastValidBlockHeight: 100n,
+        };
+      },
+      async sendSignedTransaction() {
+        throw new Error('must not broadcast');
+      },
+      async getBlockHeight() {
+        return 0n;
+      },
+      async getSignatureStatus() {
+        return null;
+      },
+      async getFinalizedTransfers() {
+        return null;
+      },
+    };
+    await expect(
+      executeApprovedPayoutPlan(database, {
+        planId: plan.id,
+        config: {
+          enabled: true,
+          network: 'localnet',
+          mainnetConfirmed: false,
+          treasuryAddress: treasury,
+          maxRecipientsPerBatch: 8,
+        },
+        rpc,
+        signer,
+        now: new Date(),
+      }),
+    ).rejects.toMatchObject({ code: 'PAYOUT_TREASURY_INSUFFICIENT' });
+    expect(signCount).toBe(0);
+    const executions = await database.pool.query<{ count: string }>(
+      'select count(*)::text count from payout_executions where payout_plan_id=$1',
+      [plan.id],
+    );
+    expect(executions.rows[0]!.count).toBe('0');
+  });
+
+  it('requires reconciliation instead of marking a mismatched on-chain transfer paid', async () => {
+    const { plan } = await seedApprovedHourly('hour-11', [1n], 100n);
+    const treasury = Keypair.generate().publicKey.toBase58();
+    let broadcast = false;
+    const rpc: PayoutRpc = {
+      async assertNetwork() {},
+      async getBalance() {
+        return 1_000n;
+      },
+      async prepareTransaction(treasuryAddress, recipients) {
+        const transaction = mockPreparedTransaction(treasuryAddress, recipients);
+        return {
+          unsignedTransaction: transaction.unsignedTransaction,
+          feeLamports: 5n,
+          recentBlockhash: transaction.recentBlockhash,
+          lastValidBlockHeight: 100n,
+        };
+      },
+      async sendSignedTransaction() {
+        broadcast = true;
+        return 'sig-mismatch';
+      },
+      async getBlockHeight() {
+        return 1n;
+      },
+      async getSignatureStatus() {
+        return broadcast ? { confirmationStatus: 'finalized', error: null, slot: 50n } : null;
+      },
+      async getFinalizedTransfers() {
+        return {
+          error: null,
+          slot: 50n,
+          transfers: [
+            {
+              source: treasury,
+              destination: Keypair.generate().publicKey.toBase58(),
+              lamports: 100n,
+            },
+          ],
+        };
+      },
+    };
+    const signer: PayoutSigner = {
+      type: 'MOCK',
+      publicKey: treasury,
+      async signTransaction() {
+        return { signedTransaction: Uint8Array.from([1]), signature: 'sig-mismatch' };
+      },
+    };
+    const result = await executeApprovedPayoutPlan(database, {
+      planId: plan.id,
+      config: {
+        enabled: true,
+        network: 'localnet',
+        mainnetConfirmed: false,
+        treasuryAddress: treasury,
+        maxRecipientsPerBatch: 8,
+      },
+      rpc,
+      signer,
+      now: new Date(),
+    });
+    expect(result.state).toBe('RECONCILIATION_REQUIRED');
+    expect((await getPayoutPlanAudit(database, plan.id))!.state).toBe('RECONCILIATION_REQUIRED');
+  });
+
+  it('preserves a verified batch while rebuilding only a proven-expired batch', async () => {
+    const { plan } = await seedApprovedHourly('hour-12', [2n, 1n], 300n);
+    const treasury = Keypair.generate().publicKey.toBase58();
+    const recipients = new Map<number, readonly { destination: string; lamports: bigint }[]>();
+    const preparedIds = new Map<string, number>();
+    const sends = new Map<string, number>();
+    let prepareId = 0;
+    const rpc: PayoutRpc = {
+      async assertNetwork() {},
+      async getBalance() {
+        return 10_000n;
+      },
+      async prepareTransaction(treasuryAddress, rows) {
+        const id = ++prepareId;
+        recipients.set(id, rows);
+        const transaction = mockPreparedTransaction(treasuryAddress, rows);
+        preparedIds.set(Buffer.from(transaction.unsignedTransaction).toString('base64'), id);
+        return {
+          unsignedTransaction: transaction.unsignedTransaction,
+          feeLamports: 5n,
+          recentBlockhash: transaction.recentBlockhash,
+          lastValidBlockHeight: 100n,
+        };
+      },
+      async sendSignedTransaction(bytes) {
+        const signature = `sig-${bytes[0]}`;
+        sends.set(signature, (sends.get(signature) ?? 0) + 1);
+        return signature;
+      },
+      async getBlockHeight() {
+        return 101n;
+      },
+      async getSignatureStatus(signature) {
+        return (signature === 'sig-1' || signature === 'sig-3') && sends.has(signature)
+          ? { confirmationStatus: 'finalized', error: null, slot: 60n }
+          : null;
+      },
+      async getFinalizedTransfers(signature) {
+        const id = Number(signature.slice(4));
+        return {
+          error: null,
+          slot: 60n,
+          transfers: (recipients.get(id) ?? []).map((row) => ({ source: treasury, ...row })),
+        };
+      },
+    };
+    const signer: PayoutSigner = {
+      type: 'MOCK',
+      publicKey: treasury,
+      async signTransaction(bytes) {
+        const id = preparedIds.get(Buffer.from(bytes).toString('base64'))!;
+        return { signedTransaction: Uint8Array.from([id]), signature: `sig-${id}` };
+      },
+    };
+    const config = {
+      enabled: true,
+      network: 'localnet' as const,
+      mainnetConfirmed: false,
+      treasuryAddress: treasury,
+      maxRecipientsPerBatch: 1,
+    };
+    const partial = await executeApprovedPayoutPlan(database, {
+      planId: plan.id,
+      config,
+      rpc,
+      signer,
+      now: new Date(),
+    });
+    expect(partial.state).toBe('FAILED_RETRYABLE');
+    expect(partial.batchStates.sort()).toEqual(['FAILED_RETRYABLE', 'VERIFIED']);
+    const retried = await retryPayoutExecution(database, {
+      executionId: `execution:${plan.id}`,
+      config,
+      rpc,
+      signer,
+      now: new Date(),
+    });
+    expect(retried.state).toBe('VERIFIED');
+    expect(sends.get('sig-1')).toBe(1);
+    expect(sends.get('sig-2')).toBe(1);
+    expect(sends.get('sig-3')).toBe(1);
   });
 });

@@ -163,7 +163,18 @@ export interface HourlyResult {
   finalized_at: string;
   reward_rank?: number | null;
   reward_allocation_lamports?: string | null;
-  payout_plan_state?: 'CALCULATED' | 'FROZEN' | 'VALIDATED' | 'APPROVED' | null;
+  payout_plan_state?:
+    | 'CALCULATED'
+    | 'FROZEN'
+    | 'VALIDATED'
+    | 'APPROVED'
+    | 'SIGNED'
+    | 'BROADCAST'
+    | 'VERIFIED'
+    | 'FAILED_RETRYABLE'
+    | 'FAILED_FINAL'
+    | 'RECONCILIATION_REQUIRED'
+    | null;
 }
 export interface Page<T> {
   items: T[];

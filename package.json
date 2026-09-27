@@ -30,7 +30,9 @@
     "e2e:server": "tsx apps/api/test/e2e-server.ts",
     "db:generate": "npm run db:generate --workspace @paperfund/db",
     "db:migrate": "npm run build && npm run db:migrate --workspace @paperfund/db",
-    "db:check": "npm run build && npm run db:check --workspace @paperfund/db"
+    "db:check": "npm run build && npm run db:check --workspace @paperfund/db",
+    "payout:approve": "tsx scripts/payout-approve.ts",
+    "payout:execute": "tsx scripts/payout-execute.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -529,6 +529,10 @@ export const payoutPlans = pgTable(
     calculatedAt: timestamp('calculated_at', { withTimezone: true }).notNull(),
     frozenAt: timestamp('frozen_at', { withTimezone: true }),
     validatedAt: timestamp('validated_at', { withTimezone: true }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    signedAt: timestamp('signed_at', { withTimezone: true }),
+    broadcastAt: timestamp('broadcast_at', { withTimezone: true }),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
     configSnapshot: jsonb('config_snapshot').notNull(),
     sourceResultSnapshot: jsonb('source_result_snapshot').notNull(),
     totalAllocatedLamports: bigint('total_allocated_lamports', { mode: 'bigint' }).notNull(),
@@ -546,7 +550,7 @@ export const payoutPlans = pgTable(
     ),
     check(
       'payout_plans_state_valid',
-      sql`${table.state} in ('CALCULATED','FROZEN','VALIDATED','APPROVED')`,
+      sql`${table.state} in ('CALCULATED','FROZEN','VALIDATED','APPROVED','SIGNED','BROADCAST','VERIFIED','FAILED_RETRYABLE','FAILED_FINAL','RECONCILIATION_REQUIRED')`,
     ),
     check(
       'payout_plans_counts_valid',
@@ -617,6 +621,118 @@ export const payoutAllocations = pgTable(
     check(
       'payout_allocations_amount_valid',
       sql`${table.allocatedLamports} >= 0 and ${table.dustAdjustmentLamports} >= 0 and ${table.dustAdjustmentLamports} <= 1`,
+    ),
+  ],
+);
+
+export const payoutPlanApprovals = pgTable('payout_plan_approvals', {
+  id: text('id').primaryKey(),
+  payoutPlanId: text('payout_plan_id')
+    .notNull()
+    .unique()
+    .references(() => payoutPlans.id),
+  approvalMethod: text('approval_method').notNull(),
+  approverIdentifier: text('approver_identifier').notNull(),
+  planSnapshotHash: text('plan_snapshot_hash').notNull(),
+  approvedAt: timestamp('approved_at', { withTimezone: true }).notNull(),
+  createdAt,
+});
+
+export const payoutExecutions = pgTable('payout_executions', {
+  id: text('id').primaryKey(),
+  payoutPlanId: text('payout_plan_id')
+    .notNull()
+    .unique()
+    .references(() => payoutPlans.id),
+  network: text('network').notNull(),
+  treasuryAddress: text('treasury_address').notNull(),
+  signerType: text('signer_type').notNull(),
+  state: text('state').notNull(),
+  totalPayoutLamports: bigint('total_payout_lamports', { mode: 'bigint' }).notNull(),
+  estimatedFeeLamports: bigint('estimated_fee_lamports', { mode: 'bigint' }).notNull(),
+  preparedAt: timestamp('prepared_at', { withTimezone: true }).notNull(),
+  signedAt: timestamp('signed_at', { withTimezone: true }),
+  broadcastAt: timestamp('broadcast_at', { withTimezone: true }),
+  lastBroadcastAt: timestamp('last_broadcast_at', { withTimezone: true }),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  failureCode: text('failure_code'),
+  failureDetail: text('failure_detail'),
+  createdAt,
+  updatedAt,
+});
+
+export const payoutBatches = pgTable(
+  'payout_batches',
+  {
+    id: text('id').primaryKey(),
+    payoutExecutionId: text('payout_execution_id')
+      .notNull()
+      .references(() => payoutExecutions.id),
+    batchIndex: integer('batch_index').notNull(),
+    intentVersion: text('intent_version').notNull(),
+    intentHash: text('intent_hash').notNull().unique(),
+    state: text('state').notNull(),
+    recipientCount: integer('recipient_count').notNull(),
+    totalLamports: bigint('total_lamports', { mode: 'bigint' }).notNull(),
+    feeLamports: bigint('fee_lamports', { mode: 'bigint' }).notNull(),
+    recentBlockhash: text('recent_blockhash').notNull(),
+    lastValidBlockHeight: bigint('last_valid_block_height', { mode: 'bigint' }).notNull(),
+    unsignedTransactionBase64: text('unsigned_transaction_base64').notNull(),
+    signedTransactionBase64: text('signed_transaction_base64'),
+    transactionSignature: text('transaction_signature').unique(),
+    signedAt: timestamp('signed_at', { withTimezone: true }),
+    broadcastAt: timestamp('broadcast_at', { withTimezone: true }),
+    lastBroadcastAt: timestamp('last_broadcast_at', { withTimezone: true }),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    confirmationSlot: bigint('confirmation_slot', { mode: 'bigint' }),
+    failureCode: text('failure_code'),
+    failureDetail: text('failure_detail'),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    unique('payout_batches_execution_index_unique').on(table.payoutExecutionId, table.batchIndex),
+  ],
+);
+
+export const payoutBatchAllocations = pgTable(
+  'payout_batch_allocations',
+  {
+    payoutBatchId: text('payout_batch_id')
+      .notNull()
+      .references(() => payoutBatches.id),
+    payoutAllocationId: text('payout_allocation_id')
+      .notNull()
+      .unique()
+      .references(() => payoutAllocations.id),
+    ordinal: integer('ordinal').notNull(),
+    destinationAddress: text('destination_address').notNull(),
+    lamports: bigint('lamports', { mode: 'bigint' }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique('payout_batch_allocations_ordinal_unique').on(table.payoutBatchId, table.ordinal),
+  ],
+);
+
+export const payoutBroadcastAttempts = pgTable(
+  'payout_broadcast_attempts',
+  {
+    id: text('id').primaryKey(),
+    payoutBatchId: text('payout_batch_id')
+      .notNull()
+      .references(() => payoutBatches.id),
+    attemptNumber: integer('attempt_number').notNull(),
+    transactionSignature: text('transaction_signature').notNull(),
+    outcome: text('outcome').notNull(),
+    rpcDetail: text('rpc_detail'),
+    attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique('payout_broadcast_attempts_batch_number_unique').on(
+      table.payoutBatchId,
+      table.attemptNumber,
     ),
   ],
 );

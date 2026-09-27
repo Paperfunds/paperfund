@@ -1169,6 +1169,52 @@ operational boundaries are in `docs/PAYOUTS.md` and `docs/API.md`.
 
 Phase 5C validation completed with 328 passing tests and 2 intentional skips, 32/32 extension tests,
 clean lint and typecheck, successful production build, applied forward migration and DB readiness,
-and the real-stack web Playwright flow passing. A positive frozen pool with zero participants fails
-closed because no approved recipient exists; a future explicit carry/reconciliation policy is
-required rather than creating a non-winner allocation.
+and the real-stack web Playwright flow passing. At the end of Phase 5C, a positive frozen pool with
+zero participants still failed closed; Phase 5D below supersedes that temporary gap with the
+canonical Reward Buffer carry-forward rule.
+
+## 35. Phase 5D implementation record
+
+Phase 5D adds the controlled real-SOL payout execution boundary. The canonical lifecycle is now
+`CALCULATED → FROZEN → VALIDATED → APPROVED → SIGNED → BROADCAST → VERIFIED`, with explicit
+retryable, final-failure, and reconciliation-required states. Approval is a server-side operator CLI
+action and records operator, source, timestamp, and immutable plan-snapshot hash. The worker does not
+approve, sign, or broadcast payouts.
+
+Forward migration `0006_secure_payout_execution.sql` adds approval, execution, deterministic batch,
+batch-allocation, broadcast-attempt, and zero-participant outcome records. Each allocation can belong
+to only one execution batch. Intent hashes commit to plan, batch index, explicit network, treasury,
+ordered destinations, and exact lamports. Network fees are treasury/platform operating costs and
+never reduce winner allocations.
+
+Real execution defaults off. The operator CLI defaults to dry-run and live mode requires an explicit
+enable switch, configured network and treasury, enabled server-side signer, matching signer public
+key, matching RPC genesis hash, and sufficient treasury balance for payouts plus estimated fees.
+Mainnet additionally requires separate acknowledgement. Private key material is loaded only from
+server environment for the gated development local-keypair signer and is never persisted, logged,
+returned by APIs, or sent to web/extension code. Signer and Solana RPC boundaries allow future HSM,
+hardware, multisig, or remote implementations.
+
+Transaction batches use exact bigint lamports and conservative deterministic recipient limits.
+Prepared intent is persisted before signing; signed bytes and their derived signature are persisted
+before broadcast. A send response never means payment success. `VERIFIED` requires Solana finalized
+status and exact on-chain System Program transfer comparison against stored treasury, recipients,
+and amounts. Ambiguous broadcasts reconcile the known signature before retry. Only a transaction
+proven absent after blockhash expiry may be rebuilt from the same immutable intent; verified batches
+remain untouched during partial retries.
+
+The canonical zero-participant rule is now resolved: when a finalized hourly or daily player reward
+pool has zero eligible participants, no fake winner or payout plan is created, nothing is burned or
+routed to platform accounting, and the complete player-designated amount is atomically carried into
+Reward Buffer. The immutable reason is `ZERO_PARTICIPANT_CARRY_FORWARD`, paired with a source-unique
+outcome so retries remain exact and idempotent.
+
+User reward reads distinguish pending, approved, processing, paid, and failed/review. Only a fully
+reconciled `VERIFIED` plan appears paid. Commands, configuration, finality policy, retry and security
+behavior are documented in `docs/PAYOUTS.md`. Phase 5D does not add an admin dashboard, multisig UI,
+treasury funding/sweeps, withdrawals, KYC/tax reporting, or arbitrary payout editing.
+
+Phase 5D validation completed with 336 passing tests and 2 intentional skips, 32/32 extension tests,
+clean formatting/lint/typecheck, a successful production build, passing database readiness, and the
+real-stack web Playwright flow. Live devnet/mainnet payout smoke was deliberately not run because no
+funded operator treasury or signer secret is part of the repository or deterministic test setup.

@@ -979,7 +979,17 @@ function DailyPage({ user }: { user: User | null }) {
           </div>
           <Metric
             label="Pending payout"
-            value={`${formatSol(latestDailyReward.rewardAllocationLamports)} · ${latestDailyReward.status === 'ALLOCATED' ? 'Allocated' : 'Pending'}`}
+            value={`${formatSol(latestDailyReward.rewardAllocationLamports)} · ${
+              latestDailyReward.status === 'PAID'
+                ? 'Paid'
+                : latestDailyReward.status === 'PROCESSING'
+                  ? 'Processing'
+                  : latestDailyReward.status === 'APPROVED'
+                    ? 'Approved'
+                    : latestDailyReward.status === 'FAILED_REVIEW'
+                      ? 'Needs review'
+                      : 'Pending'
+            }`}
           />
         </section>
       )}

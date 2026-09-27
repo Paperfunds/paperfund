@@ -39,6 +39,19 @@ export const environmentSchema = z
     REWARD_BASELINE_WINDOW: z.coerce.number().int().positive().default(12),
     REWARD_LAMBDA_BPS: z.coerce.number().int().min(0).max(10_000).default(6_000),
     REWARD_FINALIZATION_GRACE_SECONDS: z.coerce.number().int().min(0).default(60),
+    PAYOUT_EXECUTION_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    PAYOUT_NETWORK: z.enum(['localnet', 'devnet', 'mainnet-beta']).default('localnet'),
+    PAYOUT_MAINNET_CONFIRM: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    PAYOUT_TREASURY_PUBLIC_KEY: z.string().default(''),
+    PAYOUT_SIGNER_TYPE: z.enum(['DISABLED', 'LOCAL_KEYPAIR']).default('DISABLED'),
+    PAYOUT_SIGNER_SECRET_KEY: z.string().default(''),
+    PAYOUT_MAX_RECIPIENTS_PER_BATCH: z.coerce.number().int().min(1).max(12).default(8),
   })
   .readonly();
 

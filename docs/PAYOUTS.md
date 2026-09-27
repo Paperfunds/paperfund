@@ -1,8 +1,8 @@
-# Shadow winner payout accounting
+# Winner payout accounting and secure execution
 
-Phase 5C calculates and persists exact winner obligations. It is accounting only: no payout wallet,
-private key, transaction instruction, signature, broadcast, withdrawal, or on-chain transfer exists.
-The UI must say **Reward allocation** or **Pending payout**, never **Paid**.
+Phase 5C calculates and persists exact winner obligations. Phase 5D adds an operator-controlled,
+server-only Solana execution pipeline. Real payout execution is disabled by default, requires an
+explicit approval, and reports **Paid** only after finalized on-chain reconciliation succeeds.
 
 ## Authoritative inputs
 
@@ -79,10 +79,11 @@ Migration `0005_past_zaran.sql` adds:
 - `payout_allocations`: user, competition rank, tie range/size, funded ordinal count, exact amount,
   dust adjustment, and calculation explanation.
 
-The shadow lifecycle is `CALCULATED → FROZEN → VALIDATED → APPROVED`. Generation currently reaches
-`VALIDATED`; `APPROVED` is reserved for a later operational workflow. `SIGNED`, `BROADCAST`, and
-`VERIFIED` are deliberately not implemented. Financial fields and allocation details are immutable,
-and lifecycle state cannot move backward.
+The lifecycle is `CALCULATED → FROZEN → VALIDATED → APPROVED → SIGNED → BROADCAST → VERIFIED`.
+`FAILED_RETRYABLE`, `FAILED_FINAL`, and `RECONCILIATION_REQUIRED` record exceptional paths without
+silently skipping a stage. Financial fields, allocation details, approvals, allocation-to-batch
+mappings, and broadcast attempts are immutable. Operator approval records its source, identifier,
+time, and a SHA-256 hash of the approved plan snapshot.
 
 One plan is authoritative per hourly round/curve version or daily competition/curve version.
 Transaction-scoped PostgreSQL advisory locks and unique constraints make retries and simultaneous
@@ -108,15 +109,69 @@ and conservation proof.
 - `GET /api/v1/rewards/me` (authenticated)
 
 Public responses expose wallet display identity but omit internal user/result IDs and internal dust
-ordering. Exact lamports are JSON strings. The current-user response labels amounts `PENDING` unless
-a future approval/payment workflow establishes a stronger state.
+ordering. Exact lamports are JSON strings. Current-user responses distinguish pending allocation,
+approved, processing, paid, and failed/review. Only `VERIFIED` is presented as paid.
+
+## Secure operator workflow
+
+Payouts use the authenticated user's canonical Solana wallet snapshot from the approved allocation.
+Destinations and treasury are parsed as Solana public keys before preparation. A deterministic batch
+contains at most `PAYOUT_MAX_RECIPIENTS_PER_BATCH` recipients (default 8), with each allocation
+constrained to exactly one batch. Its intent hash commits to intent version, plan, batch index,
+network, treasury, and ordered allocation/destination/lamport tuples.
+
+The RPC boundary gets a recent blockhash, estimates the message fee, checks the treasury can cover
+the complete payout plus fees, submits signed bytes, reads signature status, and fetches the
+finalized parsed transaction. Fees are platform operating costs and never reduce allocations.
+Prepared intent is persisted before signing. The signer receives only serialized transactions built
+from that frozen intent; signer secrets are neither persisted nor logged.
+
+Approval and preview:
+
+```text
+npm run payout:approve -- <plan-id> <operator-identifier>
+npm run payout:execute -- <plan-id>
+```
+
+Execution is dry-run by default: it validates state, checks RPC network and treasury, builds batches,
+estimates fees, and prints intent hashes without signing or broadcasting. Live execution requires
+`--live`, `PAYOUT_EXECUTION_ENABLED=true`, a configured treasury, and an enabled signer.
+`PAYOUT_NETWORK=mainnet-beta` additionally requires `PAYOUT_MAINNET_CONFIRM=true`; RPC genesis must
+match the explicitly configured network. A development local keypair may be supplied only through
+server-side `PAYOUT_SIGNER_SECRET_KEY` JSON and must match the treasury. The signer interface can be
+replaced by an HSM, hardware, multisig, or remote signer.
+
+If submission response is lost, the known signature is reconciled before any resend. The same signed
+bytes have the same signature. A missing transaction is eligible for `--live --retry` only after its
+last valid block height passes and history still contains no signature; the service then rebuilds
+from the same immutable intent. Verified batches are never rebuilt or resent. Multi-batch execution
+remains partial until every batch verifies.
+
+`VERIFIED` requires `finalized` signature status, a successful transaction, and exact comparison of
+on-chain System Program transfers with persisted treasury, ordered recipients, and lamports. A
+mismatch becomes `RECONCILIATION_REQUIRED`, never paid. A returned send signature is only an
+identifier; completion uses signature status plus the finalized transaction rather than the
+deprecated confirmation RPC.
+
+## Zero-participant carry-forward
+
+A finalized hourly or daily player reward pool with zero eligible participants creates no winner and
+no payout plan. Its complete player-designated amount moves atomically into Reward Buffer with an
+immutable `ZERO_PARTICIPANT_CARRY_FORWARD` movement and source-unique outcome. Nothing is burned or
+routed to platform accounting, and retries cannot apply the carry twice.
+
+## Configuration
+
+- `PAYOUT_EXECUTION_ENABLED=false`: fail-closed live execution switch.
+- `PAYOUT_NETWORK=localnet`: explicit `localnet`, `devnet`, or `mainnet-beta` selection.
+- `PAYOUT_MAINNET_CONFIRM=false`: independent mainnet acknowledgement.
+- `PAYOUT_TREASURY_PUBLIC_KEY`: public fee-payer/source address only.
+- `PAYOUT_SIGNER_TYPE=DISABLED`: `DISABLED` or development-only `LOCAL_KEYPAIR`.
+- `PAYOUT_SIGNER_SECRET_KEY`: server-only 64-byte JSON secret; never persisted or printed.
+- `PAYOUT_MAX_RECIPIENTS_PER_BATCH=8`: conservative retry-isolated batching limit.
 
 ## Not implemented
 
-No real-SOL transaction construction, custody, payout address snapshot, private keys, signing,
-multisig, approval dashboard, broadcast, confirmation, treasury deposit, withdrawal UI, tax/KYC, or
-reconciliation adjustment is included.
-
-A positive frozen prize pool with zero participants cannot satisfy both “pay only participants” and
-exact conservation. Generation therefore fails closed for that case. No recipient, carry-forward,
-or treasury fallback has been invented; it requires a future explicit product policy.
+No multisig UI, admin dashboard, KYC/tax workflow, treasury auto-funding/sweeping, withdrawals,
+arbitrary payout editing, token conversion, or automatic mainnet execution is included. Devnet is
+supported by configuration, but live devnet smoke is optional and not part of deterministic tests.

@@ -33,8 +33,18 @@ export interface RewardAllocation {
   tieGroupSize: number;
   won: boolean;
   rewardAllocationLamports: string;
-  status: 'PENDING' | 'ALLOCATED' | 'NOT_A_WINNER';
-  payoutPlanState: 'CALCULATED' | 'FROZEN' | 'VALIDATED' | 'APPROVED';
+  status: 'PENDING' | 'APPROVED' | 'PROCESSING' | 'PAID' | 'FAILED_REVIEW' | 'NOT_A_WINNER';
+  payoutPlanState:
+    | 'CALCULATED'
+    | 'FROZEN'
+    | 'VALIDATED'
+    | 'APPROVED'
+    | 'SIGNED'
+    | 'BROADCAST'
+    | 'VERIFIED'
+    | 'FAILED_RETRYABLE'
+    | 'FAILED_FINAL'
+    | 'RECONCILIATION_REQUIRED';
 }
 
 export interface InjectedWallet {
