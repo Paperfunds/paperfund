@@ -171,6 +171,33 @@ function services() {
     async currentDailyCompetition() {
       return { id: 'daily:one' };
     },
+    async hourlyPayoutWinners() {
+      return {
+        id: 'payout:hourly:one',
+        state: 'VALIDATED',
+        allocations: [{ walletAddress: 'wallet', competitiveRank: 1, allocatedLamports: 123n }],
+      };
+    },
+    async dailyPayoutWinners() {
+      return {
+        id: 'payout:daily:one',
+        state: 'VALIDATED',
+        allocations: [{ walletAddress: 'wallet', competitiveRank: 1, allocatedLamports: 456n }],
+      };
+    },
+    async payoutPlan() {
+      return { id: 'payout:hourly:one', prizePoolLamports: 123n, state: 'VALIDATED' };
+    },
+    async userRewardAllocations() {
+      return [
+        {
+          competitiveRank: 1,
+          won: true,
+          rewardAllocationLamports: 123n,
+          status: 'PENDING',
+        },
+      ];
+    },
     async marketSupport() {
       return { supported: true };
     },
@@ -245,6 +272,45 @@ describe('V1 competition API', () => {
     expect(sell.json()).toMatchObject({
       tokenAmountSoldBaseUnits: '100',
       remainingQuantityBaseUnits: '0',
+    });
+  });
+
+  it('exposes exact shadow winner reads and authenticated current-user allocations', async () => {
+    const app = buildApp({
+      config,
+      database: { healthCheck: async () => true },
+      redis: { healthCheck: async () => true },
+      ...services(),
+      logger: false,
+    });
+    apps.push(app);
+    const hourly = await app.inject({
+      method: 'GET',
+      url: '/api/v1/rewards/hourly/round%3Aone/winners',
+    });
+    expect(hourly.statusCode).toBe(200);
+    expect(hourly.json()).toMatchObject({
+      state: 'VALIDATED',
+      allocations: [{ competitiveRank: 1, allocatedLamports: '123' }],
+    });
+    const daily = await app.inject({
+      method: 'GET',
+      url: '/api/v1/rewards/daily/2026-09-25/winners',
+    });
+    expect(daily.json().allocations[0].allocatedLamports).toBe('456');
+    const plan = await app.inject({ method: 'GET', url: '/api/v1/payout-plans/payout%3Aone' });
+    expect(plan.json().prizePoolLamports).toBe('123');
+    const unauthenticated = await app.inject({ method: 'GET', url: '/api/v1/rewards/me' });
+    expect(unauthenticated.statusCode).toBe(401);
+    const mine = await app.inject({
+      method: 'GET',
+      url: '/api/v1/rewards/me',
+      headers: { authorization: 'Bearer valid' },
+    });
+    expect(mine.json()[0]).toMatchObject({
+      competitiveRank: 1,
+      rewardAllocationLamports: '123',
+      status: 'PENDING',
     });
   });
 });

@@ -6,6 +6,7 @@ import type {
   MarketSupport,
   Page,
   PositionValuationResponse,
+  RewardAllocation,
   Round,
   Trade,
   User,
@@ -108,6 +109,7 @@ export const api = {
   trades: (cursor?: string) => request<Page<Trade>>(`/api/v1/trades${query(cursor)}`),
   results: (cursor?: string) =>
     request<Page<HourlyResult>>(`/api/v1/results/hourly${query(cursor)}`),
+  rewardAllocations: () => request<RewardAllocation[]>('/api/v1/rewards/me'),
   hourly: () =>
     request<{
       round: { id: string; starts_at: string; ends_at_exclusive: string; state: string };

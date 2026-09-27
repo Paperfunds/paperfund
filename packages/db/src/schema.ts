@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   check,
   date,
   index,
@@ -502,6 +503,121 @@ export const dailyResultHourlyResults = pgTable(
   },
   (table) => [
     unique('daily_result_hourly_results_pair_unique').on(table.dailyResultId, table.hourlyResultId),
+  ],
+);
+
+export const payoutPlans = pgTable(
+  'payout_plans',
+  {
+    id: text('id').primaryKey(),
+    competitionType: text('competition_type').notNull(),
+    hourlyRoundId: text('hourly_round_id').references(() => hourlyRounds.id, {
+      onDelete: 'restrict',
+      onUpdate: 'restrict',
+    }),
+    dailyCompetitionId: text('daily_competition_id').references(() => dailyCompetitions.id, {
+      onDelete: 'restrict',
+      onUpdate: 'restrict',
+    }),
+    prizePoolLamports: bigint('prize_pool_lamports', { mode: 'bigint' }).notNull(),
+    curveVersion: text('curve_version').notNull(),
+    tiePolicyVersion: text('tie_policy_version').notNull(),
+    participantCount: integer('participant_count').notNull(),
+    nominalWinnerCount: integer('nominal_winner_count').notNull(),
+    actualWinnerCount: integer('actual_winner_count').notNull(),
+    state: text('state').notNull().default('CALCULATED'),
+    calculatedAt: timestamp('calculated_at', { withTimezone: true }).notNull(),
+    frozenAt: timestamp('frozen_at', { withTimezone: true }),
+    validatedAt: timestamp('validated_at', { withTimezone: true }),
+    configSnapshot: jsonb('config_snapshot').notNull(),
+    sourceResultSnapshot: jsonb('source_result_snapshot').notNull(),
+    totalAllocatedLamports: bigint('total_allocated_lamports', { mode: 'bigint' }).notNull(),
+    conservationHolds: boolean('conservation_holds').notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique('payout_plans_hour_curve_unique').on(table.hourlyRoundId, table.curveVersion),
+    unique('payout_plans_daily_curve_unique').on(table.dailyCompetitionId, table.curveVersion),
+    index('payout_plans_state_idx').on(table.state, table.calculatedAt),
+    check('payout_plans_type_valid', sql`${table.competitionType} in ('HOURLY','DAILY')`),
+    check(
+      'payout_plans_source_exact',
+      sql`(${table.competitionType} = 'HOURLY' and ${table.hourlyRoundId} is not null and ${table.dailyCompetitionId} is null) or (${table.competitionType} = 'DAILY' and ${table.hourlyRoundId} is null and ${table.dailyCompetitionId} is not null)`,
+    ),
+    check(
+      'payout_plans_state_valid',
+      sql`${table.state} in ('CALCULATED','FROZEN','VALIDATED','APPROVED')`,
+    ),
+    check(
+      'payout_plans_counts_valid',
+      sql`${table.participantCount} >= 0 and ${table.nominalWinnerCount} > 0 and ${table.actualWinnerCount} >= 0`,
+    ),
+    check(
+      'payout_plans_amounts_valid',
+      sql`${table.prizePoolLamports} >= 0 and ${table.totalAllocatedLamports} >= 0`,
+    ),
+    check(
+      'payout_plans_conservation_exact',
+      sql`${table.conservationHolds} and ${table.prizePoolLamports} = ${table.totalAllocatedLamports}`,
+    ),
+  ],
+);
+
+export const payoutRankBuckets = pgTable(
+  'payout_rank_buckets',
+  {
+    id: text('id').primaryKey(),
+    payoutPlanId: text('payout_plan_id')
+      .notNull()
+      .references(() => payoutPlans.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    ordinal: integer('ordinal').notNull(),
+    weightPpm: bigint('weight_ppm', { mode: 'bigint' }).notNull(),
+    floorAllocationLamports: bigint('floor_allocation_lamports', { mode: 'bigint' }).notNull(),
+    remainderBasis: bigint('remainder_basis', { mode: 'bigint' }).notNull(),
+    finalAllocationLamports: bigint('final_allocation_lamports', { mode: 'bigint' }).notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique('payout_rank_buckets_plan_ordinal_unique').on(table.payoutPlanId, table.ordinal),
+    check('payout_rank_buckets_ordinal_positive', sql`${table.ordinal} > 0`),
+    check(
+      'payout_rank_buckets_values_nonnegative',
+      sql`${table.weightPpm} >= 0 and ${table.floorAllocationLamports} >= 0 and ${table.remainderBasis} >= 0 and ${table.finalAllocationLamports} >= 0`,
+    ),
+  ],
+);
+
+export const payoutAllocations = pgTable(
+  'payout_allocations',
+  {
+    id: text('id').primaryKey(),
+    payoutPlanId: text('payout_plan_id')
+      .notNull()
+      .references(() => payoutPlans.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    competitiveRank: integer('competitive_rank').notNull(),
+    tieGroupSize: integer('tie_group_size').notNull(),
+    ordinalStart: integer('ordinal_start').notNull(),
+    ordinalEnd: integer('ordinal_end').notNull(),
+    fundedOrdinalCount: integer('funded_ordinal_count').notNull(),
+    allocatedLamports: bigint('allocated_lamports', { mode: 'bigint' }).notNull(),
+    dustAdjustmentLamports: bigint('dust_adjustment_lamports', { mode: 'bigint' }).notNull(),
+    allocationExplanation: jsonb('allocation_explanation').notNull(),
+    createdAt,
+  },
+  (table) => [
+    unique('payout_allocations_plan_user_unique').on(table.payoutPlanId, table.userId),
+    index('payout_allocations_user_idx').on(table.userId, table.createdAt),
+    check(
+      'payout_allocations_rank_valid',
+      sql`${table.competitiveRank} > 0 and ${table.tieGroupSize} > 0 and ${table.ordinalStart} > 0 and ${table.ordinalEnd} >= ${table.ordinalStart} and ${table.fundedOrdinalCount} > 0`,
+    ),
+    check(
+      'payout_allocations_amount_valid',
+      sql`${table.allocatedLamports} >= 0 and ${table.dustAdjustmentLamports} >= 0 and ${table.dustAdjustmentLamports} <= 1`,
+    ),
   ],
 );
 

@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto';
 import fastify, { type FastifyRequest } from 'fastify';
 
 import type { AppConfig } from '@paperfund/config';
-import { FinancialServiceError, RewardAccountingError, type DatabaseService } from '@paperfund/db';
+import {
+  FinancialServiceError,
+  PayoutPlanError,
+  RewardAccountingError,
+  type DatabaseService,
+} from '@paperfund/db';
 import { ExecutionEngineError } from '@paperfund/execution';
 import type { ServiceStatus } from '@paperfund/shared';
 
@@ -131,6 +136,11 @@ const statusByCode: Record<string, number> = {
   IDEMPOTENCY_CONFLICT: 409,
   ENTITY_NOT_FOUND: 404,
   FINALIZATION_CONFLICT: 409,
+  PAYOUT_SOURCE_NOT_FOUND: 404,
+  PAYOUT_PLAN_NOT_FOUND: 404,
+  PAYOUT_SOURCE_NOT_READY: 409,
+  PAYOUT_SOURCE_NOT_FINAL: 409,
+  DAILY_REWARD_NOT_READY: 409,
 };
 
 export function buildApp(dependencies: AppDependencies) {
@@ -169,6 +179,7 @@ export function buildApp(dependencies: AppDependencies) {
     const domainError =
       error instanceof ApiError ||
       error instanceof FinancialServiceError ||
+      error instanceof PayoutPlanError ||
       error instanceof RewardAccountingError ||
       error instanceof ExecutionEngineError;
     const frameworkStatus =
@@ -500,6 +511,27 @@ export function buildApp(dependencies: AppDependencies) {
   });
   app.get('/api/v1/rewards/daily/current', async () =>
     exactJson(await competition.currentDailyRewardPool()),
+  );
+  app.get('/api/v1/rewards/hourly/:roundId/winners', async (request) => {
+    const roundId = (request.params as { roundId: string }).roundId;
+    if (roundId.length === 0 || roundId.length > 128)
+      throw new ApiError('INVALID_REQUEST', 'roundId is invalid.');
+    return exactJson(await competition.hourlyPayoutWinners(roundId));
+  });
+  app.get('/api/v1/rewards/daily/:idOrDate/winners', async (request) => {
+    const idOrDate = (request.params as { idOrDate: string }).idOrDate;
+    if (idOrDate.length === 0 || idOrDate.length > 128)
+      throw new ApiError('INVALID_REQUEST', 'Daily competition identifier is invalid.');
+    return exactJson(await competition.dailyPayoutWinners(idOrDate));
+  });
+  app.get('/api/v1/payout-plans/:planId', async (request) => {
+    const planId = (request.params as { planId: string }).planId;
+    if (planId.length === 0 || planId.length > 512)
+      throw new ApiError('INVALID_REQUEST', 'Payout plan identifier is invalid.');
+    return exactJson(await competition.payoutPlan(planId));
+  });
+  app.get('/api/v1/rewards/me', async (request) =>
+    exactJson(await competition.userRewardAllocations((await user(request)).id)),
   );
 
   app.get('/api/v1/markets/:mint', async (request) => {

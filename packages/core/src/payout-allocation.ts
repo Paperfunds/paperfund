@@ -5,10 +5,40 @@ import { lamports, type Lamports } from './money.js';
 import type { PartsPerMillion } from './percentages.js';
 import type { DailyResult, HourlyResult } from './types.js';
 
+export const HOURLY_PAYOUT_CURVE_VERSION = 'hourly-top10-v1';
+export const DAILY_PAYOUT_CURVE_VERSION = 'daily-top25-v1';
+export const PAYOUT_TIE_POLICY_VERSION = 'combined-funded-ordinals-v1';
+
+export interface PayoutRankBucket {
+  readonly ordinal: number;
+  readonly weightPpm: PartsPerMillion;
+  readonly floorAllocationLamports: Lamports;
+  readonly remainderBasis: bigint;
+  readonly finalAllocationLamports: Lamports;
+}
+
+export interface PayoutTieGroup {
+  readonly competitiveRank: number;
+  readonly tieGroupSize: number;
+  readonly ordinalStart: number;
+  readonly ordinalEnd: number;
+  readonly fundedOrdinals: readonly number[];
+  readonly fundedOrdinalCount: number;
+  readonly combinedFundedLamports: Lamports;
+  readonly equalFloorLamports: Lamports;
+  readonly tieDustLamports: Lamports;
+  readonly userIdsInDustOrder: readonly UserId[];
+}
+
 export interface PayoutAllocation {
   readonly userId: UserId;
   readonly rank: number;
+  readonly tieGroupSize: number;
+  readonly ordinalStart: number;
+  readonly ordinalEnd: number;
+  readonly fundedOrdinalCount: number;
   readonly payoutLamports: Lamports;
+  readonly dustAdjustmentLamports: Lamports;
   readonly curveWeightPpm: PartsPerMillion;
 }
 
@@ -17,38 +47,32 @@ export type PayoutAllocationResult =
       readonly ok: true;
       readonly prizePoolLamports: Lamports;
       readonly occupiedWeightPpm: bigint;
+      readonly nominalWinnerCount: number;
+      readonly actualWinnerCount: number;
+      readonly rankBuckets: readonly PayoutRankBucket[];
+      readonly tieGroups: readonly PayoutTieGroup[];
       readonly allocations: readonly PayoutAllocation[];
     }
   | {
       readonly ok: false;
-      readonly reason:
-        | 'INVALID_PRIZE_POOL'
-        | 'UNRESOLVED_WINNER_TIE_FOR_PAYOUT'
-        | 'INVALID_LEADERBOARD_FOR_PAYOUT';
+      readonly reason: 'INVALID_PRIZE_POOL' | 'INVALID_LEADERBOARD_FOR_PAYOUT';
     };
 
 interface RankedUser {
   readonly userId: UserId;
 }
 
-function allocatePayouts<Result extends RankedUser>(input: {
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+export function allocatePayouts<Result extends RankedUser>(input: {
   readonly prizePoolLamports: bigint;
   readonly leaderboard: Leaderboard<Result>;
-  readonly winnerSelection: WinnerSelection<Result>;
   readonly payoutCurve: readonly PayoutCurveEntry[];
 }): PayoutAllocationResult {
   if (input.prizePoolLamports < 0n) return { ok: false, reason: 'INVALID_PRIZE_POOL' };
-  if (!input.winnerSelection.ok) {
-    return {
-      ok: false,
-      reason:
-        input.winnerSelection.reason === 'UNRESOLVED_TIE_AT_WINNER_CUTOFF'
-          ? 'UNRESOLVED_WINNER_TIE_FOR_PAYOUT'
-          : 'INVALID_LEADERBOARD_FOR_PAYOUT',
-    };
-  }
-  const winnerSelection = input.winnerSelection;
-  const winnerCount = winnerSelection.winnerCount;
+
   let expectedRank = 1;
   const users = new Set<string>();
   const structurallyInvalid = input.leaderboard.rankGroups.some((group) => {
@@ -68,81 +92,153 @@ function allocatePayouts<Result extends RankedUser>(input: {
   const invalidCurve = input.payoutCurve.some(
     ({ rank, sharePpm }, index) => rank !== index + 1 || sharePpm < 0n,
   );
+  const participantsFromGroups = input.leaderboard.rankGroups.reduce(
+    (count, group) => count + group.results.length,
+    0,
+  );
   if (
     structurallyInvalid ||
     invalidCurve ||
-    winnerCount !== input.payoutCurve.length ||
-    input.leaderboard.participantCount !==
-      input.leaderboard.rankGroups.reduce((count, group) => count + group.results.length, 0)
+    input.payoutCurve.length === 0 ||
+    input.leaderboard.participantCount !== participantsFromGroups
   ) {
     return { ok: false, reason: 'INVALID_LEADERBOARD_FOR_PAYOUT' };
   }
 
-  const winningGroups = input.leaderboard.rankGroups.filter(({ rank }) => rank <= winnerCount);
-  if (winningGroups.some(({ tied }) => tied)) {
-    return { ok: false, reason: 'UNRESOLVED_WINNER_TIE_FOR_PAYOUT' };
-  }
-  const winners = winningGroups.flatMap((group) =>
-    group.results.map((result) => ({ rank: group.rank, result })),
-  );
-  if (
-    winners.length !== winnerSelection.provisionalWinners.length ||
-    winners.length !== Math.min(input.leaderboard.participantCount, winnerCount) ||
-    winners.some(({ rank }, index) => rank !== index + 1) ||
-    winners.some(
-      ({ result }, index) => result.userId !== winnerSelection.provisionalWinners[index]?.userId,
-    )
-  ) {
-    return { ok: false, reason: 'INVALID_LEADERBOARD_FOR_PAYOUT' };
-  }
-  if (winners.length === 0) {
+  if (participantsFromGroups === 0) {
     return input.prizePoolLamports === 0n
       ? {
           ok: true,
           prizePoolLamports: lamports(0n),
           occupiedWeightPpm: 0n,
+          nominalWinnerCount: input.payoutCurve.length,
+          actualWinnerCount: 0,
+          rankBuckets: [],
+          tieGroups: [],
           allocations: [],
         }
       : { ok: false, reason: 'INVALID_LEADERBOARD_FOR_PAYOUT' };
   }
 
-  const curveByRank = new Map(input.payoutCurve.map((entry) => [entry.rank, entry]));
-  const occupiedWeightPpm = winners.reduce(
-    (total, { rank }) => total + (curveByRank.get(rank)?.sharePpm ?? 0n),
-    0n,
-  );
+  const fundedOrdinalCount = Math.min(participantsFromGroups, input.payoutCurve.length);
+  const fundedCurve = input.payoutCurve.slice(0, fundedOrdinalCount);
+  const occupiedWeightPpm = fundedCurve.reduce((sum, entry) => sum + entry.sharePpm, 0n);
   if (occupiedWeightPpm <= 0n) {
     return { ok: false, reason: 'INVALID_LEADERBOARD_FOR_PAYOUT' };
   }
-  const floors = winners.map(({ rank, result }) => {
-    const weight = curveByRank.get(rank)?.sharePpm;
-    if (weight === undefined) return undefined;
+
+  const mutableBuckets = fundedCurve.map(({ rank, sharePpm }) => {
+    const numerator = input.prizePoolLamports * sharePpm;
+    const floor = numerator / occupiedWeightPpm;
     return {
-      userId: result.userId,
-      rank,
-      payoutLamports: (input.prizePoolLamports * weight) / occupiedWeightPpm,
-      curveWeightPpm: weight,
+      ordinal: rank,
+      weightPpm: sharePpm,
+      floorAllocationLamports: floor,
+      remainderBasis: numerator % occupiedWeightPpm,
+      finalAllocationLamports: floor,
     };
   });
-  if (floors.some((value) => value === undefined)) {
+  const floorTotal = mutableBuckets.reduce(
+    (sum, bucket) => sum + bucket.floorAllocationLamports,
+    0n,
+  );
+  let bucketDust = input.prizePoolLamports - floorTotal;
+  const largestRemainderOrder = [...mutableBuckets].sort(
+    (left, right) =>
+      (left.remainderBasis > right.remainderBasis
+        ? -1
+        : left.remainderBasis < right.remainderBasis
+          ? 1
+          : 0) || left.ordinal - right.ordinal,
+  );
+  for (const bucket of largestRemainderOrder) {
+    if (bucketDust === 0n) break;
+    bucket.finalAllocationLamports += 1n;
+    bucketDust -= 1n;
+  }
+  if (bucketDust !== 0n) {
     return { ok: false, reason: 'INVALID_LEADERBOARD_FOR_PAYOUT' };
   }
-  const exactFloors = floors as Array<{
-    userId: UserId;
-    rank: number;
-    payoutLamports: bigint;
-    curveWeightPpm: PartsPerMillion;
-  }>;
-  const allocated = exactFloors.reduce((total, payout) => total + payout.payoutLamports, 0n);
-  exactFloors[0]!.payoutLamports += input.prizePoolLamports - allocated;
+
+  const bucketByOrdinal = new Map(mutableBuckets.map((bucket) => [bucket.ordinal, bucket]));
+  const allocations: PayoutAllocation[] = [];
+  const tieGroups: PayoutTieGroup[] = [];
+
+  for (const group of input.leaderboard.rankGroups) {
+    const ordinalStart = group.rank;
+    const ordinalEnd = ordinalStart + group.tieGroupSize - 1;
+    const lastFundedOrdinal = Math.min(ordinalEnd, fundedOrdinalCount);
+    const fundedOrdinals =
+      ordinalStart <= lastFundedOrdinal
+        ? Array.from(
+            { length: lastFundedOrdinal - ordinalStart + 1 },
+            (_, index) => ordinalStart + index,
+          )
+        : [];
+    if (fundedOrdinals.length === 0) continue;
+
+    const combinedFundedLamports = fundedOrdinals.reduce(
+      (sum, ordinal) => sum + bucketByOrdinal.get(ordinal)!.finalAllocationLamports,
+      0n,
+    );
+    const groupWeightPpm = fundedOrdinals.reduce(
+      (sum, ordinal) => sum + bucketByOrdinal.get(ordinal)!.weightPpm,
+      0n,
+    );
+    const groupSize = BigInt(group.tieGroupSize);
+    const equalFloorLamports = combinedFundedLamports / groupSize;
+    const originalTieDust = combinedFundedLamports % groupSize;
+    let remainingTieDust = originalTieDust;
+    const usersInDustOrder = [...group.results].sort((left, right) =>
+      compareText(left.userId, right.userId),
+    );
+    tieGroups.push({
+      competitiveRank: group.rank,
+      tieGroupSize: group.tieGroupSize,
+      ordinalStart,
+      ordinalEnd,
+      fundedOrdinals,
+      fundedOrdinalCount: fundedOrdinals.length,
+      combinedFundedLamports: lamports(combinedFundedLamports),
+      equalFloorLamports: lamports(equalFloorLamports),
+      tieDustLamports: lamports(originalTieDust),
+      userIdsInDustOrder: usersInDustOrder.map(({ userId }) => userId),
+    });
+    for (const result of usersInDustOrder) {
+      const dustAdjustment = remainingTieDust > 0n ? 1n : 0n;
+      if (remainingTieDust > 0n) remainingTieDust -= 1n;
+      allocations.push({
+        userId: result.userId,
+        rank: group.rank,
+        tieGroupSize: group.tieGroupSize,
+        ordinalStart,
+        ordinalEnd,
+        fundedOrdinalCount: fundedOrdinals.length,
+        payoutLamports: lamports(equalFloorLamports + dustAdjustment),
+        dustAdjustmentLamports: lamports(dustAdjustment),
+        curveWeightPpm: groupWeightPpm as PartsPerMillion,
+      });
+    }
+  }
+
+  const allocated = allocations.reduce((sum, allocation) => sum + allocation.payoutLamports, 0n);
+  if (allocated !== input.prizePoolLamports) {
+    return { ok: false, reason: 'INVALID_LEADERBOARD_FOR_PAYOUT' };
+  }
+
   return {
     ok: true,
     prizePoolLamports: lamports(input.prizePoolLamports),
     occupiedWeightPpm,
-    allocations: exactFloors.map((payout) => ({
-      ...payout,
-      payoutLamports: lamports(payout.payoutLamports),
+    nominalWinnerCount: input.payoutCurve.length,
+    actualWinnerCount: allocations.length,
+    rankBuckets: mutableBuckets.map((bucket) => ({
+      ...bucket,
+      floorAllocationLamports: lamports(bucket.floorAllocationLamports),
+      finalAllocationLamports: lamports(bucket.finalAllocationLamports),
     })),
+    tieGroups,
+    allocations,
   };
 }
 

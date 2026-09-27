@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 5A implementation record
-**Product status:** Authoritative trading and creator-fee reward-pool accounting complete
+**Document status:** Canonical specification with Phase 5C implementation record
+**Product status:** Authoritative trading, reward-pool accounting, and shadow winner allocation complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-25
 
@@ -187,17 +187,19 @@ Where available, retain creator/deployer information and liquidity events to sup
 
 The hourly leaderboard should show rank, user or display wallet, current equity, current P&L, time remaining, current prize pool, and optionally current positions. During the round it is provisional. Final rank is determined only after settlement. The Top 10 receive real SOL.
 
-Hourly tie-breaking is **TBD**. Do not infer a rule from timestamps, wallet address, trade count, or any other field.
-
-Provisional winner membership may be known when a complete tie group fits inside the Top 10, but final reward-amount allocation must not occur while any tie exists among winning ranks because the rank percentages differ. A tie entirely outside the winning ranks does not block payout allocation. Until a tie-breaking policy is explicitly approved, the system must return an unresolved-tie failure rather than assign unequal rank shares arbitrarily.
+Hourly ranking uses competition ranks such as `1, 2, 2, 4`. Tied users share the combined prize
+allocation of the ordinal positions occupied by their tie group. If a tie crosses the Top 10 cutoff,
+only funded ordinal positions contribute prize capital, but every member of the tie group shares that
+capital equally. Stable user-ID ordering may assign indivisible lamport dust only; it never changes
+competitive rank or implies superiority.
 
 ### 6.2 Daily leaderboard
 
 The daily leaderboard ranks users by cumulative Paper SOL P&L across all completed hourly results in the active UTC day. The Top 25 receive real SOL after daily finalization.
 
-Daily tie-breaking is **TBD**. Implementations may detect and represent ties, but they must not choose winners from a tie that crosses the winner cutoff until a tie-breaking policy is explicitly approved.
-
-Even when a complete tie group fits inside the Top 25, final reward-amount allocation must not occur while that tie remains among winning ranks because the rank percentages differ. A tie entirely outside the winning ranks does not block payout allocation. No implementation may invent a tie-breaker.
+Daily ranking uses the same tie policy as hourly ranking. Tied users share the combined funded ordinal
+allocations occupied by the group. A tie crossing the Top 25 shares only the funded ordinal capital
+among all tied users. Ties entirely below the cutoff receive no allocation.
 
 Daily attribution is resolved: an hourly result belongs to the UTC Daily Championship containing its hourly round's authoritative start time, regardless of when settlement, reward finalization, payout, or indexer discovery occurs.
 
@@ -287,7 +289,12 @@ The approved Daily Top 25 curve sums to exactly **100.000%**. Ranks 1–24 are u
 
 ### 8.3 Integer payout and dust policy
 
-All real-SOL reward calculations must ultimately use lamports/integer base units. After calculating rank allocations, any unavoidable integer remainder from division is assigned to rank 1. The complete prize pool must therefore be distributed exactly: no SOL may disappear through percentage rounding. Configuration validation must confirm that each payout curve's declared percentages total exactly 100% at its declared precision before the curve can be used.
+All real-SOL reward calculations use lamports/integer base units. Rank buckets use exact integer
+largest-remainder allocation, with ordinal ascending as the deterministic fallback for equal
+remainders. Underfilled fields renormalize occupied funded weights first. Funded buckets in a tie
+group are combined and divided equally; indivisible tie dust uses stable user-ID ascending order.
+That ordering is non-competitive and does not alter displayed rank. The full pool is distributed
+exactly, and curve validation requires an exact 100% total at the declared precision.
 
 ## 9. Reward Buffer and dynamic hourly rewards
 
@@ -454,7 +461,11 @@ Materialized balances may be maintained for performance, but they must reconcile
 
 Authoritative financial accounting must not use JavaScript `Number`. Use integer base units, `BigInt`, and explicit fixed-point decimal representations as appropriate for Paper SOL, token amounts, prices, fees, P&L, allocation ratios, buffer accounting, and payouts.
 
-Real-SOL payout allocations must ultimately use lamports/integer base units. After rank shares are calculated, any unavoidable integer remainder is assigned to rank 1 so the full prize pool is distributed exactly. Other operation-specific fixed-point scales and intermediate rounding directions remain **TBD** where not otherwise specified. Validation must reject percentage configurations that do not meet the approved exact total.
+Real-SOL payout allocations must use lamports/integer base units. Rank conversion uses the approved
+largest-remainder rule and tie division uses stable user-ID order only for indivisible dust, so the
+full prize pool is distributed exactly. Other operation-specific fixed-point scales and intermediate
+rounding directions remain **TBD** where not otherwise specified. Validation must reject percentage
+configurations that do not meet the approved exact total.
 
 ## 12. Creator-fee ingestion
 
@@ -531,12 +542,12 @@ The design and tests must explicitly cover:
 - protocol migration between quote and execution;
 - unavailable or stale market data;
 - zero or near-zero output;
-- payout rounding dust, assigned to rank 1 in lamports;
+- payout rank-bucket and tie-split dust, assigned by approved deterministic non-competitive rules;
 - a late creator-fee event during the grace period and a correction after reward freeze;
 - duplicate fee events and payout jobs;
 - RPC/indexer outage;
 - settlement retry and partial settlement recovery;
-- hourly or daily leaderboard ties (**policy TBD**);
+- hourly or daily leaderboard ties, including ties crossing the payout cutoff;
 - an hourly round crossing the UTC-day boundary, attributed to the UTC day containing its authoritative start time (**policy resolved**);
 - Reward Buffer exhaustion;
 - configuration change near a round boundary;
@@ -659,7 +670,7 @@ Connect authentication, round state, trading, ledger, positions, live provisiona
 
 ### Phase 6 — Daily Championship
 
-Persist every completed hourly result, accumulate gains and losses using the approved round-start UTC attribution rule, run daily finalization, expose live/final leaderboards, and cover midnight behavior. Resolve the daily tie-breaking policy before production finalization.
+Persist every completed hourly result, accumulate gains and losses using the approved round-start UTC attribution rule, run daily finalization, expose live/final leaderboards, and cover midnight behavior. Apply the approved shared-funded-ordinal tie policy during payout allocation.
 
 ### Phase 7 — Creator-fee tracking
 
@@ -693,22 +704,24 @@ Add adapters incrementally with protocol-specific math validation, replay fixtur
 
 The following are intentionally unresolved and must not be invented:
 
-1. **Leaderboard ties:** hourly and daily tie-breaking are TBD.
-2. **Reserve policy:** target and launch/high-revenue activation/deactivation policy are TBD.
-3. **Settlement data:** exact cutoff market-state and outage/recovery policy is TBD.
-4. **Fee ingestion:** chain finality/reorg policy and post-freeze reconciliation remedies are TBD.
-5. **Supported integrations:** Day-1 protocol(s) and terminal(s) are TBD.
-6. **Market-data freshness:** thresholds and reject/defer policy are configurable but TBD.
-7. **Payout operations:** custody, approvals, confirmation, retry, and failure-recovery policies are TBD.
-8. **Legal eligibility:** jurisdictional and compliance rules await qualified review.
+1. **Reserve policy:** target and launch/high-revenue activation/deactivation policy is TBD.
+2. **Settlement data:** exact cutoff market-state and outage/recovery policy is TBD.
+3. **Fee ingestion:** chain finality/reorg policy and post-freeze reconciliation remedies are TBD.
+4. **Market-data freshness:** thresholds and reject/defer policy are configurable but TBD.
+5. **Payout operations:** custody, approvals, confirmation, retry, and failure-recovery policies are TBD.
+6. **Legal eligibility:** jurisdictional and compliance rules await qualified review.
 
 **Resolved decision — Daily attribution:** Hourly results are attributed to the UTC Daily Championship containing the hourly round's authoritative start time.
 
 **Resolved decision — Dynamic baseline activation:** The baseline is the floor of the arithmetic mean of the most recent full configured window of completed natural hourly reward allocations; the default window is 12 hours and partial windows do not activate smoothing.
 
-**Resolved decision — Payout ties:** Tie-breaking remains TBD, so any tie among winning ranks blocks final reward-amount allocation; ties entirely outside the winning ranks do not block allocation.
+**Resolved decision — Payout ties:** Tied users share the combined allocation of their occupied
+funded ordinal positions. A cutoff-crossing tie shares only funded ordinal capital among every tied
+user. Ties retain competition rank, and stable user-ID ordering is used only for indivisible dust.
 
-The previously identified payout-curve, Reward Buffer source, payout-dust, order-cutoff, late-fee attribution, and Daily Championship attribution ambiguities are resolved by Sections 3, 6, 7, 8, 9, 11, and 12. Leaderboard tie-breaking remains explicitly TBD.
+The previously identified payout-curve, payout-tie, Reward Buffer source, payout-dust, order-cutoff,
+late-fee attribution, and Daily Championship attribution ambiguities are resolved by Sections 3, 6,
+7, 8, 9, 11, and 12.
 
 No other contradiction was identified in the supplied hourly/daily competition rules: every hour resets to 10 Paper SOL; every completed hourly gain or loss contributes to the UTC-day cumulative score; hourly rewards go to Top 10 after realistic force settlement; daily rewards go to Top 25 after UTC-day finalization.
 
@@ -1119,3 +1132,43 @@ The approved primary Paperfund brand asset is the **black interlocking PF mark w
 horizontal accent**. It is user-approved and must not be invented, redrawn, recolored, or distorted.
 The binary asset was not present in the repository during Phase 5B, so asset wiring is deferred to a
 later branding pass and does not block terminal support.
+
+## 34. Phase 5C implementation record
+
+Phase 5C converts finalized authoritative hourly and daily prize pools into persisted shadow payout
+plans. It does not create transactions, hold payout keys, sign, broadcast, transfer SOL, or mark any
+allocation paid. The stable curve identifiers are `hourly-top10-v1` and `daily-top25-v1`; the tie
+policy identifier is `combined-funded-ordinals-v1`.
+
+Allocation reads only finalized competition results and frozen/final reward pools. Exact bigint
+largest-remainder math converts the applicable curve weights into ordinal rank buckets. Underfilled
+fields renormalize the occupied funded ordinal weights to the full pool. Each tie group combines its
+funded ordinal buckets and divides them equally across all tied users. When a tie crosses the cutoff,
+only funded ordinal buckets contribute. Stable user-ID ascending order assigns indivisible tie dust
+without changing competition rank. Negative scores remain eligible. Every plan conserves exactly:
+the sum of user allocations and rank buckets equals the frozen prize pool.
+
+Forward migration `0005_past_zaran.sql` adds payout plans, persisted rank buckets, and user
+allocations with source/curve/tie snapshots, unique source/version constraints, lifecycle guards,
+immutable financial details, and deferred conservation validation. Plans progress through
+`CALCULATED`, `FROZEN`, and `VALIDATED`; `APPROVED` is reserved for later operational approval.
+Normal generation never mutates a frozen plan. PostgreSQL advisory locks plus uniqueness make
+generation idempotent and concurrency-safe.
+
+The worker freezes a daily reward pool only after its daily competition and every contained hourly
+reward pool are final, then generates eligible hourly and daily plans independently of the next
+trading round. The validator replays the configured curve against current authoritative results and
+checks source finality, versions, participants, ranks, ties, buckets, duplicates, nonnegative amounts,
+winner counts, and conservation. Audit reads expose source leaderboard snapshots, exact curve
+buckets, tie explanations, dust adjustments, final allocations, and a conservation proof.
+
+Public read APIs expose hourly winners, daily winners, and sanitized plan audits. Authenticated users
+can read their own pending allocations. Hourly history shows finalized rank and pending reward
+allocation without claiming payment. Detailed contracts, lifecycle, rounding, APIs, limitations, and
+operational boundaries are in `docs/PAYOUTS.md` and `docs/API.md`.
+
+Phase 5C validation completed with 328 passing tests and 2 intentional skips, 32/32 extension tests,
+clean lint and typecheck, successful production build, applied forward migration and DB readiness,
+and the real-stack web Playwright flow passing. A positive frozen pool with zero participants fails
+closed because no approved recipient exists; a future explicit carry/reconciliation policy is
+required rather than creating a non-winner allocation.

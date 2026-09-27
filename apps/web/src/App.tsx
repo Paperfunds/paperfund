@@ -956,6 +956,14 @@ function HourlyPage() {
 
 function DailyPage({ user }: { user: User | null }) {
   const board = useQuery({ queryKey: ['daily'], queryFn: api.daily, refetchInterval: 8_000 });
+  const rewards = useQuery({
+    queryKey: ['reward-allocations', user?.id],
+    queryFn: api.rewardAllocations,
+    enabled: Boolean(user),
+  });
+  const latestDailyReward = rewards.data?.find(
+    ({ competitionType }) => competitionType === 'DAILY',
+  );
   return (
     <PageFrame>
       <PageTitle
@@ -963,6 +971,18 @@ function DailyPage({ user }: { user: User | null }) {
         title="Daily leaderboard"
         subtitle="Every finalized hourly gain and loss contributes to the current UTC day's cumulative score."
       />
+      {latestDailyReward?.won && (
+        <section className="round-complete">
+          <div>
+            <span className="eyebrow">DAILY REWARD ALLOCATION</span>
+            <strong>Rank #{latestDailyReward.competitiveRank}</strong>
+          </div>
+          <Metric
+            label="Pending payout"
+            value={`${formatSol(latestDailyReward.rewardAllocationLamports)} · ${latestDailyReward.status === 'ALLOCATED' ? 'Allocated' : 'Pending'}`}
+          />
+        </section>
+      )}
       {board.isLoading ? (
         <SkeletonPanel />
       ) : board.data?.entries.length ? (
@@ -1035,7 +1055,7 @@ function Leaderboard({
         </table>
       </div>
       <p className="table-note">
-        Ties are shown exactly as returned by the backend. Paperfund does not invent a tie-break.
+        Ties keep their competition rank and share the combined funded ordinal allocation.
       </p>
     </section>
   );
@@ -1098,6 +1118,13 @@ function RoundComplete({ result }: { result: HourlyResult }) {
         value={signedSol(result.hourly_pnl_lamports)}
         className={pnlClass(result.hourly_pnl_lamports)}
       />
+      {result.reward_allocation_lamports !== null &&
+        result.reward_allocation_lamports !== undefined && (
+          <Metric
+            label={`Reward allocation · Rank #${result.reward_rank}`}
+            value={`${formatSol(result.reward_allocation_lamports)} · Pending`}
+          />
+        )}
     </section>
   );
 }
@@ -1119,6 +1146,13 @@ function ResultCard({ result }: { result: HourlyResult }) {
         value={signedSol(result.hourly_pnl_lamports)}
         className={pnlClass(result.hourly_pnl_lamports)}
       />
+      {result.reward_allocation_lamports !== null &&
+        result.reward_allocation_lamports !== undefined && (
+          <Metric
+            label={`Reward · Rank #${result.reward_rank}`}
+            value={`${formatSol(result.reward_allocation_lamports)} · Pending`}
+          />
+        )}
     </article>
   );
 }

@@ -2,7 +2,13 @@ import { config as loadDotenv } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 
 import { parseEnvironment } from '@paperfund/config';
-import { createDatabase, runHourlyLifecycleTick, runRewardFinalizationTick } from '@paperfund/db';
+import {
+  createDatabase,
+  runDailyRewardFinalizationTick,
+  runHourlyLifecycleTick,
+  runPayoutPlanGenerationTick,
+  runRewardFinalizationTick,
+} from '@paperfund/db';
 import { createProductionExecutionRouter } from '@paperfund/protocols';
 
 loadDotenv({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
@@ -38,7 +44,13 @@ async function tick() {
       lambdaBps: BigInt(config.REWARD_LAMBDA_BPS),
       configurationVersion: 'phase-5a-v1',
     });
+    const rewardDays = await runDailyRewardFinalizationTick(database, now);
+    const payoutPlans = await runPayoutPlanGenerationTick(database, now);
     for (const roundId of rewardRounds) log('info', 'reward_pool_frozen', { roundId });
+    for (const dailyCompetitionId of rewardDays)
+      log('info', 'daily_reward_pool_frozen', { dailyCompetitionId });
+    for (const payoutPlanId of payoutPlans)
+      log('info', 'shadow_payout_plan_validated', { payoutPlanId });
     for (const event of events) {
       log('info', event.type.toLowerCase(), {
         roundId: event.roundId,

@@ -1,0 +1,2772 @@
+{
+  "id": "f33c4cf5-1df3-4352-8c7c-cb122970ddb7",
+  "prevId": "e78dd8b8-17a4-4802-99d1-dbcffd1c02f3",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.app_meta": {
+      "name": "app_meta",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.assets": {
+      "name": "assets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "mint_address": {
+          "name": "mint_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decimals": {
+          "name": "decimals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "assets_mint_address_unique": {
+          "name": "assets_mint_address_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "mint_address"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "assets_decimals_valid": {
+          "name": "assets_decimals_valid",
+          "value": "\"assets\".\"decimals\" between 0 and 255"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.competition_accounts": {
+      "name": "competition_accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hourly_round_id": {
+          "name": "hourly_round_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starting_paper_sol_lamports": {
+          "name": "starting_paper_sol_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paper_sol_balance_lamports": {
+          "name": "paper_sol_balance_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "realized_pnl_lamports": {
+          "name": "realized_pnl_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "final_settled_balance_lamports": {
+          "name": "final_settled_balance_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hourly_pnl_lamports": {
+          "name": "hourly_pnl_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "finalized_at": {
+          "name": "finalized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "competition_accounts_round_idx": {
+          "name": "competition_accounts_round_idx",
+          "columns": [
+            {
+              "expression": "hourly_round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "competition_accounts_user_id_users_id_fk": {
+          "name": "competition_accounts_user_id_users_id_fk",
+          "tableFrom": "competition_accounts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "competition_accounts_hourly_round_id_hourly_rounds_id_fk": {
+          "name": "competition_accounts_hourly_round_id_hourly_rounds_id_fk",
+          "tableFrom": "competition_accounts",
+          "tableTo": "hourly_rounds",
+          "columnsFrom": [
+            "hourly_round_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "competition_accounts_user_round_unique": {
+          "name": "competition_accounts_user_round_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id",
+            "hourly_round_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "competition_accounts_starting_balance_positive": {
+          "name": "competition_accounts_starting_balance_positive",
+          "value": "\"competition_accounts\".\"starting_paper_sol_lamports\" > 0"
+        },
+        "competition_accounts_balance_nonnegative": {
+          "name": "competition_accounts_balance_nonnegative",
+          "value": "\"competition_accounts\".\"paper_sol_balance_lamports\" >= 0"
+        },
+        "competition_accounts_finalization_consistent": {
+          "name": "competition_accounts_finalization_consistent",
+          "value": "(\"competition_accounts\".\"final_settled_balance_lamports\" is null and \"competition_accounts\".\"hourly_pnl_lamports\" is null and \"competition_accounts\".\"finalized_at\" is null) or (\"competition_accounts\".\"final_settled_balance_lamports\" is not null and \"competition_accounts\".\"hourly_pnl_lamports\" = \"competition_accounts\".\"final_settled_balance_lamports\" - \"competition_accounts\".\"starting_paper_sol_lamports\" and \"competition_accounts\".\"finalized_at\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.competition_token_slots": {
+      "name": "competition_token_slots",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "competition_account_id": {
+          "name": "competition_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "first_successful_buy_at": {
+          "name": "first_successful_buy_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "competition_token_slots_account_idx": {
+          "name": "competition_token_slots_account_idx",
+          "columns": [
+            {
+              "expression": "competition_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "competition_token_slots_competition_account_id_competition_accounts_id_fk": {
+          "name": "competition_token_slots_competition_account_id_competition_accounts_id_fk",
+          "tableFrom": "competition_token_slots",
+          "tableTo": "competition_accounts",
+          "columnsFrom": [
+            "competition_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "competition_token_slots_asset_id_assets_id_fk": {
+          "name": "competition_token_slots_asset_id_assets_id_fk",
+          "tableFrom": "competition_token_slots",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "competition_token_slots_account_asset_unique": {
+          "name": "competition_token_slots_account_asset_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "competition_account_id",
+            "asset_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.daily_competitions": {
+      "name": "daily_competitions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "utc_date": {
+          "name": "utc_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at_exclusive": {
+          "name": "ends_at_exclusive",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OPEN'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "finalized_at": {
+          "name": "finalized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "daily_competitions_utc_date_unique": {
+          "name": "daily_competitions_utc_date_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "utc_date"
+          ]
+        },
+        "daily_competitions_starts_at_unique": {
+          "name": "daily_competitions_starts_at_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "starts_at"
+          ]
+        },
+        "daily_competitions_ends_at_exclusive_unique": {
+          "name": "daily_competitions_ends_at_exclusive_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "ends_at_exclusive"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "daily_competitions_exact_utc_window": {
+          "name": "daily_competitions_exact_utc_window",
+          "value": "\"daily_competitions\".\"starts_at\" = date_trunc('day', \"daily_competitions\".\"starts_at\" at time zone 'UTC') at time zone 'UTC' and \"daily_competitions\".\"ends_at_exclusive\" = \"daily_competitions\".\"starts_at\" + interval '1 day' and \"daily_competitions\".\"utc_date\" = (\"daily_competitions\".\"starts_at\" at time zone 'UTC')::date"
+        },
+        "daily_competitions_state_valid": {
+          "name": "daily_competitions_state_valid",
+          "value": "\"daily_competitions\".\"state\" in ('OPEN', 'CLOSING', 'FINALIZING', 'FINALIZED', 'PAYING', 'PAID')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.daily_result_hourly_results": {
+      "name": "daily_result_hourly_results",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "daily_result_id": {
+          "name": "daily_result_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hourly_result_id": {
+          "name": "hourly_result_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_record_id": {
+          "name": "idempotency_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contributed_at": {
+          "name": "contributed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "daily_result_hourly_results_daily_result_id_daily_results_id_fk": {
+          "name": "daily_result_hourly_results_daily_result_id_daily_results_id_fk",
+          "tableFrom": "daily_result_hourly_results",
+          "tableTo": "daily_results",
+          "columnsFrom": [
+            "daily_result_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "daily_result_hourly_results_hourly_result_id_hourly_results_id_fk": {
+          "name": "daily_result_hourly_results_hourly_result_id_hourly_results_id_fk",
+          "tableFrom": "daily_result_hourly_results",
+          "tableTo": "hourly_results",
+          "columnsFrom": [
+            "hourly_result_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "daily_result_hourly_results_idempotency_record_id_idempotency_records_id_fk": {
+          "name": "daily_result_hourly_results_idempotency_record_id_idempotency_records_id_fk",
+          "tableFrom": "daily_result_hourly_results",
+          "tableTo": "idempotency_records",
+          "columnsFrom": [
+            "idempotency_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "daily_result_hourly_results_hourly_result_id_unique": {
+          "name": "daily_result_hourly_results_hourly_result_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "hourly_result_id"
+          ]
+        },
+        "daily_result_hourly_results_idempotency_record_id_unique": {
+          "name": "daily_result_hourly_results_idempotency_record_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "idempotency_record_id"
+          ]
+        },
+        "daily_result_hourly_results_pair_unique": {
+          "name": "daily_result_hourly_results_pair_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "daily_result_id",
+            "hourly_result_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.daily_results": {
+      "name": "daily_results",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "daily_competition_id": {
+          "name": "daily_competition_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cumulative_pnl_lamports": {
+          "name": "cumulative_pnl_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "completed_hourly_round_count": {
+          "name": "completed_hourly_round_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "daily_results_daily_competition_id_daily_competitions_id_fk": {
+          "name": "daily_results_daily_competition_id_daily_competitions_id_fk",
+          "tableFrom": "daily_results",
+          "tableTo": "daily_competitions",
+          "columnsFrom": [
+            "daily_competition_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "daily_results_user_id_users_id_fk": {
+          "name": "daily_results_user_id_users_id_fk",
+          "tableFrom": "daily_results",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "daily_results_competition_user_unique": {
+          "name": "daily_results_competition_user_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "daily_competition_id",
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "daily_results_completed_count_nonnegative": {
+          "name": "daily_results_completed_count_nonnegative",
+          "value": "\"daily_results\".\"completed_hourly_round_count\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.fills": {
+      "name": "fills",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "market_id": {
+          "name": "market_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "execution_id": {
+          "name": "execution_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "side": {
+          "name": "side",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_quantity": {
+          "name": "base_quantity",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quote_lamports": {
+          "name": "quote_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "execution_price": {
+          "name": "execution_price",
+          "type": "numeric(38, 18)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fee_lamports": {
+          "name": "fee_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "actual_input_lamports": {
+          "name": "actual_input_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actual_output_lamports": {
+          "name": "actual_output_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fee_breakdown": {
+          "name": "fee_breakdown",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "protocol_id": {
+          "name": "protocol_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "adapter_version": {
+          "name": "adapter_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "market_state_evidence_id": {
+          "name": "market_state_evidence_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cost_basis_lamports_removed": {
+          "name": "cost_basis_lamports_removed",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "realized_pnl_lamports": {
+          "name": "realized_pnl_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "idempotency_record_id": {
+          "name": "idempotency_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "executed_at": {
+          "name": "executed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "fills_order_time_idx": {
+          "name": "fills_order_time_idx",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "executed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "fills_order_id_orders_id_fk": {
+          "name": "fills_order_id_orders_id_fk",
+          "tableFrom": "fills",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "fills_market_id_markets_id_fk": {
+          "name": "fills_market_id_markets_id_fk",
+          "tableFrom": "fills",
+          "tableTo": "markets",
+          "columnsFrom": [
+            "market_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "fills_market_state_evidence_id_market_state_evidence_id_fk": {
+          "name": "fills_market_state_evidence_id_market_state_evidence_id_fk",
+          "tableFrom": "fills",
+          "tableTo": "market_state_evidence",
+          "columnsFrom": [
+            "market_state_evidence_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "fills_idempotency_record_id_idempotency_records_id_fk": {
+          "name": "fills_idempotency_record_id_idempotency_records_id_fk",
+          "tableFrom": "fills",
+          "tableTo": "idempotency_records",
+          "columnsFrom": [
+            "idempotency_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "fills_execution_id_unique": {
+          "name": "fills_execution_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "execution_id"
+          ]
+        },
+        "fills_idempotency_record_id_unique": {
+          "name": "fills_idempotency_record_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "idempotency_record_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "fills_side_valid": {
+          "name": "fills_side_valid",
+          "value": "\"fills\".\"side\" in ('BUY', 'SELL')"
+        },
+        "fills_base_positive": {
+          "name": "fills_base_positive",
+          "value": "\"fills\".\"base_quantity\" > 0"
+        },
+        "fills_quote_positive": {
+          "name": "fills_quote_positive",
+          "value": "\"fills\".\"quote_lamports\" > 0"
+        },
+        "fills_price_positive": {
+          "name": "fills_price_positive",
+          "value": "\"fills\".\"execution_price\" > 0"
+        },
+        "fills_fee_nonnegative": {
+          "name": "fills_fee_nonnegative",
+          "value": "\"fills\".\"fee_lamports\" >= 0"
+        },
+        "fills_actual_input_positive": {
+          "name": "fills_actual_input_positive",
+          "value": "\"fills\".\"actual_input_lamports\" is null or \"fills\".\"actual_input_lamports\" > 0"
+        },
+        "fills_actual_output_positive": {
+          "name": "fills_actual_output_positive",
+          "value": "\"fills\".\"actual_output_lamports\" is null or \"fills\".\"actual_output_lamports\" > 0"
+        },
+        "fills_cost_removed_nonnegative": {
+          "name": "fills_cost_removed_nonnegative",
+          "value": "\"fills\".\"cost_basis_lamports_removed\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.hourly_results": {
+      "name": "hourly_results",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "hourly_round_id": {
+          "name": "hourly_round_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "competition_account_id": {
+          "name": "competition_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "final_settled_balance_lamports": {
+          "name": "final_settled_balance_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "starting_paper_sol_lamports": {
+          "name": "starting_paper_sol_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hourly_pnl_lamports": {
+          "name": "hourly_pnl_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_record_id": {
+          "name": "idempotency_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finalized_at": {
+          "name": "finalized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "hourly_results_round_idx": {
+          "name": "hourly_results_round_idx",
+          "columns": [
+            {
+              "expression": "hourly_round_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "hourly_results_hourly_round_id_hourly_rounds_id_fk": {
+          "name": "hourly_results_hourly_round_id_hourly_rounds_id_fk",
+          "tableFrom": "hourly_results",
+          "tableTo": "hourly_rounds",
+          "columnsFrom": [
+            "hourly_round_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "hourly_results_competition_account_id_competition_accounts_id_fk": {
+          "name": "hourly_results_competition_account_id_competition_accounts_id_fk",
+          "tableFrom": "hourly_results",
+          "tableTo": "competition_accounts",
+          "columnsFrom": [
+            "competition_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "hourly_results_user_id_users_id_fk": {
+          "name": "hourly_results_user_id_users_id_fk",
+          "tableFrom": "hourly_results",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "hourly_results_idempotency_record_id_idempotency_records_id_fk": {
+          "name": "hourly_results_idempotency_record_id_idempotency_records_id_fk",
+          "tableFrom": "hourly_results",
+          "tableTo": "idempotency_records",
+          "columnsFrom": [
+            "idempotency_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "hourly_results_competition_account_id_unique": {
+          "name": "hourly_results_competition_account_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "competition_account_id"
+          ]
+        },
+        "hourly_results_idempotency_record_id_unique": {
+          "name": "hourly_results_idempotency_record_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "idempotency_record_id"
+          ]
+        },
+        "hourly_results_round_account_unique": {
+          "name": "hourly_results_round_account_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "hourly_round_id",
+            "competition_account_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "hourly_results_pnl_exact": {
+          "name": "hourly_results_pnl_exact",
+          "value": "\"hourly_results\".\"hourly_pnl_lamports\" = \"hourly_results\".\"final_settled_balance_lamports\" - \"hourly_results\".\"starting_paper_sol_lamports\""
+        },
+        "hourly_results_final_balance_nonnegative": {
+          "name": "hourly_results_final_balance_nonnegative",
+          "value": "\"hourly_results\".\"final_settled_balance_lamports\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.hourly_rounds": {
+      "name": "hourly_rounds",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "starts_at": {
+          "name": "starts_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ends_at_exclusive": {
+          "name": "ends_at_exclusive",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'SCHEDULED'"
+        },
+        "starting_paper_sol_lamports": {
+          "name": "starting_paper_sol_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_unique_tokens": {
+          "name": "max_unique_tokens",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_buy_ratio_bps": {
+          "name": "max_buy_ratio_bps",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reward_finalization_grace_period_seconds": {
+          "name": "reward_finalization_grace_period_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rules_version": {
+          "name": "rules_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "finalized_at": {
+          "name": "finalized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "hourly_rounds_starts_at_unique": {
+          "name": "hourly_rounds_starts_at_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "starts_at"
+          ]
+        },
+        "hourly_rounds_ends_at_exclusive_unique": {
+          "name": "hourly_rounds_ends_at_exclusive_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "ends_at_exclusive"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "hourly_rounds_exact_window": {
+          "name": "hourly_rounds_exact_window",
+          "value": "\"hourly_rounds\".\"starts_at\" = date_trunc('hour', \"hourly_rounds\".\"starts_at\") and \"hourly_rounds\".\"ends_at_exclusive\" = \"hourly_rounds\".\"starts_at\" + interval '1 hour'"
+        },
+        "hourly_rounds_state_valid": {
+          "name": "hourly_rounds_state_valid",
+          "value": "\"hourly_rounds\".\"state\" in ('SCHEDULED', 'OPEN', 'CLOSING', 'SETTLING', 'FINALIZED', 'PAYING', 'PAID')"
+        },
+        "hourly_rounds_starting_balance_positive": {
+          "name": "hourly_rounds_starting_balance_positive",
+          "value": "\"hourly_rounds\".\"starting_paper_sol_lamports\" > 0"
+        },
+        "hourly_rounds_token_limit_positive": {
+          "name": "hourly_rounds_token_limit_positive",
+          "value": "\"hourly_rounds\".\"max_unique_tokens\" > 0"
+        },
+        "hourly_rounds_buy_ratio_valid": {
+          "name": "hourly_rounds_buy_ratio_valid",
+          "value": "\"hourly_rounds\".\"max_buy_ratio_bps\" > 0 and \"hourly_rounds\".\"max_buy_ratio_bps\" <= 10000"
+        },
+        "hourly_rounds_grace_period_nonnegative": {
+          "name": "hourly_rounds_grace_period_nonnegative",
+          "value": "\"hourly_rounds\".\"reward_finalization_grace_period_seconds\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.idempotency_records": {
+      "name": "idempotency_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "operation_class": {
+          "name": "operation_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_hash": {
+          "name": "request_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "competition_account_id": {
+          "name": "competition_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_entity_type": {
+          "name": "result_entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result_entity_id": {
+          "name": "result_entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "idempotency_records_competition_account_id_competition_accounts_id_fk": {
+          "name": "idempotency_records_competition_account_id_competition_accounts_id_fk",
+          "tableFrom": "idempotency_records",
+          "tableTo": "competition_accounts",
+          "columnsFrom": [
+            "competition_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "idempotency_operation_key_unique": {
+          "name": "idempotency_operation_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "operation_class",
+            "idempotency_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "idempotency_status_valid": {
+          "name": "idempotency_status_valid",
+          "value": "\"idempotency_records\".\"status\" in ('PENDING', 'COMPLETED', 'FAILED')"
+        },
+        "idempotency_completion_consistent": {
+          "name": "idempotency_completion_consistent",
+          "value": "(\"idempotency_records\".\"status\" = 'PENDING' and \"idempotency_records\".\"completed_at\" is null) or (\"idempotency_records\".\"status\" <> 'PENDING' and \"idempotency_records\".\"completed_at\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.journal_transactions": {
+      "name": "journal_transactions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "competition_account_id": {
+          "name": "competition_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation_type": {
+          "name": "operation_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_entity_type": {
+          "name": "source_entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_entity_id": {
+          "name": "source_entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_record_id": {
+          "name": "idempotency_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "journal_transactions_account_time_idx": {
+          "name": "journal_transactions_account_time_idx",
+          "columns": [
+            {
+              "expression": "competition_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "journal_transactions_competition_account_id_competition_accounts_id_fk": {
+          "name": "journal_transactions_competition_account_id_competition_accounts_id_fk",
+          "tableFrom": "journal_transactions",
+          "tableTo": "competition_accounts",
+          "columnsFrom": [
+            "competition_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "journal_transactions_idempotency_record_id_idempotency_records_id_fk": {
+          "name": "journal_transactions_idempotency_record_id_idempotency_records_id_fk",
+          "tableFrom": "journal_transactions",
+          "tableTo": "idempotency_records",
+          "columnsFrom": [
+            "idempotency_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "journal_transactions_idempotency_record_id_unique": {
+          "name": "journal_transactions_idempotency_record_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "idempotency_record_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ledger_entries": {
+      "name": "ledger_entries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "journal_transaction_id": {
+          "name": "journal_transaction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "competition_account_id": {
+          "name": "competition_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_code": {
+          "name": "account_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direction": {
+          "name": "direction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_lamports": {
+          "name": "amount_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "ledger_entries_account_time_idx": {
+          "name": "ledger_entries_account_time_idx",
+          "columns": [
+            {
+              "expression": "competition_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "ledger_entries_journal_idx": {
+          "name": "ledger_entries_journal_idx",
+          "columns": [
+            {
+              "expression": "journal_transaction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "ledger_entries_journal_transaction_id_journal_transactions_id_fk": {
+          "name": "ledger_entries_journal_transaction_id_journal_transactions_id_fk",
+          "tableFrom": "ledger_entries",
+          "tableTo": "journal_transactions",
+          "columnsFrom": [
+            "journal_transaction_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "ledger_entries_competition_account_id_competition_accounts_id_fk": {
+          "name": "ledger_entries_competition_account_id_competition_accounts_id_fk",
+          "tableFrom": "ledger_entries",
+          "tableTo": "competition_accounts",
+          "columnsFrom": [
+            "competition_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ledger_entries_account_code_valid": {
+          "name": "ledger_entries_account_code_valid",
+          "value": "\"ledger_entries\".\"account_code\" in ('CASH', 'POSITION_COST', 'HOURLY_STARTING_CAPITAL', 'TRADING_PNL', 'TRADING_FEES')"
+        },
+        "ledger_entries_direction_valid": {
+          "name": "ledger_entries_direction_valid",
+          "value": "\"ledger_entries\".\"direction\" in ('DEBIT', 'CREDIT')"
+        },
+        "ledger_entries_amount_positive": {
+          "name": "ledger_entries_amount_positive",
+          "value": "\"ledger_entries\".\"amount_lamports\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.market_state_evidence": {
+      "name": "market_state_evidence",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "protocol_id": {
+          "name": "protocol_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "market_id": {
+          "name": "market_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "observed_at": {
+          "name": "observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chain_slot": {
+          "name": "chain_slot",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chain_block_id": {
+          "name": "chain_block_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "adapter_version": {
+          "name": "adapter_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalization_version": {
+          "name": "normalization_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_state": {
+          "name": "normalized_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raw_source": {
+          "name": "raw_source",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state_fingerprint": {
+          "name": "state_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "market_state_evidence_market_time_idx": {
+          "name": "market_state_evidence_market_time_idx",
+          "columns": [
+            {
+              "expression": "market_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "observed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "market_state_evidence_market_id_markets_id_fk": {
+          "name": "market_state_evidence_market_id_markets_id_fk",
+          "tableFrom": "market_state_evidence",
+          "tableTo": "markets",
+          "columnsFrom": [
+            "market_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "market_state_evidence_state_fingerprint_unique": {
+          "name": "market_state_evidence_state_fingerprint_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "state_fingerprint"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "market_state_evidence_protocol_nonempty": {
+          "name": "market_state_evidence_protocol_nonempty",
+          "value": "length(\"market_state_evidence\".\"protocol_id\") > 0"
+        },
+        "market_state_evidence_adapter_nonempty": {
+          "name": "market_state_evidence_adapter_nonempty",
+          "value": "length(\"market_state_evidence\".\"adapter_version\") > 0"
+        },
+        "market_state_evidence_normalization_nonempty": {
+          "name": "market_state_evidence_normalization_nonempty",
+          "value": "length(\"market_state_evidence\".\"normalization_version\") > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.markets": {
+      "name": "markets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "base_asset_id": {
+          "name": "base_asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quote_asset_id": {
+          "name": "quote_asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "venue": {
+          "name": "venue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provider_market_id": {
+          "name": "provider_market_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "markets_base_asset_id_assets_id_fk": {
+          "name": "markets_base_asset_id_assets_id_fk",
+          "tableFrom": "markets",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "base_asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "markets_quote_asset_id_assets_id_fk": {
+          "name": "markets_quote_asset_id_assets_id_fk",
+          "tableFrom": "markets",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "quote_asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "markets_venue_provider_unique": {
+          "name": "markets_venue_provider_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "venue",
+            "provider_market_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "markets_distinct_assets": {
+          "name": "markets_distinct_assets",
+          "value": "\"markets\".\"base_asset_id\" <> \"markets\".\"quote_asset_id\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.order_market_state_evidence": {
+      "name": "order_market_state_evidence",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence_id": {
+          "name": "evidence_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position_id": {
+          "name": "position_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "executable_value_lamports": {
+          "name": "executable_value_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "order_market_state_evidence_order_idx": {
+          "name": "order_market_state_evidence_order_idx",
+          "columns": [
+            {
+              "expression": "order_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "order_market_state_evidence_order_id_orders_id_fk": {
+          "name": "order_market_state_evidence_order_id_orders_id_fk",
+          "tableFrom": "order_market_state_evidence",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "order_market_state_evidence_evidence_id_market_state_evidence_id_fk": {
+          "name": "order_market_state_evidence_evidence_id_market_state_evidence_id_fk",
+          "tableFrom": "order_market_state_evidence",
+          "tableTo": "market_state_evidence",
+          "columnsFrom": [
+            "evidence_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "order_market_state_evidence_position_id_positions_id_fk": {
+          "name": "order_market_state_evidence_position_id_positions_id_fk",
+          "tableFrom": "order_market_state_evidence",
+          "tableTo": "positions",
+          "columnsFrom": [
+            "position_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "order_market_state_evidence_usage_unique": {
+          "name": "order_market_state_evidence_usage_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "order_id",
+            "evidence_id",
+            "purpose",
+            "position_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "order_market_state_evidence_purpose_valid": {
+          "name": "order_market_state_evidence_purpose_valid",
+          "value": "\"order_market_state_evidence\".\"purpose\" in ('BUY_EXECUTION', 'SELL_EXECUTION', 'POSITION_EXIT_VALUATION')"
+        },
+        "order_market_state_evidence_value_nonnegative": {
+          "name": "order_market_state_evidence_value_nonnegative",
+          "value": "\"order_market_state_evidence\".\"executable_value_lamports\" is null or \"order_market_state_evidence\".\"executable_value_lamports\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.orders": {
+      "name": "orders",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "competition_account_id": {
+          "name": "competition_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "market_id": {
+          "name": "market_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "side": {
+          "name": "side",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_base_units": {
+          "name": "requested_base_units",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_quote_lamports": {
+          "name": "requested_quote_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "execution_context": {
+          "name": "execution_context",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'NORMAL_USER'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PENDING'"
+        },
+        "idempotency_record_id": {
+          "name": "idempotency_record_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "rejected_at": {
+          "name": "rejected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rejection_reason": {
+          "name": "rejection_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "orders_account_time_idx": {
+          "name": "orders_account_time_idx",
+          "columns": [
+            {
+              "expression": "competition_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "requested_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "orders_competition_account_id_competition_accounts_id_fk": {
+          "name": "orders_competition_account_id_competition_accounts_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "competition_accounts",
+          "columnsFrom": [
+            "competition_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "orders_market_id_markets_id_fk": {
+          "name": "orders_market_id_markets_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "markets",
+          "columnsFrom": [
+            "market_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "orders_idempotency_record_id_idempotency_records_id_fk": {
+          "name": "orders_idempotency_record_id_idempotency_records_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "idempotency_records",
+          "columnsFrom": [
+            "idempotency_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "orders_idempotency_record_id_unique": {
+          "name": "orders_idempotency_record_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "idempotency_record_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "orders_side_valid": {
+          "name": "orders_side_valid",
+          "value": "\"orders\".\"side\" in ('BUY', 'SELL')"
+        },
+        "orders_execution_context_valid": {
+          "name": "orders_execution_context_valid",
+          "value": "\"orders\".\"execution_context\" in ('NORMAL_USER', 'FORCED_HOURLY_SETTLEMENT')"
+        },
+        "orders_status_valid": {
+          "name": "orders_status_valid",
+          "value": "\"orders\".\"status\" in ('PENDING', 'PARTIALLY_FILLED', 'COMPLETED', 'REJECTED', 'CANCELLED')"
+        },
+        "orders_request_valid": {
+          "name": "orders_request_valid",
+          "value": "(\"orders\".\"side\" = 'BUY' and \"orders\".\"requested_quote_lamports\" > 0 and \"orders\".\"requested_base_units\" is null) or (\"orders\".\"side\" = 'SELL' and \"orders\".\"requested_base_units\" > 0 and \"orders\".\"requested_quote_lamports\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payout_allocations": {
+      "name": "payout_allocations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "payout_plan_id": {
+          "name": "payout_plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "competitive_rank": {
+          "name": "competitive_rank",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tie_group_size": {
+          "name": "tie_group_size",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ordinal_start": {
+          "name": "ordinal_start",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ordinal_end": {
+          "name": "ordinal_end",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "funded_ordinal_count": {
+          "name": "funded_ordinal_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocated_lamports": {
+          "name": "allocated_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dust_adjustment_lamports": {
+          "name": "dust_adjustment_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "allocation_explanation": {
+          "name": "allocation_explanation",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payout_allocations_user_idx": {
+          "name": "payout_allocations_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payout_allocations_payout_plan_id_payout_plans_id_fk": {
+          "name": "payout_allocations_payout_plan_id_payout_plans_id_fk",
+          "tableFrom": "payout_allocations",
+          "tableTo": "payout_plans",
+          "columnsFrom": [
+            "payout_plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "payout_allocations_user_id_users_id_fk": {
+          "name": "payout_allocations_user_id_users_id_fk",
+          "tableFrom": "payout_allocations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "payout_allocations_plan_user_unique": {
+          "name": "payout_allocations_plan_user_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "payout_plan_id",
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "payout_allocations_rank_valid": {
+          "name": "payout_allocations_rank_valid",
+          "value": "\"payout_allocations\".\"competitive_rank\" > 0 and \"payout_allocations\".\"tie_group_size\" > 0 and \"payout_allocations\".\"ordinal_start\" > 0 and \"payout_allocations\".\"ordinal_end\" >= \"payout_allocations\".\"ordinal_start\" and \"payout_allocations\".\"funded_ordinal_count\" > 0"
+        },
+        "payout_allocations_amount_valid": {
+          "name": "payout_allocations_amount_valid",
+          "value": "\"payout_allocations\".\"allocated_lamports\" >= 0 and \"payout_allocations\".\"dust_adjustment_lamports\" >= 0 and \"payout_allocations\".\"dust_adjustment_lamports\" <= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payout_plans": {
+      "name": "payout_plans",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "competition_type": {
+          "name": "competition_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hourly_round_id": {
+          "name": "hourly_round_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "daily_competition_id": {
+          "name": "daily_competition_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prize_pool_lamports": {
+          "name": "prize_pool_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "curve_version": {
+          "name": "curve_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tie_policy_version": {
+          "name": "tie_policy_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "participant_count": {
+          "name": "participant_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nominal_winner_count": {
+          "name": "nominal_winner_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actual_winner_count": {
+          "name": "actual_winner_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'CALCULATED'"
+        },
+        "calculated_at": {
+          "name": "calculated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "frozen_at": {
+          "name": "frozen_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "validated_at": {
+          "name": "validated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config_snapshot": {
+          "name": "config_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_result_snapshot": {
+          "name": "source_result_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_allocated_lamports": {
+          "name": "total_allocated_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "conservation_holds": {
+          "name": "conservation_holds",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payout_plans_state_idx": {
+          "name": "payout_plans_state_idx",
+          "columns": [
+            {
+              "expression": "state",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "calculated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payout_plans_hourly_round_id_hourly_rounds_id_fk": {
+          "name": "payout_plans_hourly_round_id_hourly_rounds_id_fk",
+          "tableFrom": "payout_plans",
+          "tableTo": "hourly_rounds",
+          "columnsFrom": [
+            "hourly_round_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "payout_plans_daily_competition_id_daily_competitions_id_fk": {
+          "name": "payout_plans_daily_competition_id_daily_competitions_id_fk",
+          "tableFrom": "payout_plans",
+          "tableTo": "daily_competitions",
+          "columnsFrom": [
+            "daily_competition_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "payout_plans_hour_curve_unique": {
+          "name": "payout_plans_hour_curve_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "hourly_round_id",
+            "curve_version"
+          ]
+        },
+        "payout_plans_daily_curve_unique": {
+          "name": "payout_plans_daily_curve_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "daily_competition_id",
+            "curve_version"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "payout_plans_type_valid": {
+          "name": "payout_plans_type_valid",
+          "value": "\"payout_plans\".\"competition_type\" in ('HOURLY','DAILY')"
+        },
+        "payout_plans_source_exact": {
+          "name": "payout_plans_source_exact",
+          "value": "(\"payout_plans\".\"competition_type\" = 'HOURLY' and \"payout_plans\".\"hourly_round_id\" is not null and \"payout_plans\".\"daily_competition_id\" is null) or (\"payout_plans\".\"competition_type\" = 'DAILY' and \"payout_plans\".\"hourly_round_id\" is null and \"payout_plans\".\"daily_competition_id\" is not null)"
+        },
+        "payout_plans_state_valid": {
+          "name": "payout_plans_state_valid",
+          "value": "\"payout_plans\".\"state\" in ('CALCULATED','FROZEN','VALIDATED','APPROVED')"
+        },
+        "payout_plans_counts_valid": {
+          "name": "payout_plans_counts_valid",
+          "value": "\"payout_plans\".\"participant_count\" >= 0 and \"payout_plans\".\"nominal_winner_count\" > 0 and \"payout_plans\".\"actual_winner_count\" >= 0"
+        },
+        "payout_plans_amounts_valid": {
+          "name": "payout_plans_amounts_valid",
+          "value": "\"payout_plans\".\"prize_pool_lamports\" >= 0 and \"payout_plans\".\"total_allocated_lamports\" >= 0"
+        },
+        "payout_plans_conservation_exact": {
+          "name": "payout_plans_conservation_exact",
+          "value": "\"payout_plans\".\"conservation_holds\" and \"payout_plans\".\"prize_pool_lamports\" = \"payout_plans\".\"total_allocated_lamports\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payout_rank_buckets": {
+      "name": "payout_rank_buckets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "payout_plan_id": {
+          "name": "payout_plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ordinal": {
+          "name": "ordinal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "weight_ppm": {
+          "name": "weight_ppm",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "floor_allocation_lamports": {
+          "name": "floor_allocation_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "remainder_basis": {
+          "name": "remainder_basis",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "final_allocation_lamports": {
+          "name": "final_allocation_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "payout_rank_buckets_payout_plan_id_payout_plans_id_fk": {
+          "name": "payout_rank_buckets_payout_plan_id_payout_plans_id_fk",
+          "tableFrom": "payout_rank_buckets",
+          "tableTo": "payout_plans",
+          "columnsFrom": [
+            "payout_plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "payout_rank_buckets_plan_ordinal_unique": {
+          "name": "payout_rank_buckets_plan_ordinal_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "payout_plan_id",
+            "ordinal"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "payout_rank_buckets_ordinal_positive": {
+          "name": "payout_rank_buckets_ordinal_positive",
+          "value": "\"payout_rank_buckets\".\"ordinal\" > 0"
+        },
+        "payout_rank_buckets_values_nonnegative": {
+          "name": "payout_rank_buckets_values_nonnegative",
+          "value": "\"payout_rank_buckets\".\"weight_ppm\" >= 0 and \"payout_rank_buckets\".\"floor_allocation_lamports\" >= 0 and \"payout_rank_buckets\".\"remainder_basis\" >= 0 and \"payout_rank_buckets\".\"final_allocation_lamports\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.positions": {
+      "name": "positions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "competition_account_id": {
+          "name": "competition_account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "market_id": {
+          "name": "market_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_id": {
+          "name": "asset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "remaining_base_units": {
+          "name": "remaining_base_units",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "cost_basis_lamports": {
+          "name": "cost_basis_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "realized_pnl_lamports": {
+          "name": "realized_pnl_lamports",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OPEN'"
+        },
+        "opened_at": {
+          "name": "opened_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "positions_competition_account_id_competition_accounts_id_fk": {
+          "name": "positions_competition_account_id_competition_accounts_id_fk",
+          "tableFrom": "positions",
+          "tableTo": "competition_accounts",
+          "columnsFrom": [
+            "competition_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "positions_market_id_markets_id_fk": {
+          "name": "positions_market_id_markets_id_fk",
+          "tableFrom": "positions",
+          "tableTo": "markets",
+          "columnsFrom": [
+            "market_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "positions_asset_id_assets_id_fk": {
+          "name": "positions_asset_id_assets_id_fk",
+          "tableFrom": "positions",
+          "tableTo": "assets",
+          "columnsFrom": [
+            "asset_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "positions_account_market_unique": {
+          "name": "positions_account_market_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "competition_account_id",
+            "market_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "positions_quantity_nonnegative": {
+          "name": "positions_quantity_nonnegative",
+          "value": "\"positions\".\"remaining_base_units\" >= 0"
+        },
+        "positions_cost_nonnegative": {
+          "name": "positions_cost_nonnegative",
+          "value": "\"positions\".\"cost_basis_lamports\" >= 0"
+        },
+        "positions_status_valid": {
+          "name": "positions_status_valid",
+          "value": "\"positions\".\"status\" in ('OPEN', 'CLOSED')"
+        },
+        "positions_state_consistent": {
+          "name": "positions_state_consistent",
+          "value": "(\"positions\".\"status\" = 'OPEN' and \"positions\".\"remaining_base_units\" > 0 and \"positions\".\"cost_basis_lamports\" > 0 and \"positions\".\"closed_at\" is null) or (\"positions\".\"status\" = 'CLOSED' and \"positions\".\"remaining_base_units\" = 0 and \"positions\".\"cost_basis_lamports\" = 0 and \"positions\".\"closed_at\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.users": {
+      "name": "users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "wallet_address": {
+          "name": "wallet_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_wallet_address_unique": {
+          "name": "users_wallet_address_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "wallet_address"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

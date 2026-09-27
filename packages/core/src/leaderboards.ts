@@ -24,14 +24,6 @@ export type WinnerSelection<Result> =
     }
   | {
       readonly ok: false;
-      readonly reason: 'UNRESOLVED_TIE_AT_WINNER_CUTOFF';
-      readonly winnerCount: number;
-      readonly cutoffBlocked: true;
-      readonly provisionalWinners: readonly Result[];
-      readonly cutoffTie: LeaderboardRankGroup<Result>;
-    }
-  | {
-      readonly ok: false;
       readonly reason: 'INVALID_WINNER_COUNT';
     };
 
@@ -119,14 +111,8 @@ export function selectProvisionalWinners<Result>(
     const groupEnd = group.rank + group.tieGroupSize - 1;
     if (group.rank > winnerCount) break;
     if (groupEnd > winnerCount) {
-      return {
-        ok: false,
-        reason: 'UNRESOLVED_TIE_AT_WINNER_CUTOFF',
-        winnerCount,
-        cutoffBlocked: true,
-        provisionalWinners,
-        cutoffTie: group,
-      };
+      provisionalWinners.push(...group.results);
+      break;
     }
     provisionalWinners.push(...group.results);
   }

@@ -19,7 +19,11 @@ import {
   getCurrentDailyCompetition,
   getCurrentDailyRewardPool,
   getCurrentHourlyRewardPool,
+  getDailyPayoutWinners,
   getHourlyRewardPool,
+  getHourlyPayoutWinners,
+  getPayoutPlanAudit,
+  getUserRewardAllocations,
   reconcileHourlyRewardPool,
   getCurrentRound,
   defaultRewardAccountingConfig,
@@ -587,8 +591,13 @@ export class CompetitionService {
       await this.database.pool.query(
         `select hr.id, hr.hourly_round_id, r.starts_at, r.ends_at_exclusive,
               hr.starting_paper_sol_lamports, hr.final_settled_balance_lamports,
-              hr.hourly_pnl_lamports, hr.finalized_at
+              hr.hourly_pnl_lamports, hr.finalized_at,
+              pa.competitive_rank reward_rank,
+              pa.allocated_lamports reward_allocation_lamports,
+              pp.state payout_plan_state
        from hourly_results hr join hourly_rounds r on r.id = hr.hourly_round_id
+       left join payout_plans pp on pp.hourly_round_id=hr.hourly_round_id
+       left join payout_allocations pa on pa.payout_plan_id=pp.id and pa.user_id=hr.user_id
        where hr.user_id = $1 order by r.starts_at desc limit $2 offset $3`,
         [userId, page.limit + 1, offset],
       )
@@ -677,6 +686,52 @@ export class CompetitionService {
 
   rewardReconciliation(roundId: string) {
     return reconcileHourlyRewardPool(this.database, roundId);
+  }
+
+  private async publicPayoutPlan(plan: Awaited<ReturnType<typeof getPayoutPlanAudit>>) {
+    if (!plan) return null;
+    return {
+      ...plan,
+      sourceLeaderboard: plan.sourceLeaderboard.map((row) => ({
+        walletAddress: row['walletAddress'],
+        score: row['score'],
+        competitiveRank: row['competitiveRank'],
+        tieGroupSize: row['tieGroupSize'],
+      })),
+      allocations: plan.allocations.map((row) => ({
+        walletAddress: row.walletAddress,
+        competitiveRank: row.competitiveRank,
+        tied: row.tied,
+        tieGroupSize: row.tieGroupSize,
+        ordinalStart: row.ordinalStart,
+        ordinalEnd: row.ordinalEnd,
+        fundedOrdinalCount: row.fundedOrdinalCount,
+        allocatedLamports: row.allocatedLamports,
+        dustAdjustmentLamports: row.dustAdjustmentLamports,
+        explanation: {
+          fundedOrdinals: row.explanation['fundedOrdinals'],
+          combinedFundedLamports: row.explanation['combinedFundedLamports'],
+          equalFloorLamports: row.explanation['equalFloorLamports'],
+          tieDustLamports: row.explanation['tieDustLamports'],
+        },
+      })),
+    };
+  }
+
+  async payoutPlan(planId: string) {
+    return this.publicPayoutPlan(await getPayoutPlanAudit(this.database, planId));
+  }
+
+  async hourlyPayoutWinners(roundId: string) {
+    return this.publicPayoutPlan(await getHourlyPayoutWinners(this.database, roundId));
+  }
+
+  async dailyPayoutWinners(idOrDate: string) {
+    return this.publicPayoutPlan(await getDailyPayoutWinners(this.database, idOrDate));
+  }
+
+  userRewardAllocations(userId: string) {
+    return getUserRewardAllocations(this.database, userId);
   }
 }
 

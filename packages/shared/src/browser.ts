@@ -161,6 +161,9 @@ export interface HourlyResult {
   final_settled_balance_lamports: string;
   hourly_pnl_lamports: string;
   finalized_at: string;
+  reward_rank?: number | null;
+  reward_allocation_lamports?: string | null;
+  payout_plan_state?: 'CALCULATED' | 'FROZEN' | 'VALIDATED' | 'APPROVED' | null;
 }
 export interface Page<T> {
   items: T[];

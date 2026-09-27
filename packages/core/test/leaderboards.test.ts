@@ -216,18 +216,16 @@ describe('configured provisional winner cutoffs', () => {
     ).toHaveLength(10);
   });
 
-  it('blocks an unresolved hourly tie crossing rank 10', () => {
+  it('includes every member of an hourly tie crossing rank 10', () => {
     const scores = [100n, 90n, 80n, 70n, 60n, 50n, 40n, 30n, 20n, 10n, 10n];
     const result = hourlyBoard(scores.map((score, index) => hourly(index + 1, score)));
     expect(result.ok && result.winnerSelection).toMatchObject({
-      ok: false,
-      reason: 'UNRESOLVED_TIE_AT_WINNER_CUTOFF',
-      cutoffBlocked: true,
+      ok: true,
+      cutoffBlocked: false,
       provisionalWinners: expect.any(Array),
-      cutoffTie: { rank: 10, tied: true, tieGroupSize: 2 },
     });
-    if (result.ok && !result.winnerSelection.ok && 'cutoffTie' in result.winnerSelection) {
-      expect(result.winnerSelection.provisionalWinners).toHaveLength(9);
+    if (result.ok && result.winnerSelection.ok) {
+      expect(result.winnerSelection.provisionalWinners).toHaveLength(11);
     }
   });
 
@@ -259,7 +257,7 @@ describe('configured provisional winner cutoffs', () => {
     }
   });
 
-  it('blocks a daily tie crossing rank 25 but ignores one wholly below it', () => {
+  it('includes a daily tie crossing rank 25 but ignores one wholly below it', () => {
     const crossingScores = [
       ...Array.from({ length: 24 }, (_, index) => BigInt(100 - index)),
       1n,
@@ -267,10 +265,12 @@ describe('configured provisional winner cutoffs', () => {
     ];
     const crossing = dailyBoard(crossingScores.map((score, index) => daily(index + 1, score)));
     expect(crossing.ok && crossing.winnerSelection).toMatchObject({
-      ok: false,
-      reason: 'UNRESOLVED_TIE_AT_WINNER_CUTOFF',
-      cutoffTie: { rank: 25, tieGroupSize: 2 },
+      ok: true,
+      cutoffBlocked: false,
     });
+    if (crossing.ok && crossing.winnerSelection.ok) {
+      expect(crossing.winnerSelection.provisionalWinners).toHaveLength(26);
+    }
 
     const belowScores = [...Array.from({ length: 25 }, (_, index) => BigInt(100 - index)), 1n, 1n];
     const below = dailyBoard(belowScores.map((score, index) => daily(index + 1, score)));

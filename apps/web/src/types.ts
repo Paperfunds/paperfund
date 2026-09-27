@@ -23,6 +23,20 @@ export interface LeaderboardEntry {
   completed_hourly_round_count?: number;
 }
 
+export interface RewardAllocation {
+  payoutPlanId: string;
+  competitionType: 'HOURLY' | 'DAILY';
+  hourlyRoundId: string | null;
+  dailyCompetitionId: string | null;
+  competitiveRank: number;
+  tied: boolean;
+  tieGroupSize: number;
+  won: boolean;
+  rewardAllocationLamports: string;
+  status: 'PENDING' | 'ALLOCATED' | 'NOT_A_WINNER';
+  payoutPlanState: 'CALCULATED' | 'FROZEN' | 'VALIDATED' | 'APPROVED';
+}
+
 export interface InjectedWallet {
   isConnected?: boolean;
   publicKey?: { toString(): string };

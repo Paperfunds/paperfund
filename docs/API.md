@@ -119,3 +119,23 @@ responses never claim that dynamic smoothing is final.
   provisional daily contribution.
 
 Raw provider payloads and internal credentials are never returned. See `docs/REWARDS.md`.
+
+## Shadow payout reads (Phase 5C)
+
+Shadow payout reads are exact, read-only accounting views. They never claim that SOL was sent.
+Lamport amounts are JSON strings and plan states are `CALCULATED`, `FROZEN`, `VALIDATED`, or
+`APPROVED`. Current generation finishes at `VALIDATED`.
+
+- `GET /api/v1/rewards/hourly/:roundId/winners` returns the finalized hourly plan and winner
+  allocations, including competition rank and tie metadata.
+- `GET /api/v1/rewards/daily/:dateOrCompetitionId/winners` resolves either the UTC date or persisted
+  daily competition ID and returns its finalized plan.
+- `GET /api/v1/payout-plans/:id` returns the sanitized audit model: prize pool, curve/version,
+  source leaderboard, rank buckets, allocations, dust adjustments, and conservation proof.
+- `GET /api/v1/rewards/me` requires authentication and returns the current user's exact hourly and
+  daily allocations with `PENDING` or `ALLOCATED` wording. It does not report payment.
+
+Public payout responses use wallet display identity and omit internal user/result identifiers and
+the internal stable user-ID dust ordering. Plans are generated only from finalized competition
+results and frozen/final reward pools. See `docs/PAYOUTS.md` for tie pooling, cutoff behavior,
+underfilled renormalization, exact rounding, lifecycle, validation, and limitations.
