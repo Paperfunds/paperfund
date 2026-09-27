@@ -32,7 +32,9 @@
     "db:migrate": "npm run build && npm run db:migrate --workspace @paperfund/db",
     "db:check": "npm run build && npm run db:check --workspace @paperfund/db",
     "payout:approve": "tsx scripts/payout-approve.ts",
-    "payout:execute": "tsx scripts/payout-execute.ts"
+    "payout:execute": "tsx scripts/payout-execute.ts",
+    "creator-fees:backfill": "tsx scripts/creator-fees-backfill.ts",
+    "creator-fees:status": "tsx scripts/creator-fees-status.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

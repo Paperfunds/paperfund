@@ -39,6 +39,16 @@ export const environmentSchema = z
     REWARD_BASELINE_WINDOW: z.coerce.number().int().positive().default(12),
     REWARD_LAMBDA_BPS: z.coerce.number().int().min(0).max(10_000).default(6_000),
     REWARD_FINALIZATION_GRACE_SECONDS: z.coerce.number().int().min(0).default(60),
+    CREATOR_FEE_INGESTION_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((value) => value === 'true'),
+    CREATOR_FEE_NETWORK: z.enum(['localnet', 'devnet', 'mainnet-beta']).default('mainnet-beta'),
+    PAPERFUND_TOKEN_MINT: z.string().default(''),
+    PAPERFUND_CREATOR_WALLET: z.string().default(''),
+    CREATOR_FEE_PAGE_SIZE: z.coerce.number().int().min(1).max(100).default(50),
+    CREATOR_FEE_RPC_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(4),
+    CREATOR_FEE_RPC_MIN_INTERVAL_MS: z.coerce.number().int().min(0).default(75),
     PAYOUT_EXECUTION_ENABLED: z
       .enum(['true', 'false'])
       .default('false')

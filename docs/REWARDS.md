@@ -1,4 +1,4 @@
-# Creator-fee reward accounting (Phase 5A)
+# Creator-fee ingestion and reward accounting (Phases 5A and 5E)
 
 Phase 5A is the authoritative funding-accounting layer. It records verified creator-fee revenue,
 freezes exact hourly and daily prize-pool amounts, and maintains the player-owned Reward Buffer. It
@@ -19,10 +19,90 @@ the authoritative event time and the hourly round's half-open `[start, end)` win
 database insertion time are irrelevant. The daily destination is the UTC day containing the
 hourly round start.
 
-The repository supplies a `CreatorFeeSource` boundary and deterministic
-`FixtureCreatorFeeSource`. No live Pump/PumpSwap watcher is implemented: current creator-fee event
-decoding, finality, and reorg rules were not verified to the required standard without expanding
-this phase. Production must not substitute an estimated or guessed watcher.
+The repository supplies a `CreatorFeeSource` boundary, deterministic `FixtureCreatorFeeSource`, and
+the read-only production `SolanaPumpCreatorFeeSource`. The production source scans only the explicitly
+configured Paperfund token mint, then accepts an event only when its program, discriminator, matching
+trade instruction, mint/pool, wrapped/native SOL quote, creator wallet, successful transaction, exact
+fee, and destination-vault account semantics agree. It never estimates a fee from volume or a rate.
+
+## Live Pump ecosystem source
+
+Phase 5E verified the current official
+[Pump IDL](https://github.com/pump-fun/pump-public-docs/blob/main/idl/pump.json),
+[PumpSwap IDL](https://github.com/pump-fun/pump-public-docs/blob/main/idl/pump_amm.json),
+[creator-fee collection documentation](https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/COLLECT_CREATOR_FEE.md),
+and [creator-fee sharing documentation](https://github.com/pump-fun/pump-public-docs/blob/main/docs/instructions/CREATOR_FEE_SHARING.md).
+
+- Pump.fun bonding-curve trades run under `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P`.
+  `TradeEvent.creator_fee` is the exact lamport amount. The event mint and creator must match the
+  configured funding identity and a current legacy or v2 buy/sell instruction in the same successful
+  transaction. V2 verification additionally binds base mint, wrapped-SOL quote mint, quote token
+  program, creator-vault PDA, and its associated quote-token account. Fees accrue there and may be
+  collected later with `collect_creator_fee_v2`; collection is not counted as new revenue.
+- PumpSwap trades run under `pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA`.
+  `BuyEvent.coin_creator_fee` or `SellEvent.coin_creator_fee` is exact. Because the event names its
+  pool rather than its base mint, the parser binds it to the same transaction's canonical PumpSwap
+  trade instruction and verifies pool, configured base mint, wrapped-SOL quote mint, creator, and
+  coin-creator vault accounts. `collect_coin_creator_fee` is a later claim and is not counted.
+
+Current events expose cashback and holder-reward fields. Paperfund rejects events with non-zero
+cashback or holder rewards because those amounts are not unambiguously creator-wallet revenue. A
+shared creator configuration must still emit the exact configured creator and token identity; the
+source otherwise fails closed.
+
+The immutable chain identity is `(transaction signature, event log index)`. Anchor `Program data`
+is decoded only while the expected program is active in the invocation log, then bound to the
+matching compiled instruction. Real mainnet Pump and PumpSwap event payloads are checked into the
+test suite as offline fixtures; tests never need the network.
+
+## Observation, finality, and reconciliation
+
+Discovery is not financial verification. `creator_fee_observations` records `OBSERVED`, `CONFIRMED`,
+and `FINALIZED` lifecycle evidence. Only Solana `finalized` status promotes an event into the existing
+canonical `creator_fee_events` table with `VERIFIED` status. The authoritative financial timestamp is
+the transaction's chain `blockTime`, not RPC discovery time or the protocol event timestamp.
+
+Pending signatures are rechecked on every ingestion tick. An on-chain error or three consecutive
+history-aware status misses becomes `ROLLED_BACK` and never funds rewards. Recent finalized
+observations are also re-audited against
+signature status, refetched event evidence, and the linked canonical row. Any disappearance or
+mismatch becomes `RECONCILIATION_REQUIRED` and creates an explicit open
+`creator_fee_reconciliation_findings` row. Immutable reward history is not silently rewritten.
+
+`creator_fee_ingestion_checkpoints` stores the source/network/funding identity, newest durable
+signature and slot, finalized-chain slot, success time, and last categorized RPC error. The cursor is
+advanced only after observations have been persisted. A crash before advancement safely replays the
+same chain identities through database uniqueness.
+
+## Operations and configuration
+
+Live following is disabled by default and isolated from the round/reward/payout worker path. An RPC
+failure records health detail and does not stop hourly lifecycle processing. Reads are serially
+rate-limited, have bounded exponential retry/backoff, time out, and use a configurable page size.
+No signer, secret key, transaction construction, send, claim, sweep, or trade operation exists in
+this source.
+
+Environment keys:
+
+- `CREATOR_FEE_INGESTION_ENABLED=false`
+- `CREATOR_FEE_NETWORK=mainnet-beta`
+- `PAPERFUND_TOKEN_MINT` (required when enabled)
+- `PAPERFUND_CREATOR_WALLET` (required when enabled)
+- `CREATOR_FEE_PAGE_SIZE=50` (1–100)
+- `CREATOR_FEE_RPC_MAX_ATTEMPTS=4`
+- `CREATOR_FEE_RPC_MIN_INTERVAL_MS=75`
+
+Operator commands:
+
+```text
+npm run creator-fees:status
+npm run creator-fees:backfill -- <from-slot> <to-slot-exclusive> [max-transactions]
+```
+
+Backfill ranges are half-open, capped at 500,000 slots and 10,000 examined transactions, accept only
+finalized evidence, do not move the live-follow cursor, and are idempotent. Status reports the durable
+checkpoint, lag inputs, categorized error, and observation counts. Open reconciliation findings can
+be inspected directly with the status data and database audit tables.
 
 ## Grace, freeze, and late events
 
@@ -122,8 +202,11 @@ Environment keys:
 
 Mode activation is configuration only. No reserve-target or launch-policy auto activation exists.
 
-## Not implemented
+## Known limitations
 
-Phase 5A deliberately excludes live Pump/PumpSwap fee decoding, chain finality/reorg policy, automatic
-post-freeze remedies, winner allocation, payout custody/signing/broadcast, real SOL transfers,
-reserve-policy automation, admin UI, and additional protocols.
+Only current Pump.fun bonding-curve and canonical PumpSwap trade events are supported. Raydium,
+Meteora, other launchpads, fee claiming/sweeping, automatic post-freeze remedies, and an admin UI are
+out of scope. A protocol IDL/event-layout upgrade fails closed until reviewed. Bounded historical
+backfill depends on the configured RPC retaining the requested transaction history. A finalized
+inconsistency is quarantined for operator reconciliation; it never automatically reverses a frozen
+reward pool.

@@ -4,10 +4,14 @@ import { fileURLToPath } from 'node:url';
 import { parseEnvironment } from '@paperfund/config';
 import {
   createDatabase,
+  recordCreatorFeeIngestionFailure,
+  runCreatorFeeIngestionTick,
   runDailyRewardFinalizationTick,
   runHourlyLifecycleTick,
   runPayoutPlanGenerationTick,
   runRewardFinalizationTick,
+  SolanaJsonRpcClient,
+  SolanaPumpCreatorFeeSource,
 } from '@paperfund/db';
 import { createProductionExecutionRouter } from '@paperfund/protocols';
 
@@ -20,6 +24,21 @@ const router = createProductionExecutionRouter({
   rpcTimeoutMs: config.SOLANA_RPC_TIMEOUT_MS,
   commitment: config.SOLANA_COMMITMENT,
 });
+const creatorFeeSource = config.CREATOR_FEE_INGESTION_ENABLED
+  ? new SolanaPumpCreatorFeeSource(
+      new SolanaJsonRpcClient(config.SOLANA_RPC_URL, {
+        timeoutMs: config.SOLANA_RPC_TIMEOUT_MS,
+        maxAttempts: config.CREATOR_FEE_RPC_MAX_ATTEMPTS,
+        minimumRequestIntervalMs: config.CREATOR_FEE_RPC_MIN_INTERVAL_MS,
+      }),
+      {
+        tokenMint: config.PAPERFUND_TOKEN_MINT,
+        creatorWallet: config.PAPERFUND_CREATOR_WALLET,
+      },
+      config.CREATOR_FEE_NETWORK,
+      config.CREATOR_FEE_PAGE_SIZE,
+    )
+  : null;
 let stopping = false;
 let timer: NodeJS.Timeout | undefined;
 
@@ -30,6 +49,29 @@ function log(level: 'info' | 'error', event: string, metadata: Record<string, un
 }
 
 async function tick() {
+  if (creatorFeeSource) {
+    try {
+      const result = await runCreatorFeeIngestionTick(database, creatorFeeSource);
+      log('info', 'creator_fee_ingestion_tick', {
+        ...result,
+        finalizedChainSlot: result.finalizedChainSlot.toString(),
+      });
+    } catch (error) {
+      try {
+        await recordCreatorFeeIngestionFailure(database, creatorFeeSource, error);
+      } catch (healthError) {
+        log('error', 'creator_fee_ingestion_health_write_failed', {
+          message:
+            healthError instanceof Error ? healthError.message : 'Unknown health write failure',
+        });
+      }
+      log('error', 'creator_fee_ingestion_tick_failed', {
+        errorCode:
+          error instanceof Error && 'code' in error ? String(error.code) : 'INTERNAL_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown creator-fee ingestion failure',
+      });
+    }
+  }
   try {
     const now = new Date();
     const events = await runHourlyLifecycleTick(

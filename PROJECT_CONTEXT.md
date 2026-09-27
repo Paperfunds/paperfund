@@ -1,9 +1,9 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 5C implementation record
-**Product status:** Authoritative trading, reward-pool accounting, and shadow winner allocation complete
+**Document status:** Canonical specification with Phase 5E implementation record
+**Product status:** Authoritative trading, live creator-fee ingestion, reward accounting, winner allocation, and controlled payout execution complete
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-28
 
 ## 1. Purpose and change policy
 
@@ -1218,3 +1218,52 @@ Phase 5D validation completed with 336 passing tests and 2 intentional skips, 32
 clean formatting/lint/typecheck, a successful production build, passing database readiness, and the
 real-stack web Playwright flow. Live devnet/mainnet payout smoke was deliberately not run because no
 funded operator treasury or signer secret is part of the repository or deterministic test setup.
+
+## 36. Phase 5E implementation record
+
+Phase 5E adds a production-capable, read-only Solana creator-fee ingestion pipeline for the two
+already-supported Pump venues without changing trading, reward economics, winner allocation, or
+payout execution. Official current Pump and PumpSwap IDLs and creator-fee documentation establish
+that exact fees accrue per successful trade into program-defined creator vaults and are claimed
+later. Paperfund therefore ingests the authoritative per-trade event and never counts a later
+collection instruction as new revenue.
+
+`SolanaPumpCreatorFeeSource` scans only the explicitly configured Paperfund token mint. Pump
+`TradeEvent` evidence must match the canonical Pump program, a trade instruction, mint, creator,
+native/wrapped-SOL quote, creator-vault account semantics, and exact positive `creator_fee`. PumpSwap
+`BuyEvent`/`SellEvent` evidence must match the canonical AMM program and same-transaction instruction
+pool, configured base mint, wrapped-SOL quote, creator, creator-vault accounts, and exact positive
+`coin_creator_fee`. Non-zero holder-reward or cashback paths are rejected because they are not
+unambiguous creator-wallet revenue. The chain identity is transaction signature plus event log index.
+
+Discovery persists observations separately from financial verification. Observed and confirmed
+transactions never fund rewards. Only Solana `finalized` status promotes the exact event into the
+existing immutable `creator_fee_events` model as `VERIFIED`. Chain `blockTime` is authoritative and
+retains the existing half-open hourly `[start,end)` attribution and late-after-freeze behavior.
+Pre-finality disappearance becomes `ROLLED_BACK`. Recent local finalizations are continuously audited
+against status, refetched event evidence, and the canonical row; any inconsistency becomes
+`RECONCILIATION_REQUIRED` with a durable finding and never silently rewrites financial history.
+
+Forward migration `0007_live_creator_fee_ingestion.sql` adds observation/finality state, durable
+per-source checkpoints and health/error data, and reconciliation findings. The checkpoint advances
+only after durable observations, so crash replay is harmless under chain-identity uniqueness. The
+worker runs ingestion in an independent failure boundary with bounded serial RPC reads,
+timeout/retry/backoff, and configurable rate limiting. It cannot sign, construct, send, trade, claim,
+or sweep. Live following defaults off and fails closed when token-mint or creator-wallet identity is
+missing.
+
+Operators can inspect health with `npm run creator-fees:status` and run an explicitly bounded,
+half-open, finalized-only, cursor-independent backfill with `npm run creator-fees:backfill --
+<from-slot> <to-slot-exclusive> [max-transactions]`. Real mainnet Pump and PumpSwap event payloads are
+stored as offline fixtures. Deterministic coverage verifies exact decoding, program/instruction and
+identity false positives, finality promotion, rollback/reconciliation escalation, restart recovery,
+hour-boundary attribution, bounded backfill, and replay idempotency. Detailed semantics,
+configuration, operations, security properties, and limitations are in `docs/REWARDS.md`.
+
+Phase 5E validation completed with 342 passing tests and 2 intentional skips, including 6 new
+fee-ingestion tests; 32/32 extension tests; clean formatting, lint, and typecheck; successful web and
+extension builds; applied migration and passing database readiness; and the real-stack web
+Playwright flow. An optional read-only mainnet parser smoke passed against the two captured Pump and
+PumpSwap signatures and exact fees. A configured end-to-end Paperfund mainnet follow smoke was not
+run because the repository does not contain an approved Paperfund token-mint/creator-wallet funding
+identity; ingestion remains disabled by default and fails closed without it.
