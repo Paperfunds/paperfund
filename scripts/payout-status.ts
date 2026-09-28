@@ -44,10 +44,13 @@ if (!planId) {
     const batches = execution
       ? (
           await database.pool.query(
-            `select batch_index,state,recipient_count,total_lamports::text,transaction_signature,
-                    broadcast_attempt_count,confirmation_slot::text,failure_code,failure_detail,
-                    broadcast_at,verified_at,updated_at
-             from payout_batches where payout_execution_id=$1 order by batch_index`,
+            `select b.batch_index,b.state,b.recipient_count,b.total_lamports::text,
+                    b.transaction_signature,
+                    (select count(*)::int from payout_broadcast_attempts a
+                     where a.payout_batch_id=b.id) broadcast_attempt_count,
+                    b.confirmation_slot::text,b.failure_code,b.failure_detail,
+                    b.broadcast_at,b.verified_at,b.updated_at
+             from payout_batches b where b.payout_execution_id=$1 order by b.batch_index`,
             [execution.id],
           )
         ).rows

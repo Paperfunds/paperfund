@@ -1,0 +1,46 @@
+name: paperfund-production
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: paperfund
+      POSTGRES_USER: paperfund
+      POSTGRES_PASSWORD: ${PAPERFUND_POSTGRES_PASSWORD:?Set PAPERFUND_POSTGRES_PASSWORD}
+    ports:
+      - '127.0.0.1:5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U paperfund -d paperfund']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - paperfund-postgres:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command:
+      [
+        'redis-server',
+        '--appendonly',
+        'yes',
+        '--requirepass',
+        '${PAPERFUND_REDIS_PASSWORD:?Set PAPERFUND_REDIS_PASSWORD}',
+      ]
+    ports:
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$${PAPERFUND_REDIS_PASSWORD}" --no-auth-warning ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      PAPERFUND_REDIS_PASSWORD: ${PAPERFUND_REDIS_PASSWORD:?Set PAPERFUND_REDIS_PASSWORD}
+    volumes:
+      - paperfund-redis:/data
+
+volumes:
+  paperfund-postgres:
+  paperfund-redis:

@@ -33,6 +33,19 @@ npm run ops:check
 state. A healthy result is required before startup. Confirm the returned genesis hash belongs to the
 configured network. Never paste a signer secret into a ticket, log, or shell transcript.
 
+For a production host, copy `.env.production.example` to the untracked `.env.production`, replace
+all example values, and load those values into the API/worker supervisor and build shell. Start the
+durable, loopback-only services with:
+
+```powershell
+docker compose --env-file .env.production -f compose.production.yml up -d
+```
+
+The production compose file requires non-default PostgreSQL and Redis passwords, enables Redis AOF,
+uses named volumes, and restarts both containers unless stopped. It deliberately does not publish a
+web, API, or worker container. `DATABASE_URL` and `REDIS_URL` must contain the same passwords, URL
+encoded where necessary.
+
 ## Process supervision
 
 Run the API and worker independently so one can restart without taking down the other:
@@ -63,6 +76,13 @@ API-only, worker-only, and combined restarts do not rewrite immutable financial 
 restart, require `/ready`, a fresh worker tick, and unchanged payout/fee totals before declaring
 recovery complete.
 
+Recommended Task Scheduler settings are **Run whether user is logged on or not**, **Start in** set
+to the repository root, restart every minute up to three times, and stop the existing instance
+before starting another. Use one task for `npm run start:api` and one for `npm run start:worker`; do
+not put secrets directly in task arguments. The worker atomically refreshes
+`WORKER_HEARTBEAT_FILE` with its PID, tick times, fee-poll time, lifecycle-success time, and last
+categorized error. Alert when it is older than three tick intervals.
+
 ## Startup checklist and health commands
 
 - `docker compose ps`: PostgreSQL and Redis are healthy and bound only to loopback.
@@ -87,6 +107,13 @@ Terminate TLS at a maintained reverse proxy and forward only public API/web rout
 HTTPS origins in `ALLOWED_ORIGINS`. Build the web app and extension with public HTTPS API/app URLs;
 never expose raw Node, PostgreSQL, or Redis ports. Rebuild the extension after changing its allowed
 API origin.
+
+`API_PUBLIC_ORIGIN` and `APP_PUBLIC_ORIGIN` are mandatory non-loopback HTTPS origins in production.
+The web production build sets `PAPERFUND_REQUIRE_PRODUCTION_ORIGINS=true` and requires
+`VITE_API_BASE_URL`; plain HTTP is rejected except for an explicit loopback-only acceptance build. A vendor-neutral reverse proxy should serve the static
+`apps/web/dist` output, proxy the API origin to `127.0.0.1:3000`, preserve forwarded HTTPS metadata,
+and enforce certificate renewal. A managed tunnel is acceptable when it provides stable reviewed
+hostnames and access controls, but it is not a substitute for exact CORS and secure cookies.
 
 ## Creator-fee shadow rollout
 
@@ -133,7 +160,9 @@ The dry-run must pass before enabling execution. Verify network, RPC genesis, tr
 recipient count, payout total, fee estimate, and treasury balance. Live devnet operation requires
 `PAYOUT_NETWORK=devnet`, an explicitly funded devnet treasury, matching signer, and
 `PAYOUT_EXECUTION_ENABLED=true`. Mainnet additionally requires `PAYOUT_MAINNET_CONFIRM=true`; keep
-it false outside a separately authorized mainnet change window.
+it false outside a separately authorized mainnet change window. In addition,
+`PAYOUT_MAINNET_MAX_PLAN_LAMPORTS` is a fail-closed total-plan ceiling checked during dry-run before
+signing. Exceeding it requires changing reviewed configuration, never splitting or editing a plan.
 
 After broadcast, status is not payment proof. Reconcile until every batch and the plan are
 `VERIFIED`; compare persisted signatures and exact lamports with finalized RPC records.
@@ -142,16 +171,31 @@ proven absence. Stop on `FAILED_FINAL` or `RECONCILIATION_REQUIRED` and retain a
 
 ## Backup, restore, and incident checks
 
-Take encrypted PostgreSQL logical backups before migrations and payout windows. A typical container
-backup uses `pg_dump --format=custom`; store the result outside the repository and test restoration
-into a separate database with `pg_restore --clean --if-exists`. Run migrations and `npm run db:check`
-against the restored copy, then compare payout plans, allocations, executions, batches, creator-fee
-checkpoints, observations, and reconciliation findings. Redis is not the financial system of record.
+Take encrypted PostgreSQL logical backups before migrations and payout windows. `npm run db:backup`
+creates a timestamped custom-format dump under the ignored `backups/` directory. Immediately run
+`npm run db:restore-smoke -- -BackupPath backups/<dump>`; it copies the dump into PostgreSQL,
+restores an isolated timestamped database, verifies public tables exist, and removes only that
+temporary database. Copy the validated dump to encrypted off-host storage with documented retention.
+Redis is not the financial system of record.
+
+`npm run ops:check` emits structured PASS/WARN/FAIL checks for environment validation, database,
+migration count, Redis, RPC identity/latency, local API readiness, worker heartbeat freshness,
+creator-fee checkpoint health, payout switches, and public origins. In production, missing API
+readiness or a stale heartbeat is a failure. In a development shell they are warnings so an offline
+preflight remains useful.
 
 For incidents, first disable live payouts and preserve logs. Record UTC time, commit, configured
 network (never secrets), health output, plan/source ID, signatures, and database states. Do not
 delete checkpoints, observations, executions, batches, or attempts. Rotate any possibly exposed
 credential outside the application, then re-run preflight.
+
+Immediate controls are configuration-driven: set `PAYOUT_EXECUTION_ENABLED=false`, disable the
+signer, and stop any operator payout shell; set `CREATOR_FEE_INGESTION_ENABLED=false` to stop chain
+following; stop the worker to halt lifecycle and ingestion while leaving API reads available. If
+mutations must stop while public reads remain online, configure the HTTPS ingress to reject non-GET
+API methods, verify the rule from outside, and leave the worker stopped. To replace an unhealthy RPC,
+change only `SOLANA_RPC_URL` and existing timeout/rate settings, run `npm run ops:check`, then restart
+the affected process. Preserve logs and database evidence throughout.
 
 Free RPC tiers can throttle, prune history, or impose burst limits. Warning signs are rising retry
 counts, repeated timeouts or 429 responses, increasing lag, or missing historical signatures.

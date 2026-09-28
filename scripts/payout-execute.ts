@@ -28,6 +28,7 @@ if (!planId) {
     mainnetConfirmed: environment.PAYOUT_MAINNET_CONFIRM,
     treasuryAddress: environment.PAYOUT_TREASURY_PUBLIC_KEY,
     maxRecipientsPerBatch: environment.PAYOUT_MAX_RECIPIENTS_PER_BATCH,
+    mainnetMaxPlanLamports: BigInt(environment.PAYOUT_MAINNET_MAX_PLAN_LAMPORTS),
   } as const;
   try {
     const signer =

@@ -97,6 +97,14 @@ npm run build:extension
 
 The build emits `apps/extension/build` and generates an API-origin-specific manifest. The manifest key makes the unpacked development ID stable: `lcnpjpkojoadojibfbjfohpjepkfmdln`.
 
+The production package must use exact HTTPS build-time origins and be rebuilt whenever either origin
+changes. Add its exact `chrome-extension://lcnpjpkojoadojibfbjfohpjepkfmdln` origin to server CORS.
+Inspect the packaged manifest and bundle before distribution: it must contain no RPC URL, database
+URL, Redis URL, cookie secret, or signer material. The approved black interlocking PF mark with green
+horizontal accent is not present as a binary in the repository; do not approximate it. Supplying and
+exporting the exact approved asset from `assets/brand/paperfund-mark.svg` at 16, 32, 48, and 128
+pixels is a launch checklist gate.
+
 Exact developer installation:
 
 1. Run `npm run build:extension`.

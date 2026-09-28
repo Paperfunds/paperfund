@@ -21,6 +21,7 @@ export interface PayoutExecutionConfig {
   readonly mainnetConfirmed: boolean;
   readonly treasuryAddress: string;
   readonly maxRecipientsPerBatch: number;
+  readonly mainnetMaxPlanLamports?: bigint;
 }
 
 export interface PreparedTransaction {
@@ -406,6 +407,15 @@ export async function dryRunPayoutExecution(
     batches.push({ ...intent, ...prepared });
   }
   const totalPayoutLamports = batches.reduce((sum, batch) => sum + batch.totalLamports, 0n);
+  if (
+    input.config.network === 'mainnet-beta' &&
+    input.config.mainnetMaxPlanLamports !== undefined &&
+    totalPayoutLamports > input.config.mainnetMaxPlanLamports
+  )
+    throw new PayoutPlanError(
+      'PAYOUT_MAINNET_CAP_EXCEEDED',
+      'Approved plan exceeds the configured mainnet payout safety cap.',
+    );
   const estimatedFeeLamports = batches.reduce((sum, batch) => sum + batch.feeLamports, 0n);
   const treasuryBalanceLamports = await input.rpc.getBalance(input.config.treasuryAddress);
   const requiredLamports = totalPayoutLamports + estimatedFeeLamports;

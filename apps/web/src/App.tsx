@@ -151,11 +151,14 @@ export function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <NavLink className="wordmark" to="/trade" aria-label="Paperfund home">
+        <NavLink className="wordmark" to="/" aria-label="Paperfund home">
           <span className="wordmark-mark">P</span>
           <span>Paperfund</span>
         </NavLink>
         <nav aria-label="Primary navigation">
+          <NavItem to="/" icon="⌂">
+            Home
+          </NavItem>
           <NavItem to="/trade" icon="↗">
             Trade
           </NavItem>
@@ -167,6 +170,9 @@ export function App() {
           </NavItem>
           <NavItem to="/history" icon="≡">
             History
+          </NavItem>
+          <NavItem to="/rules" icon="§">
+            Rules
           </NavItem>
         </nav>
         <div className="sidebar-foot">
@@ -197,12 +203,15 @@ export function App() {
           <WalletControl auth={auth} />
         </header>
         <div className="mobile-nav">
+          <NavItem to="/">Home</NavItem>
           <NavItem to="/trade">Trade</NavItem>
           <NavItem to="/hourly">Hourly</NavItem>
           <NavItem to="/daily">Daily</NavItem>
           <NavItem to="/history">History</NavItem>
+          <NavItem to="/rules">Rules</NavItem>
         </div>
         <Routes>
+          <Route path="/" element={<LandingPage />} />
           <Route
             path="/trade"
             element={
@@ -218,10 +227,103 @@ export function App() {
           <Route path="/hourly" element={<HourlyPage />} />
           <Route path="/daily" element={<DailyPage user={auth.user} />} />
           <Route path="/history" element={<HistoryPage user={auth.user} />} />
-          <Route path="*" element={<Navigate to="/trade" replace />} />
+          <Route path="/rules" element={<RulesPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
     </div>
+  );
+}
+
+function LandingPage() {
+  return (
+    <PageFrame>
+      <section className="welcome launch-landing">
+        <div className="eyebrow">FREE HOURLY SOLANA PAPER TRADING</div>
+        <h1>
+          Prove your edge.
+          <br />
+          <em>Earn real rewards.</em>
+        </h1>
+        <p>
+          Start every UTC hour with 10 Paper SOL, trade simulated Solana markets with realistic
+          execution, and compete for creator-fee-funded rewards. Paperfund works on the web and
+          alongside Axiom, GMGN.ai, and Terminal.trade.
+        </p>
+        <div className="launch-actions">
+          <NavLink className="button primary" to="/trade">
+            Enter Paperfund
+          </NavLink>
+          <NavLink className="button secondary" to="/rules">
+            Read the rules
+          </NavLink>
+        </div>
+        <div className="rule-grid">
+          <Rule number="01" title="10 Paper SOL" body="A clean simulated account every hour." />
+          <Rule
+            number="02"
+            title="Realistic fills"
+            body="Fees, price impact, and forced settlement."
+          />
+          <Rule
+            number="03"
+            title="Real rewards"
+            body="Audited allocations funded by creator fees."
+          />
+        </div>
+        <span className="simulation-label">
+          Simulated trading only · Paper SOL has no monetary value · No trading deposits
+        </span>
+      </section>
+    </PageFrame>
+  );
+}
+
+function RulesPage() {
+  return (
+    <PageFrame>
+      <PageTitle
+        eyebrow="COMPETITION RULES"
+        title="One hour. One account. The same rules for everyone."
+        subtitle="Paperfund is a simulated trading competition. Paper SOL and simulated positions have no monetary value."
+      />
+      <section className="rules-list" aria-label="Competition rules">
+        <Rule
+          number="01"
+          title="Fresh hourly account"
+          body="Each UTC hour starts with exactly 10 Paper SOL. Balances and positions never carry forward."
+        />
+        <Rule
+          number="02"
+          title="Position controls"
+          body="Each buy is capped at 20% of starting capital, and each account can hold at most five open position slots."
+        />
+        <Rule
+          number="03"
+          title="Execution model"
+          body="Quotes include protocol fees, price impact, slippage controls, and authoritative route validation."
+        />
+        <Rule
+          number="04"
+          title="Forced settlement"
+          body="When the hour closes, every open position is sold through the same execution engine before ranks finalize."
+        />
+        <Rule
+          number="05"
+          title="Hourly and daily ranks"
+          body="Hourly rewards use the top 10; daily rewards use the top 25. Competitive ranks preserve ties."
+        />
+        <Rule
+          number="06"
+          title="Reward funding"
+          body="Rewards are allocated from verified creator-fee proceeds, reviewed, approved, paid, and reconciled on-chain."
+        />
+      </section>
+      <div className="rules-callout">
+        Rewards are not guaranteed. Only an approved payout allocation marked paid after on-chain
+        verification represents a completed reward.
+      </div>
+    </PageFrame>
   );
 }
 
@@ -978,7 +1080,7 @@ function DailyPage({ user }: { user: User | null }) {
             <strong>Rank #{latestDailyReward.competitiveRank}</strong>
           </div>
           <Metric
-            label="Pending payout"
+            label="Reward allocation"
             value={`${formatSol(latestDailyReward.rewardAllocationLamports)} · ${
               latestDailyReward.status === 'PAID'
                 ? 'Paid'

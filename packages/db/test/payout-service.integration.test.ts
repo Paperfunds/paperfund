@@ -577,6 +577,53 @@ describe('Phase 5C shadow payout persistence', () => {
     expect(executions.rows[0]!.count).toBe('0');
   });
 
+  it('refuses a mainnet plan above the configured operator cap', async () => {
+    const { plan } = await seedApprovedHourly('hour-mainnet-cap', [1n], 101n);
+    const treasury = Keypair.generate().publicKey.toBase58();
+    const rpc: PayoutRpc = {
+      async assertNetwork() {},
+      async getBalance() {
+        return 10_000n;
+      },
+      async prepareTransaction(treasuryAddress, recipients) {
+        const transaction = mockPreparedTransaction(treasuryAddress, recipients);
+        return {
+          unsignedTransaction: transaction.unsignedTransaction,
+          feeLamports: 5n,
+          recentBlockhash: transaction.recentBlockhash,
+          lastValidBlockHeight: 100n,
+        };
+      },
+      async sendSignedTransaction() {
+        throw new Error('must not broadcast');
+      },
+      async getBlockHeight() {
+        return 0n;
+      },
+      async getSignatureStatus() {
+        return null;
+      },
+      async getFinalizedTransfers() {
+        return null;
+      },
+    };
+
+    await expect(
+      dryRunPayoutExecution(database, {
+        planId: plan.id,
+        config: {
+          enabled: true,
+          network: 'mainnet-beta',
+          mainnetConfirmed: true,
+          treasuryAddress: treasury,
+          maxRecipientsPerBatch: 8,
+          mainnetMaxPlanLamports: 100n,
+        },
+        rpc,
+      }),
+    ).rejects.toMatchObject({ code: 'PAYOUT_MAINNET_CAP_EXCEEDED' });
+  });
+
   it('requires reconciliation instead of marking a mismatched on-chain transfer paid', async () => {
     const { plan } = await seedApprovedHourly('hour-11', [1n], 100n);
     const treasury = Keypair.generate().publicKey.toBase58();

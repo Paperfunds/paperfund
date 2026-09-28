@@ -31,6 +31,8 @@
     "db:generate": "npm run db:generate --workspace @paperfund/db",
     "db:migrate": "npm run build && npm run db:migrate --workspace @paperfund/db",
     "db:check": "npm run build && npm run db:check --workspace @paperfund/db",
+    "db:backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-backup.ps1",
+    "db:restore-smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/db-restore-smoke.ps1",
     "start:api": "npm run start --workspace @paperfund/api",
     "start:worker": "npm run start --workspace @paperfund/worker",
     "ops:check": "tsx scripts/ops-check.ts",

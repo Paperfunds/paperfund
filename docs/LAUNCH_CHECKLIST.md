@@ -1,0 +1,107 @@
+# Production launch checklist
+
+This checklist is the operator gate for the first Windows-hosted Paperfund deployment. It does not
+authorize creator-fee financial promotion or a mainnet payout. Record the UTC time, operator, commit,
+and result for every checked item.
+
+## Release inputs
+
+- [ ] Production host has Node.js 22+, npm 10+, Git, Docker Desktop, and a maintained HTTPS reverse
+      proxy or tunnel.
+- [ ] `main` is clean, reviewed, and equal to `origin/main`; record `git rev-parse HEAD`.
+- [ ] The approved **black interlocking PF mark with green horizontal accent** has been supplied by
+      the owner. The exact source and exported browser icons are installed without redrawing,
+      recoloring, or distortion. No approved binary is currently committed, so this is a hard brand
+      release gate rather than a request to approximate it. Place the approved vector source at
+      `assets/brand/paperfund-mark.svg`, then derive the web favicon and 16/32/48/128-pixel Chromium
+      icons from that source.
+- [ ] `.env.production` was created from `.env.production.example`; every `REPLACE_`/example value
+      was replaced and the file remains untracked.
+- [ ] PostgreSQL, Redis, RPC, and any signer use separate generated secrets. Browser build variables
+      contain public origins only.
+
+## Infrastructure and build
+
+- [ ] `docker compose --env-file .env.production -f compose.production.yml up -d` reports healthy
+      PostgreSQL and Redis, bound only to loopback, with persistent named volumes.
+- [ ] A pre-migration `npm run db:backup` completed, and the restore-smoke command restored that dump
+      into an isolated temporary database.
+- [ ] With production environment values loaded: `npm ci`, `npm run db:migrate`, `npm run lint`,
+      `npm run typecheck`, `npm test`, `npm run build`, `npm run db:check`,
+      `npm run build:extension`, and `npm run test:extension` all pass.
+- [ ] `npm audit` was reviewed. Any accepted advisory has an owner and written rationale; no breaking
+      automated upgrade was applied during launch.
+- [ ] The extension release was rebuilt with the exact HTTPS `PAPERFUND_API_BASE_URL` and
+      `PAPERFUND_APP_URL`, packaged with `npm run package:extension`, and inspected for secrets and
+      unexpected permissions.
+
+## Public boundary
+
+- [ ] Web and API public origins use HTTPS. PostgreSQL, Redis, API Node port, logs, and filesystem are
+      not directly public.
+- [ ] `API_PUBLIC_ORIGIN`, `APP_PUBLIC_ORIGIN`, `VITE_API_BASE_URL`, extension build origins, and
+      reverse-proxy routes agree exactly.
+- [ ] `ALLOWED_ORIGINS` contains only the exact HTTPS app origin and reviewed extension origin.
+- [ ] Secure cookies are enabled and login/logout work from the public web app.
+- [ ] Landing and rules pages accurately state 10 Paper SOL per hour, 20% max buy, five slots,
+      forced settlement, top-10/top-25 reward curves, tie handling, and simulated/no-value status.
+- [ ] Axiom, GMGN.ai, and Terminal.trade production builds show the shared overlay only on supported
+      Solana token routes; multi-tab mint isolation and logout remain correct.
+
+## Process and observability
+
+- [ ] Dedicated unprivileged Windows Task Scheduler entries run API and worker independently, use the
+      repository as **Start in**, load the production environment, restart on failure, and retain
+      separate logs.
+- [ ] Startup order was PostgreSQL/Redis, migrations, API, worker, HTTPS proxy. `/health`, `/ready`,
+      and `npm run ops:check` are green.
+- [ ] `logs/worker-heartbeat.json` is updating. Monitoring alerts on process exit, stale heartbeat,
+      API readiness failure, disk pressure, database failure, RPC errors/latency, and creator-fee lag.
+- [ ] A restart drill confirmed API-only and worker-only restart recovery without duplicate rounds,
+      fee events, payout attempts, or changed totals.
+
+## Financial safety
+
+- [ ] Creator-fee ingestion starts disabled or in shadow mode. Official mint and creator-wallet
+      identities are independently verified before enabling it. Shadow evidence must be reviewed
+      before the separate decision to set `CREATOR_FEE_SHADOW_MODE=false`.
+- [ ] `PAYOUT_EXECUTION_ENABLED=false`, `PAYOUT_SIGNER_TYPE=DISABLED`, and
+      `PAYOUT_MAINNET_CONFIRM=false` at normal startup.
+- [ ] The mainnet per-plan cap is reviewed and intentionally denominated in lamports. Dry-run,
+      approval, recipient review, treasury review, and reconciliation remain separate operator steps.
+- [ ] No production signer secret is stored in Git, browser output, Task Scheduler arguments, logs,
+      tickets, or backups.
+
+## Acceptance and rollback
+
+- [ ] Full-stack smoke covers wallet authentication, round entry, buy, partial sell, sell-all,
+      forced settlement, leaderboard/history, reward wording, API readiness, worker heartbeat, and
+      extension behavior.
+- [ ] Backup location, retention, encryption, and off-host copy have been verified; a restore owner
+      and recovery objective are recorded.
+- [ ] Rollback is rehearsed: disable payouts, stop worker then API, preserve evidence, restore the
+      prior application commit, and restore the database only when a migration/data rollback has
+      been explicitly reviewed.
+- [ ] Incident contacts know that payout/fee rows, checkpoints, observations, signatures, and
+      attempts must never be deleted to make an alert disappear.
+
+## Final real-money acceptance (separate phase)
+
+- [ ] A real Paperfund-linked token and creator wallet are ready and independently verified.
+- [ ] `PAPERFUND_TOKEN_MINT` and `PAPERFUND_CREATOR_WALLET` match those identities exactly.
+- [ ] RPC network identity and finalized reads pass; financially active ingestion is explicitly
+      enabled after the shadow evidence review.
+- [ ] A bounded real test trade produces the expected creator-fee event, reaches finality, and is
+      attributed to the correct half-open UTC hour.
+- [ ] The verified fee conserves through the configured hourly/daily/platform/buffer split, and the
+      hourly competition completes with forced settlement.
+- [ ] The winner allocation freezes and validates under the existing curve and tie policy.
+- [ ] An operator reviews and approves the payout plan; dry-run confirms the exact mainnet network,
+      treasury, recipients, amounts, intent hashes, fees, balance requirement, and safety cap.
+- [ ] Only with explicit operator confirmation, execute a deliberately small mainnet payout, wait
+      for finalized confirmation, and reconcile exact on-chain transfers and balances.
+- [ ] Re-run execution/reconciliation to prove the verified plan cannot pay twice.
+
+Launch only when all hard gates are checked. A missing approved brand asset, failed restore test,
+unsafe public origin, stale worker heartbeat, unresolved reconciliation finding, or unknown chain
+identity blocks launch.

@@ -13,6 +13,8 @@ describe('parseEnvironment', () => {
       NODE_ENV: 'development',
       API_HOST: '127.0.0.1',
       API_PORT: 3000,
+      API_PUBLIC_ORIGIN: '',
+      APP_PUBLIC_ORIGIN: '',
       DATABASE_URL: 'postgresql://paperfund:paperfund@127.0.0.1:5432/paperfund',
       REDIS_URL: 'redis://127.0.0.1:6379',
       SOLANA_RPC_URL: 'https://api.mainnet-beta.solana.com',
@@ -28,6 +30,7 @@ describe('parseEnvironment', () => {
       API_RATE_LIMIT_AUTH_MAX: 20,
       API_RATE_LIMIT_TRADE_MAX: 30,
       WORKER_TICK_INTERVAL_MS: 5000,
+      WORKER_HEARTBEAT_FILE: 'logs/worker-heartbeat.json',
       REWARD_ALLOCATION_MODE: 'NORMAL',
       REWARD_BASELINE_WINDOW: 12,
       REWARD_LAMBDA_BPS: 6000,
@@ -47,6 +50,7 @@ describe('parseEnvironment', () => {
       PAYOUT_SIGNER_TYPE: 'DISABLED',
       PAYOUT_SIGNER_SECRET_KEY: '',
       PAYOUT_MAX_RECIPIENTS_PER_BATCH: 8,
+      PAYOUT_MAINNET_MAX_PLAN_LAMPORTS: '100000000',
     });
   });
 
@@ -60,5 +64,50 @@ describe('parseEnvironment', () => {
         SOLANA_RPC_URL: 'not-a-url',
       }),
     ).toThrow();
+  });
+
+  it('fails closed on unsafe production launch configuration', () => {
+    expect(() =>
+      parseEnvironment({
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://paperfund:paperfund@127.0.0.1:5432/paperfund',
+        REDIS_URL: 'redis://127.0.0.1:6379',
+        API_PUBLIC_ORIGIN: 'http://localhost:3000',
+        APP_PUBLIC_ORIGIN: 'https://app.example.com',
+        ALLOWED_ORIGINS: '*',
+      }),
+    ).toThrow();
+  });
+
+  it('rejects production origins with paths and non-exact extension origins', () => {
+    expect(() =>
+      parseEnvironment({
+        NODE_ENV: 'production',
+        DATABASE_URL: 'postgresql://paperfund:paperfund@127.0.0.1:5432/paperfund',
+        REDIS_URL: 'redis://127.0.0.1:6379',
+        API_PUBLIC_ORIGIN: 'https://api.paperfund.example/path',
+        APP_PUBLIC_ORIGIN: 'https://app.paperfund.example',
+        COOKIE_SECURE: 'true',
+        ALLOWED_ORIGINS:
+          'https://app.paperfund.example,chrome-extension://lcnpjpkojoadojibfbjfohpjepkfmdln/path',
+      }),
+    ).toThrow();
+  });
+
+  it('requires complete identities and explicit payout network when enabled', () => {
+    const base = {
+      DATABASE_URL: 'postgresql://paperfund:paperfund@127.0.0.1:5432/paperfund',
+      REDIS_URL: 'redis://127.0.0.1:6379',
+    };
+    expect(() => parseEnvironment({ ...base, CREATOR_FEE_INGESTION_ENABLED: 'true' })).toThrow();
+    expect(() =>
+      parseEnvironment({
+        ...base,
+        PAYOUT_EXECUTION_ENABLED: 'true',
+        PAYOUT_TREASURY_PUBLIC_KEY: '11111111111111111111111111111111',
+        PAYOUT_SIGNER_TYPE: 'LOCAL_KEYPAIR',
+        PAYOUT_SIGNER_SECRET_KEY: '[redacted]',
+      }),
+    ).toThrow('PAYOUT_NETWORK');
   });
 });

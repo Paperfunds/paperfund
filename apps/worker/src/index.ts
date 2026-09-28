@@ -1,4 +1,6 @@
 import { config as loadDotenv } from 'dotenv';
+import { mkdir, rename, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { parseEnvironment } from '@paperfund/config';
@@ -47,6 +49,25 @@ const creatorFeeSource = config.CREATOR_FEE_INGESTION_ENABLED
 let stopping = false;
 let timer: NodeJS.Timeout | undefined;
 let creatorFeeRetryErrors = 0;
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const heartbeatPath = isAbsolute(config.WORKER_HEARTBEAT_FILE)
+  ? config.WORKER_HEARTBEAT_FILE
+  : resolve(repositoryRoot, config.WORKER_HEARTBEAT_FILE);
+const heartbeat = {
+  processId: process.pid,
+  startedAt: new Date().toISOString(),
+  lastTickStartedAt: null as string | null,
+  lastLifecycleSuccessAt: null as string | null,
+  lastFeePollAt: null as string | null,
+  lastError: null as { at: string; scope: string; message: string } | null,
+};
+
+async function writeHeartbeat() {
+  const temporary = `${heartbeatPath}.${process.pid.toString()}.tmp`;
+  await mkdir(dirname(heartbeatPath), { recursive: true });
+  await writeFile(temporary, `${JSON.stringify(heartbeat)}\n`, { encoding: 'utf8', mode: 0o600 });
+  await rename(temporary, heartbeatPath);
+}
 
 function log(level: 'info' | 'error', event: string, metadata: Record<string, unknown>) {
   const entry = JSON.stringify({ level, event, ...metadata, timestamp: new Date().toISOString() });
@@ -55,6 +76,7 @@ function log(level: 'info' | 'error', event: string, metadata: Record<string, un
 }
 
 async function tick() {
+  heartbeat.lastTickStartedAt = new Date().toISOString();
   if (creatorFeeSource) {
     const retriesBeforeTick = creatorFeeRetryErrors;
     try {
@@ -63,6 +85,8 @@ async function tick() {
       });
       const retryErrors = creatorFeeRetryErrors - retriesBeforeTick;
       await recordCreatorFeeIngestionRetries(database, creatorFeeSource, retryErrors);
+      heartbeat.lastFeePollAt = new Date().toISOString();
+      heartbeat.lastError = null;
       log('info', 'creator_fee_ingestion_tick', {
         ...result,
         observedLagSlots: result.observedLagSlots.toString(),
@@ -95,6 +119,11 @@ async function tick() {
           error instanceof Error && 'code' in error ? String(error.code) : 'INTERNAL_ERROR',
         message: error instanceof Error ? error.message : 'Unknown creator-fee ingestion failure',
       });
+      heartbeat.lastError = {
+        at: new Date().toISOString(),
+        scope: 'creator_fee_ingestion',
+        message: error instanceof Error ? error.message : 'Unknown creator-fee ingestion failure',
+      };
     }
   }
   try {
@@ -124,12 +153,26 @@ async function tick() {
         failures: event.failures,
       });
     }
+    heartbeat.lastLifecycleSuccessAt = new Date().toISOString();
+    if (!creatorFeeSource) heartbeat.lastError = null;
   } catch (error) {
     log('error', 'round_lifecycle_tick_failed', {
       errorCode: error instanceof Error && 'code' in error ? String(error.code) : 'INTERNAL_ERROR',
       message: error instanceof Error ? error.message : 'Unknown worker failure',
     });
+    heartbeat.lastError = {
+      at: new Date().toISOString(),
+      scope: 'round_lifecycle',
+      message: error instanceof Error ? error.message : 'Unknown worker failure',
+    };
   } finally {
+    try {
+      await writeHeartbeat();
+    } catch (error) {
+      log('error', 'worker_heartbeat_write_failed', {
+        message: error instanceof Error ? error.message : 'Unknown heartbeat write failure',
+      });
+    }
     if (!stopping) timer = setTimeout(() => void tick(), config.WORKER_TICK_INTERVAL_MS);
   }
 }

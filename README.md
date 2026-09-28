@@ -13,6 +13,8 @@ The current development baseline includes:
 - the Phase 4C authoritative BUY preflight, executable portfolio valuation, and browser smoke;
 - the Phase 5B Chromium MV3 trading overlay for Axiom, GMGN.ai, and Terminal.trade;
 - the Phase 5A authoritative creator-fee and reward-pool accounting system;
+- the Phase 6A production launch configuration, readiness checks, backup/restore smoke, and public
+  landing/rules surface;
 - validated local PostgreSQL and Redis development infrastructure.
 
 See [Phase 2 ledger and schema](./docs/PHASE_2_LEDGER_AND_SCHEMA.md),
@@ -59,6 +61,8 @@ Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:3000`; the r
 | `npm run db:generate`           | Generate a Drizzle migration from schema changes  |
 | `npm run db:migrate`            | Apply committed database migrations               |
 | `npm run db:check`              | Check database connectivity                       |
+| `npm run db:backup`             | Create a timestamped PostgreSQL custom dump       |
+| `npm run db:restore-smoke`      | Prove a dump restores into an isolated database   |
 | `npm run ops:check`             | Check DB, Redis, RPC, and safe operational modes  |
 | `npm run start:api`             | Start the built API as an independent process     |
 | `npm run start:worker`          | Start the built worker as an independent process  |
@@ -68,7 +72,10 @@ Unit tests and static validation do not require Docker. Infrastructure readiness
 
 Production-oriented Windows startup, HTTPS, supervision, shadow creator-fee rollout, payout
 reconciliation, backup/restore, RPC replacement, and incident procedures are documented in
-[the operations runbook](./docs/OPERATIONS.md).
+[the operations runbook](./docs/OPERATIONS.md). Use the
+[production launch checklist](./docs/LAUNCH_CHECKLIST.md) as the release gate. Start from
+`.env.production.example` and `compose.production.yml`; neither the template nor the compose file
+contains deployable secrets.
 
 The Playwright smoke also requires local PostgreSQL from `docker compose up -d` and a one-time `npx playwright install chromium`. It creates and drops its own database, uses recorded market fixtures and a test-only wallet, and makes no external RPC or wallet request.
 

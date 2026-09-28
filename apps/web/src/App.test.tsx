@@ -227,6 +227,20 @@ function renderApp(path = '/trade') {
 }
 
 describe('Paperfund web app', () => {
+  it('explains the launch proposition and canonical rules', async () => {
+    mockApi();
+    renderApp('/');
+    expect(await screen.findByText('Prove your edge.')).toBeInTheDocument();
+    expect(screen.getByText(/Axiom, GMGN.ai, and Terminal.trade/)).toBeInTheDocument();
+
+    renderApp('/rules');
+    expect(await screen.findByText('Fresh hourly account')).toBeInTheDocument();
+    expect(screen.getByText(/top 10; daily rewards use the top 25/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Paper SOL and simulated positions have no monetary value/),
+    ).toBeInTheDocument();
+  });
+
   it('shows the unauthenticated product state', async () => {
     mockApi();
     renderApp();

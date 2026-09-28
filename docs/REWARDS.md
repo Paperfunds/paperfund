@@ -112,6 +112,14 @@ telemetry. Shadow finalizations retain verified observation evidence but deliber
 maximum-lag metrics survive worker restarts. See [the operations runbook](./OPERATIONS.md) for rollout,
 restart, outage, and promotion criteria.
 
+Production must begin with ingestion disabled or shadow mode enabled. Promotion to canonical
+financial ingestion is a separate operator change and requires independently verified mint and
+creator-wallet identities, a stable finalized observation window, understood rejects and RPC lag,
+restart/cursor replay evidence, zero unresolved reconciliation findings, and a backup plus restore
+smoke. Set `CREATOR_FEE_SHADOW_MODE=false` only after that review; do not use it as a troubleshooting
+step. Reverting to shadow mode stops new canonical insertions but does not erase existing immutable
+events or reward accounting.
+
 ## Grace, freeze, and late events
 
 Each hourly round snapshots its reward-finalization grace period (default 60 seconds). Trading in the

@@ -1307,3 +1307,53 @@ closed with `PAYOUT_MAINNET_NOT_CONFIRMED`; no mainnet transaction was sent. Com
 smoke requires only a disposable devnet signer funded with at least 5,005,000 lamports plus fee
 margin, then repeating dry-run, live execution, status reconciliation, and exact before/after balance
 checks. This external funding prerequisite does not authorize mainnet execution.
+
+## 38. Phase 6A production launch preparation record
+
+Phase 6A prepares the existing Windows-hosted application for a controlled production launch without
+changing trading economics, reward curves, tie handling, terminal coverage, or protocol support. A
+production environment template separates server secrets from public web/extension build values.
+The production Compose definition requires independent PostgreSQL and Redis passwords, binds both
+services to loopback, enables persistent storage and Redis AOF, and applies restart policies. The
+normal development Compose path remains unchanged.
+
+Production environment parsing now fails closed on missing or loopback public HTTPS origins,
+insecure cookies, unsafe CORS, incomplete creator-fee identities, incomplete payout signer/treasury
+configuration, implicit payout networks, and unconfirmed mainnet execution. The web build has an
+explicit production-origin gate. Mainnet payout dry-run enforces a reviewed total-plan lamport cap
+before signing. The payout status query now derives immutable broadcast-attempt counts from the
+attempt table rather than selecting a nonexistent batch column.
+
+The worker writes an atomic, permission-restricted heartbeat containing process/tick/lifecycle/fee
+poll/error state at a repository-stable path. `npm run ops:check` reports structured PASS/WARN/FAIL
+results for environment, database, migration count, Redis, RPC identity and latency, API readiness,
+heartbeat freshness, fee-ingestion health, payout safety, and public origins. Production treats a
+missing API or stale worker as failure. API and worker remain separately supervised processes.
+
+Timestamped PostgreSQL custom backups and isolated restore-smoke scripts provide a repeatable
+operator proof without touching the source database. The Windows operations runbook and new launch
+checklist cover startup order, Task Scheduler supervision, HTTPS boundaries, CORS/cookies, logs,
+monitoring, backup/restore, RPC degradation, creator-fee shadow promotion, payout emergency controls,
+extension release packaging, rollback, and incident evidence preservation.
+
+The public web surface now includes a concise landing page and canonical rules page. It accurately
+states the hourly 10 Paper SOL account, 20% buy cap, five positions, realistic simulated execution,
+forced settlement, top-10 hourly/top-25 daily rewards, tie preservation, creator-fee funding, and
+the fact that Paper SOL and simulated positions have no monetary value. Reward UI no longer labels an
+unpaid allocation as a payout. Existing Axiom, GMGN.ai, and Terminal.trade architecture is unchanged.
+
+The approved black interlocking PF mark with green horizontal accent was not present anywhere in the
+repository or supplied attachments. No substitute was invented. Exact asset delivery and correct web
+and Chromium icon exports remain an explicit hard brand gate in `docs/LAUNCH_CHECKLIST.md`.
+
+Phase 6A validation completed with 348 passing tests and 2 intentional skips, 32/32 extension unit
+tests, clean lint/typecheck/build, database readiness with 9/9 migrations, one passing real-stack web
+Playwright flow, and 2/2 passing headed MV3 acceptance tests covering authenticated trading and
+isolated Axiom/GMGN/Terminal tabs. Independent built API and worker processes passed `/health`,
+`/ready`, RPC, Redis, database, migration, and heartbeat checks and shut down gracefully. A
+timestamped backup restored successfully into an isolated database containing 38 public tables.
+Production-like web and extension packages built with explicit non-routable HTTPS validation
+origins; they are not release artifacts, which still require the operator's real API/app origins.
+Dependency
+audit reported eight moderate advisories in current Drizzle tooling and Solana Web3 transitive paths,
+with only unsafe semver-major/downgrade suggestions; no automated dependency mutation was applied.

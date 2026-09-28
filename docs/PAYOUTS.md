@@ -176,6 +176,8 @@ routed to platform accounting, and retries cannot apply the carry twice.
 - `PAYOUT_SIGNER_TYPE=DISABLED`: `DISABLED` or development-only `LOCAL_KEYPAIR`.
 - `PAYOUT_SIGNER_SECRET_KEY`: server-only 64-byte JSON secret; never persisted or printed.
 - `PAYOUT_MAX_RECIPIENTS_PER_BATCH=8`: conservative retry-isolated batching limit.
+- `PAYOUT_MAINNET_MAX_PLAN_LAMPORTS=100000000`: reviewed fail-closed ceiling for one mainnet plan;
+  dry-run refuses totals above it before signing.
 
 ## Not implemented
 
