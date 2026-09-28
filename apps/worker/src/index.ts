@@ -5,6 +5,7 @@ import { parseEnvironment } from '@paperfund/config';
 import {
   createDatabase,
   recordCreatorFeeIngestionFailure,
+  recordCreatorFeeIngestionRetries,
   runCreatorFeeIngestionTick,
   runDailyRewardFinalizationTick,
   runHourlyLifecycleTick,
@@ -30,6 +31,10 @@ const creatorFeeSource = config.CREATOR_FEE_INGESTION_ENABLED
         timeoutMs: config.SOLANA_RPC_TIMEOUT_MS,
         maxAttempts: config.CREATOR_FEE_RPC_MAX_ATTEMPTS,
         minimumRequestIntervalMs: config.CREATOR_FEE_RPC_MIN_INTERVAL_MS,
+        onRetry: ({ method, attempt, maxAttempts, message }) => {
+          creatorFeeRetryErrors += 1;
+          log('error', 'creator_fee_rpc_retry', { method, attempt, maxAttempts, message });
+        },
       }),
       {
         tokenMint: config.PAPERFUND_TOKEN_MINT,
@@ -41,6 +46,7 @@ const creatorFeeSource = config.CREATOR_FEE_INGESTION_ENABLED
   : null;
 let stopping = false;
 let timer: NodeJS.Timeout | undefined;
+let creatorFeeRetryErrors = 0;
 
 function log(level: 'info' | 'error', event: string, metadata: Record<string, unknown>) {
   const entry = JSON.stringify({ level, event, ...metadata, timestamp: new Date().toISOString() });
@@ -50,15 +56,34 @@ function log(level: 'info' | 'error', event: string, metadata: Record<string, un
 
 async function tick() {
   if (creatorFeeSource) {
+    const retriesBeforeTick = creatorFeeRetryErrors;
     try {
-      const result = await runCreatorFeeIngestionTick(database, creatorFeeSource);
+      const result = await runCreatorFeeIngestionTick(database, creatorFeeSource, new Date(), {
+        shadowMode: config.CREATOR_FEE_SHADOW_MODE,
+      });
+      const retryErrors = creatorFeeRetryErrors - retriesBeforeTick;
+      await recordCreatorFeeIngestionRetries(database, creatorFeeSource, retryErrors);
       log('info', 'creator_fee_ingestion_tick', {
         ...result,
+        observedLagSlots: result.observedLagSlots.toString(),
         finalizedChainSlot: result.finalizedChainSlot.toString(),
+        retryErrors,
       });
+      if (result.rejected > 0)
+        log('info', 'creator_fee_candidates_rejected', {
+          count: result.rejected,
+          category: 'NO_VERIFIED_CREATOR_FEE_EVENT',
+        });
+      if (result.reconciliationRequired > 0)
+        log('error', 'creator_fee_reconciliation_required', {
+          count: result.reconciliationRequired,
+        });
     } catch (error) {
       try {
-        await recordCreatorFeeIngestionFailure(database, creatorFeeSource, error);
+        await recordCreatorFeeIngestionFailure(database, creatorFeeSource, error, new Date(), {
+          shadowMode: config.CREATOR_FEE_SHADOW_MODE,
+          retryErrors: creatorFeeRetryErrors - retriesBeforeTick,
+        });
       } catch (healthError) {
         log('error', 'creator_fee_ingestion_health_write_failed', {
           message:
@@ -119,4 +144,11 @@ async function shutdown(signal: NodeJS.Signals) {
 
 process.once('SIGINT', () => void shutdown('SIGINT'));
 process.once('SIGTERM', () => void shutdown('SIGTERM'));
+log('info', 'worker_started', {
+  creatorFeeIngestionEnabled: config.CREATOR_FEE_INGESTION_ENABLED,
+  creatorFeeShadowMode: config.CREATOR_FEE_SHADOW_MODE,
+  creatorFeeNetwork: config.CREATOR_FEE_NETWORK,
+  payoutNetwork: config.PAYOUT_NETWORK,
+  payoutExecutionEnabled: config.PAYOUT_EXECUTION_ENABLED,
+});
 await tick();

@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 5E implementation record
-**Product status:** Authoritative trading, live creator-fee ingestion, reward accounting, winner allocation, and controlled payout execution complete
+**Document status:** Canonical specification with Phase 5F operational validation record
+**Product status:** Authoritative trading, shadow-capable live creator-fee ingestion, reward accounting, winner allocation, and controlled payout execution complete; funded devnet payout smoke pending external devnet SOL
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-28
 
@@ -1267,3 +1267,43 @@ Playwright flow. An optional read-only mainnet parser smoke passed against the t
 PumpSwap signatures and exact fees. A configured end-to-end Paperfund mainnet follow smoke was not
 run because the repository does not contain an approved Paperfund token-mint/creator-wallet funding
 identity; ingestion remains disabled by default and fails closed without it.
+
+## 37. Phase 5F operational validation record
+
+Phase 5F adds operational safety and evidence without changing trading, reward, allocation, or
+payout rules. Creator-fee ingestion now defaults to explicit shadow mode. It persists the same
+program/identity-verified observations, would-be attribution, and finality audit, plus durable poll, candidate, verified,
+rejected, retry-error, and maximum-slot-lag telemetry, while suppressing canonical
+`creator_fee_events` insertion and all downstream reward mutation. The worker logs startup mode,
+checkpoint movement, observed finalizations, lag, retry attempts, and categorized failures. Shadow
+mode is the required first deployment posture; financial promotion remains a separate reviewed
+configuration change.
+
+A real worker-path canary used an existing non-Paperfund Pump fixture identity because the official
+`PAPERFUND_TOKEN_MINT` and `PAPERFUND_CREATOR_WALLET` were not supplied. Across two successful polls
+and a restart it recorded five candidates, five verified/finalized shadow observations, zero rejects,
+zero duplicates, zero reconciliation findings, and zero canonical fee events. It resumed from the
+exact durable signature without a rescan. Public mainnet RPC throttling produced 24 bounded retry
+errors while round lifecycle work continued; a later restart successfully cleared health error state
+and resumed. Maximum observed lag was 204,968 slots. These figures validate mechanics only and are
+not Paperfund revenue evidence.
+
+Operator tooling now includes a combined DB/Redis/RPC readiness command, independent built-process
+start commands, persisted payout status/reconciliation output, and a strictly guarded disposable
+devnet payout-plan seed. The payout RPC genesis fingerprints use the full authoritative mainnet and
+devnet hashes; the previously truncated values would have rejected valid public RPC endpoints.
+`docs/OPERATIONS.md` is the initial Windows deployment runbook for HTTPS exposure, process
+supervision, startup/shutdown/recovery, shadow rollout, payout operation, backup/restore, provider
+replacement, free-tier limits, health checks, security, and incident handling.
+
+The devnet operator path created and approved a deterministic five-recipient, 5,000,000-lamport plan
+through the real CLI. Dry-run validated one deterministic batch, exact destinations and allocations,
+the intent hash, a 5,000-lamport fee estimate, and a 5,005,000-lamport treasury requirement without
+signing or broadcasting. It correctly reported the generated treasury balance as zero. Both the
+public RPC airdrop and Solana's documented proof-of-work faucet bootstrap failed under the current
+environment's faucet/rate limit, so no funded live devnet broadcast, balance delta, transaction
+signature, or on-chain reconciliation is claimed. The mainnet live-init guard independently failed
+closed with `PAYOUT_MAINNET_NOT_CONFIRMED`; no mainnet transaction was sent. Completing the funded
+smoke requires only a disposable devnet signer funded with at least 5,005,000 lamports plus fee
+margin, then repeating dry-run, live execution, status reconciliation, and exact before/after balance
+checks. This external funding prerequisite does not authorize mainnet execution.

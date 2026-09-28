@@ -11,6 +11,7 @@ import { PUMP_PROGRAM_ID, WRAPPED_SOL_MINT } from '@paperfund/protocols';
 
 import {
   createDatabase,
+  recordCreatorFeeIngestionRetries,
   runCreatorFeeBackfill,
   runCreatorFeeIngestionTick,
   SolanaPumpCreatorFeeSource,
@@ -210,12 +211,12 @@ describe('Phase 5E ingestion lifecycle', () => {
     ).toHaveProperty('rows.0.count', 1);
 
     rpc.status = null;
-    await runCreatorFeeIngestionTick(database, source, new Date('2026-09-27T20:00:15Z'));
-    await runCreatorFeeIngestionTick(database, source, new Date('2026-09-27T20:00:20Z'));
+    await runCreatorFeeIngestionTick(database, source, new Date('2026-09-27T20:01:05Z'));
+    await runCreatorFeeIngestionTick(database, source, new Date('2026-09-27T20:02:05Z'));
     const rollback = await runCreatorFeeIngestionTick(
       database,
       source,
-      new Date('2026-09-27T20:00:25Z'),
+      new Date('2026-09-27T20:03:05Z'),
     );
     expect(rollback.reconciliationRequired).toBe(1);
     expect(
@@ -256,5 +257,85 @@ describe('Phase 5E ingestion lifecycle', () => {
         toSlotExclusive: 500_001n,
       }),
     ).rejects.toMatchObject({ code: 'INVALID_BACKFILL_RANGE' });
+  });
+
+  it('records finalized shadow evidence and restart telemetry without financial mutation', async () => {
+    await database.pool.query(
+      'truncate creator_fee_reconciliation_findings,creator_fee_observations,creator_fee_events,creator_fee_ingestion_checkpoints cascade',
+    );
+    const rpc = new DeterministicRpc();
+    rpc.status = { slot: 451_097_471, err: null, confirmationStatus: 'finalized' };
+    const source = new SolanaPumpCreatorFeeSource(
+      rpc,
+      { tokenMint: mint, creatorWallet: creator },
+      'mainnet-beta',
+      25,
+    );
+
+    const first = await runCreatorFeeIngestionTick(
+      database,
+      source,
+      new Date('2026-09-28T08:00:00Z'),
+      { shadowMode: true },
+    );
+    expect(first).toMatchObject({
+      shadowMode: true,
+      candidates: 1,
+      discovered: 1,
+      rejected: 0,
+      finalizedObserved: 1,
+      finalized: 0,
+      checkpointMoved: true,
+    });
+    expect(
+      await database.pool.query('select count(*)::int count from creator_fee_events'),
+    ).toHaveProperty('rows.0.count', 0);
+    expect(
+      await database.pool.query(
+        `select confirmation_status,shadow_mode,canonical_creator_fee_event_id,
+                evidence->'shadowAttribution' shadow_attribution
+         from creator_fee_observations where transaction_signature=$1`,
+        [signature],
+      ),
+    ).toHaveProperty('rows.0', {
+      confirmation_status: 'FINALIZED',
+      shadow_mode: true,
+      canonical_creator_fee_event_id: null,
+      shadow_attribution: {
+        hourlyRoundId: 'hour:19',
+        accountingStatus: 'ATTRIBUTED',
+      },
+    });
+
+    const restart = await runCreatorFeeIngestionTick(
+      database,
+      source,
+      new Date('2026-09-28T08:00:05Z'),
+      { shadowMode: true },
+    );
+    expect(restart).toMatchObject({
+      candidates: 0,
+      discovered: 0,
+      finalized: 0,
+      checkpointMoved: false,
+      resumedFromSignature: signature,
+    });
+    await recordCreatorFeeIngestionRetries(database, source, 2, new Date('2026-09-28T08:00:06Z'));
+    expect(
+      await database.pool.query(
+        `select shadow_mode,poll_count::int,candidate_count::int,verified_count::int,
+                rejected_count::int,retry_error_count::int,max_observed_lag_slots::int
+         from creator_fee_ingestion_checkpoints where source_id=$1`,
+        [source.id],
+      ),
+    ).toHaveProperty('rows.0', {
+      shadow_mode: true,
+      poll_count: 2,
+      candidate_count: 1,
+      verified_count: 1,
+      rejected_count: 0,
+      retry_error_count: 2,
+      max_observed_lag_slots: 29,
+    });
   });
 });

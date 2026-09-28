@@ -131,6 +131,8 @@ Approval and preview:
 ```text
 npm run payout:approve -- <plan-id> <operator-identifier>
 npm run payout:execute -- <plan-id>
+npm run payout:status -- <plan-id>
+npm run payout:status -- <plan-id> --reconcile
 ```
 
 Execution is dry-run by default: it validates state, checks RPC network and treasury, builds batches,
@@ -146,6 +148,11 @@ bytes have the same signature. A missing transaction is eligible for `--live --r
 last valid block height passes and history still contains no signature; the service then rebuilds
 from the same immutable intent. Verified batches are never rebuilt or resent. Multi-batch execution
 remains partial until every batch verifies.
+
+The status command reports the persisted plan, execution, every batch, signatures, attempts,
+confirmation slots, totals, and failures. `--reconcile` performs the same finalized-chain comparison
+used by execution; it does not approve, sign, or broadcast. Operational preparation, supervision,
+backup, and incident procedures are in [the operations runbook](./OPERATIONS.md).
 
 `VERIFIED` requires `finalized` signature status, a successful transaction, and exact comparison of
 on-chain System Program transfers with persisted treasury, ordered recipients, and lamports. A

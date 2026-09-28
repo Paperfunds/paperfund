@@ -108,8 +108,8 @@ export class LocalKeypairPayoutSigner implements PayoutSigner {
 }
 
 const GENESIS_HASHES: Partial<Record<PayoutNetwork, string>> = {
-  'mainnet-beta': '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp',
-  devnet: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+  'mainnet-beta': '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+  devnet: 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG',
 };
 
 export class SolanaPayoutRpc implements PayoutRpc {

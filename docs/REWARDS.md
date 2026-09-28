@@ -85,6 +85,7 @@ this source.
 Environment keys:
 
 - `CREATOR_FEE_INGESTION_ENABLED=false`
+- `CREATOR_FEE_SHADOW_MODE=true` (observe finality and health without canonical financial mutation)
 - `CREATOR_FEE_NETWORK=mainnet-beta`
 - `PAPERFUND_TOKEN_MINT` (required when enabled)
 - `PAPERFUND_CREATOR_WALLET` (required when enabled)
@@ -103,6 +104,13 @@ Backfill ranges are half-open, capped at 500,000 slots and 10,000 examined trans
 finalized evidence, do not move the live-follow cursor, and are idempotent. Status reports the durable
 checkpoint, lag inputs, categorized error, and observation counts. Open reconciliation findings can
 be inspected directly with the status data and database audit tables.
+
+Migration `0008_operational_shadow_ingestion.sql` adds durable shadow-mode and cumulative operational
+telemetry. Shadow finalizations retain verified observation evidence but deliberately leave
+`canonical_creator_fee_event_id` empty; the evidence records the would-be hourly round and
+`ATTRIBUTED`, `LATE_AFTER_FREEZE`, or `INELIGIBLE` result. Poll, candidate, verified, rejected, retry-error, and
+maximum-lag metrics survive worker restarts. See [the operations runbook](./OPERATIONS.md) for rollout,
+restart, outage, and promotion criteria.
 
 ## Grace, freeze, and late events
 

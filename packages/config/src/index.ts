@@ -43,6 +43,10 @@ export const environmentSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((value) => value === 'true'),
+    CREATOR_FEE_SHADOW_MODE: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((value) => value === 'true'),
     CREATOR_FEE_NETWORK: z.enum(['localnet', 'devnet', 'mainnet-beta']).default('mainnet-beta'),
     PAPERFUND_TOKEN_MINT: z.string().default(''),
     PAPERFUND_CREATOR_WALLET: z.string().default(''),

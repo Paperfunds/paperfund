@@ -475,6 +475,12 @@ export class SolanaJsonRpcClient implements ReadOnlySolanaRpc {
       readonly timeoutMs?: number;
       readonly maxAttempts?: number;
       readonly minimumRequestIntervalMs?: number;
+      readonly onRetry?: (input: {
+        readonly method: string;
+        readonly attempt: number;
+        readonly maxAttempts: number;
+        readonly message: string;
+      }) => void;
     } = {},
   ) {}
 
@@ -506,6 +512,12 @@ export class SolanaJsonRpcClient implements ReadOnlySolanaRpc {
       } catch (error) {
         lastError = error;
         if (attempt < attempts) {
+          this.options.onRetry?.({
+            method,
+            attempt,
+            maxAttempts: attempts,
+            message: error instanceof Error ? error.message : 'Unknown RPC failure',
+          });
           await new Promise((resolve) => setTimeout(resolve, Math.min(2_000, 125 * 2 ** attempt)));
         }
       } finally {
@@ -662,12 +674,19 @@ function observationId(signature: string, eventIndex: number) {
 }
 
 export interface CreatorFeeIngestionTickResult {
+  readonly shadowMode: boolean;
+  readonly candidates: number;
   readonly discovered: number;
+  readonly rejected: number;
+  readonly finalizedObserved: number;
   readonly finalized: number;
   readonly duplicates: number;
   readonly rolledBack: number;
   readonly reconciliationRequired: number;
   readonly latestSignature: string | null;
+  readonly resumedFromSignature: string | null;
+  readonly checkpointMoved: boolean;
+  readonly observedLagSlots: bigint;
   readonly finalizedChainSlot: bigint;
 }
 
@@ -712,17 +731,49 @@ async function promoteFinalized(
   await database.pool.query(
     `update creator_fee_observations
      set confirmation_status='FINALIZED', finalized_at=coalesce(finalized_at,$3),
-         missing_status_checks=0,last_checked_at=$3, updated_at=$3, canonical_creator_fee_event_id=$4
+         shadow_mode=false,missing_status_checks=0,last_checked_at=$3, updated_at=$3,
+         canonical_creator_fee_event_id=$4
      where transaction_signature=$1 and event_index=$2`,
     [event.transactionSignature, event.eventIndex, now, canonical.rows[0]!.id],
   );
   return result;
 }
 
+async function finalizeObservation(
+  database: DatabaseService,
+  event: VerifiedCreatorFeeEvent,
+  now: Date,
+  shadowMode: boolean,
+) {
+  if (!shadowMode) return promoteFinalized(database, event, now);
+  const round = (
+    await database.pool.query<{ id: string; frozen: boolean }>(
+      `select r.id,exists(select 1 from hourly_reward_pools p where p.hourly_round_id=r.id) frozen
+       from hourly_rounds r where r.starts_at <= $1 and r.ends_at_exclusive > $1
+       order by r.starts_at desc limit 1`,
+      [event.eventTime],
+    )
+  ).rows[0];
+  const shadowAttribution = {
+    hourlyRoundId: round?.id ?? null,
+    accountingStatus: !round ? 'INELIGIBLE' : round.frozen ? 'LATE_AFTER_FREEZE' : 'ATTRIBUTED',
+  };
+  await database.pool.query(
+    `update creator_fee_observations
+     set confirmation_status='FINALIZED',shadow_mode=true,finalized_at=coalesce(finalized_at,$3),
+         missing_status_checks=0,last_checked_at=$3,updated_at=$3,
+         evidence=evidence || jsonb_build_object('shadowAttribution',$4::jsonb)
+     where transaction_signature=$1 and event_index=$2`,
+    [event.transactionSignature, event.eventIndex, now, JSON.stringify(shadowAttribution)],
+  );
+  return { inserted: 0, duplicates: 0 };
+}
+
 async function reconcilePending(
   database: DatabaseService,
   source: SolanaPumpCreatorFeeSource,
   now: Date,
+  shadowMode: boolean,
 ) {
   const pending = await database.pool.query<{
     id: string;
@@ -735,15 +786,19 @@ async function reconcilePending(
     `select id,transaction_signature,event_index,slot,creator_fee_lamports,source_program
      from creator_fee_observations
      where confirmation_status in ('OBSERVED','CONFIRMED')
+       and token_mint=$1 and creator_wallet=$2
      order by slot limit 100`,
+    [source.identity.tokenMint, source.identity.creatorWallet],
   );
-  if (pending.rows.length === 0) return { finalized: 0, duplicates: 0, rolledBack: 0 };
+  if (pending.rows.length === 0)
+    return { finalized: 0, finalizedObserved: 0, duplicates: 0, rolledBack: 0 };
   const statuses = await source.rpc.getSignatureStatuses(
     pending.rows.map((row) => row.transaction_signature),
   );
   let finalized = 0;
   let duplicates = 0;
   let rolledBack = 0;
+  let finalizedObserved = 0;
   for (let index = 0; index < pending.rows.length; index += 1) {
     const row = pending.rows[index]!;
     const status = statuses[index];
@@ -805,11 +860,12 @@ async function reconcilePending(
       );
       continue;
     }
-    const result = await promoteFinalized(database, event, now);
+    const result = await finalizeObservation(database, event, now, shadowMode);
+    finalizedObserved += 1;
     finalized += result.inserted;
     duplicates += result.duplicates;
   }
-  return { finalized, duplicates, rolledBack };
+  return { finalized, finalizedObserved, duplicates, rolledBack };
 }
 
 async function auditFinalized(
@@ -824,12 +880,16 @@ async function auditFinalized(
     slot: string;
     creator_fee_lamports: string;
     source_program: string;
+    shadow_mode: boolean;
     canonical_creator_fee_event_id: string | null;
   }>(
     `select id,transaction_signature,event_index,slot,creator_fee_lamports,source_program,
-            canonical_creator_fee_event_id
+            shadow_mode,canonical_creator_fee_event_id
      from creator_fee_observations where confirmation_status='FINALIZED'
+       and token_mint=$1 and creator_wallet=$2
+       and last_checked_at <= $3
      order by slot desc limit 100`,
+    [source.identity.tokenMint, source.identity.creatorWallet, new Date(now.getTime() - 60_000)],
   );
   if (rows.rows.length === 0) return 0;
   const statuses = await source.rpc.getSignatureStatuses(
@@ -859,29 +919,32 @@ async function auditFinalized(
     } else if (status.err !== null || status.confirmationStatus !== 'finalized') {
       category = 'FINALIZED_TRANSACTION_MISSING';
       detail = 'A locally finalized creator-fee transaction is no longer finalized on the RPC.';
-    } else if (!row.canonical_creator_fee_event_id) {
+    } else if (!row.shadow_mode && !row.canonical_creator_fee_event_id) {
       category = 'CANONICAL_EVENT_MISSING';
       detail = 'A finalized observation has no canonical creator-fee event link.';
     } else {
-      const canonical = await database.pool.query<{
-        slot: string;
-        creator_fee_lamports: string;
-        source_program: string;
-      }>(`select slot,creator_fee_lamports,source_program from creator_fee_events where id=$1`, [
-        row.canonical_creator_fee_event_id,
-      ]);
-      const value = canonical.rows[0];
-      if (!value) {
-        category = 'CANONICAL_EVENT_MISSING';
-        detail = 'The canonical creator-fee event linked from the observation is missing.';
-      } else if (
-        value.slot !== row.slot ||
-        value.creator_fee_lamports !== row.creator_fee_lamports ||
-        value.source_program !== row.source_program
-      ) {
-        category = 'CANONICAL_EVENT_MISMATCH';
-        detail = 'Canonical creator-fee data differs from finalized observation evidence.';
-      } else {
+      if (!row.shadow_mode) {
+        const canonical = await database.pool.query<{
+          slot: string;
+          creator_fee_lamports: string;
+          source_program: string;
+        }>(`select slot,creator_fee_lamports,source_program from creator_fee_events where id=$1`, [
+          row.canonical_creator_fee_event_id,
+        ]);
+        const value = canonical.rows[0];
+        if (!value) {
+          category = 'CANONICAL_EVENT_MISSING';
+          detail = 'The canonical creator-fee event linked from the observation is missing.';
+        } else if (
+          value.slot !== row.slot ||
+          value.creator_fee_lamports !== row.creator_fee_lamports ||
+          value.source_program !== row.source_program
+        ) {
+          category = 'CANONICAL_EVENT_MISMATCH';
+          detail = 'Canonical creator-fee data differs from finalized observation evidence.';
+        }
+      }
+      if (!category) {
         const transaction = await source.rpc.getTransaction(row.transaction_signature);
         const event = transaction
           ? parsePumpCreatorFeeEvents(
@@ -923,13 +986,25 @@ export async function runCreatorFeeIngestionTick(
   database: DatabaseService,
   source: SolanaPumpCreatorFeeSource,
   now = new Date(),
+  options: { readonly shadowMode?: boolean } = {},
 ): Promise<CreatorFeeIngestionTickResult> {
-  const checkpoint = await database.pool.query<{ latest_signature: string | null }>(
-    'select latest_signature from creator_fee_ingestion_checkpoints where source_id=$1',
+  const shadowMode = options.shadowMode ?? false;
+  const checkpoint = await database.pool.query<{
+    latest_signature: string | null;
+    latest_slot: string | null;
+  }>(
+    'select latest_signature,latest_slot::text from creator_fee_ingestion_checkpoints where source_id=$1',
     [source.id],
   );
-  const discovery = await source.discoverSince(checkpoint.rows[0]?.latest_signature ?? undefined);
+  const resumedFromSignature = checkpoint.rows[0]?.latest_signature ?? null;
+  const discovery = await source.discoverSince(resumedFromSignature ?? undefined);
+  const candidates = discovery.signatures.length;
+  const acceptedSignatures = new Set(
+    discovery.events.map((item) => item.event.transactionSignature),
+  ).size;
+  const rejected = Math.max(0, candidates - acceptedSignatures);
   let finalized = 0;
+  let finalizedObserved = 0;
   let duplicates = 0;
   for (const item of discovery.events) {
     const event = item.event;
@@ -945,10 +1020,12 @@ export async function runCreatorFeeIngestionTick(
     }>(
       `insert into creator_fee_observations
         (id,transaction_signature,event_index,slot,block_time,source_program,token_mint,
-         creator_wallet,creator_fee_lamports,confirmation_status,evidence,first_observed_at,last_checked_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12)
+         creator_wallet,creator_fee_lamports,confirmation_status,shadow_mode,evidence,
+         first_observed_at,last_checked_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13)
        on conflict (transaction_signature,event_index) do update set
          last_checked_at=excluded.last_checked_at, updated_at=excluded.last_checked_at,
+         shadow_mode=creator_fee_observations.shadow_mode or excluded.shadow_mode,
          confirmation_status=case
            when creator_fee_observations.confirmation_status in ('FINALIZED','RECONCILIATION_REQUIRED')
              then creator_fee_observations.confirmation_status
@@ -971,6 +1048,7 @@ export async function runCreatorFeeIngestionTick(
         source.identity.creatorWallet,
         event.creatorFeeLamports.toString(),
         status,
+        shadowMode,
         event.normalizedMetadata ?? {},
         now,
       ],
@@ -998,25 +1076,43 @@ export async function runCreatorFeeIngestionTick(
       status === 'FINALIZED' &&
       observation.rows[0]!.confirmation_status !== 'RECONCILIATION_REQUIRED'
     ) {
-      const result = await promoteFinalized(database, event, now);
+      const result = await finalizeObservation(database, event, now, shadowMode);
+      finalizedObserved += 1;
       finalized += result.inserted;
       duplicates += result.duplicates;
     }
   }
-  const pending = await reconcilePending(database, source, now);
+  const pending = await reconcilePending(database, source, now, shadowMode);
   finalized += pending.finalized;
+  finalizedObserved += pending.finalizedObserved;
   duplicates += pending.duplicates;
   await auditFinalized(database, source, now);
   const finalizedChainSlot = BigInt(await source.rpc.getSlot('finalized'));
   const newest = discovery.signatures[0];
+  const latestObservedSlot = newest
+    ? BigInt(newest.slot)
+    : checkpoint.rows[0]?.latest_slot
+      ? BigInt(checkpoint.rows[0].latest_slot)
+      : finalizedChainSlot;
+  const observedLagSlots =
+    finalizedChainSlot > latestObservedSlot ? finalizedChainSlot - latestObservedSlot : 0n;
+  const latestSignature = newest?.signature ?? resumedFromSignature;
+  const checkpointMoved = latestSignature !== resumedFromSignature;
   await database.pool.query(
     `insert into creator_fee_ingestion_checkpoints
-      (source_id,network,token_mint,creator_wallet,latest_signature,latest_slot,last_finalized_slot,last_success_at,updated_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$8)
+      (source_id,network,token_mint,creator_wallet,latest_signature,latest_slot,last_finalized_slot,
+       last_success_at,shadow_mode,poll_count,candidate_count,verified_count,rejected_count,
+       max_observed_lag_slots,updated_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,1,$10,$11,$12,$13,$8)
      on conflict (source_id) do update set
        latest_signature=coalesce(excluded.latest_signature,creator_fee_ingestion_checkpoints.latest_signature),
        latest_slot=coalesce(excluded.latest_slot,creator_fee_ingestion_checkpoints.latest_slot),
        last_finalized_slot=excluded.last_finalized_slot,last_success_at=excluded.last_success_at,
+       shadow_mode=excluded.shadow_mode,poll_count=creator_fee_ingestion_checkpoints.poll_count+1,
+       candidate_count=creator_fee_ingestion_checkpoints.candidate_count+excluded.candidate_count,
+       verified_count=creator_fee_ingestion_checkpoints.verified_count+excluded.verified_count,
+       rejected_count=creator_fee_ingestion_checkpoints.rejected_count+excluded.rejected_count,
+       max_observed_lag_slots=greatest(creator_fee_ingestion_checkpoints.max_observed_lag_slots,excluded.max_observed_lag_slots),
        last_error_category=null,last_error_detail=null,updated_at=excluded.updated_at`,
     [
       source.id,
@@ -1027,18 +1123,32 @@ export async function runCreatorFeeIngestionTick(
       newest?.slot ?? null,
       finalizedChainSlot.toString(),
       now,
+      shadowMode,
+      candidates,
+      discovery.events.length,
+      rejected,
+      observedLagSlots.toString(),
     ],
   );
   const reconciliation = await database.pool.query<{ count: string }>(
-    `select count(*)::text count from creator_fee_observations where confirmation_status='RECONCILIATION_REQUIRED'`,
+    `select count(*)::text count from creator_fee_observations
+     where confirmation_status='RECONCILIATION_REQUIRED' and token_mint=$1 and creator_wallet=$2`,
+    [source.identity.tokenMint, source.identity.creatorWallet],
   );
   return {
+    shadowMode,
+    candidates,
     discovered: discovery.events.length,
+    rejected,
+    finalizedObserved,
     finalized,
     duplicates,
     rolledBack: pending.rolledBack,
     reconciliationRequired: Number(reconciliation.rows[0]!.count),
-    latestSignature: newest?.signature ?? checkpoint.rows[0]?.latest_signature ?? null,
+    latestSignature,
+    resumedFromSignature,
+    checkpointMoved,
+    observedLagSlots,
     finalizedChainSlot,
   };
 }
@@ -1189,10 +1299,19 @@ export async function getCreatorFeeIngestionHealth(database: DatabaseService, so
     last_success_at: Date | null;
     last_error_category: string | null;
     last_error_detail: string | null;
+    shadow_mode: boolean;
+    poll_count: string;
+    candidate_count: string;
+    verified_count: string;
+    rejected_count: string;
+    retry_error_count: string;
+    max_observed_lag_slots: string;
     updated_at: Date;
   }>(
     `select source_id,network,token_mint,creator_wallet,latest_signature,latest_slot,
-            last_finalized_slot,last_success_at,last_error_category,last_error_detail,updated_at
+            last_finalized_slot,last_success_at,last_error_category,last_error_detail,shadow_mode,
+            poll_count::text,candidate_count::text,verified_count::text,rejected_count::text,
+            retry_error_count::text,max_observed_lag_slots::text,updated_at
      from creator_fee_ingestion_checkpoints where source_id=$1`,
     [sourceId],
   );
@@ -1229,16 +1348,20 @@ export async function recordCreatorFeeIngestionFailure(
   source: SolanaPumpCreatorFeeSource,
   error: unknown,
   now = new Date(),
+  options: { readonly shadowMode?: boolean; readonly retryErrors?: number } = {},
 ) {
   const category =
     error instanceof CreatorFeeIngestionError ? error.code : 'CREATOR_FEE_INGESTION_FAILED';
   const detail = error instanceof Error ? error.message : 'Unknown creator-fee ingestion failure';
   await database.pool.query(
     `insert into creator_fee_ingestion_checkpoints
-      (source_id,network,token_mint,creator_wallet,last_error_category,last_error_detail,updated_at)
-     values ($1,$2,$3,$4,$5,$6,$7)
+      (source_id,network,token_mint,creator_wallet,last_error_category,last_error_detail,
+       shadow_mode,retry_error_count,updated_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      on conflict (source_id) do update set
        last_error_category=excluded.last_error_category,last_error_detail=excluded.last_error_detail,
+       shadow_mode=excluded.shadow_mode,
+       retry_error_count=creator_fee_ingestion_checkpoints.retry_error_count+excluded.retry_error_count,
        updated_at=excluded.updated_at`,
     [
       source.id,
@@ -1247,7 +1370,24 @@ export async function recordCreatorFeeIngestionFailure(
       source.identity.creatorWallet,
       category,
       detail,
+      options.shadowMode ?? false,
+      options.retryErrors ?? 0,
       now,
     ],
+  );
+}
+
+export async function recordCreatorFeeIngestionRetries(
+  database: DatabaseService,
+  source: SolanaPumpCreatorFeeSource,
+  retryErrors: number,
+  now = new Date(),
+) {
+  if (retryErrors <= 0) return;
+  await database.pool.query(
+    `update creator_fee_ingestion_checkpoints
+     set retry_error_count=retry_error_count+$2,updated_at=$3
+     where source_id=$1`,
+    [source.id, retryErrors, now],
   );
 }

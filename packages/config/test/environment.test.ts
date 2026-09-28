@@ -33,6 +33,7 @@ describe('parseEnvironment', () => {
       REWARD_LAMBDA_BPS: 6000,
       REWARD_FINALIZATION_GRACE_SECONDS: 60,
       CREATOR_FEE_INGESTION_ENABLED: false,
+      CREATOR_FEE_SHADOW_MODE: true,
       CREATOR_FEE_NETWORK: 'mainnet-beta',
       PAPERFUND_TOKEN_MINT: '',
       PAPERFUND_CREATOR_WALLET: '',

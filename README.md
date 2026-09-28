@@ -59,8 +59,16 @@ Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:3000`; the r
 | `npm run db:generate`           | Generate a Drizzle migration from schema changes  |
 | `npm run db:migrate`            | Apply committed database migrations               |
 | `npm run db:check`              | Check database connectivity                       |
+| `npm run ops:check`             | Check DB, Redis, RPC, and safe operational modes  |
+| `npm run start:api`             | Start the built API as an independent process     |
+| `npm run start:worker`          | Start the built worker as an independent process  |
+| `npm run payout:status -- <id>` | Inspect or reconcile a persisted payout execution |
 
 Unit tests and static validation do not require Docker. Infrastructure readiness and migrations require the local services and values from `.env`.
+
+Production-oriented Windows startup, HTTPS, supervision, shadow creator-fee rollout, payout
+reconciliation, backup/restore, RPC replacement, and incident procedures are documented in
+[the operations runbook](./docs/OPERATIONS.md).
 
 The Playwright smoke also requires local PostgreSQL from `docker compose up -d` and a one-time `npx playwright install chromium`. It creates and drops its own database, uses recorded market fixtures and a test-only wallet, and makes no external RPC or wallet request.
 
