@@ -48,12 +48,26 @@ export default defineConfig(({ mode }) => {
             source: JSON.stringify(
               {
                 manifest_version: 3,
-                name: 'Paperfund Trading Overlay',
+                name: 'Paperfund',
                 version: extensionPackage.version,
-                description: 'Paper-only Solana competition trading on supported terminals.',
+                description:
+                  'Paper-trading competition overlay for Axiom, GMGN.ai, and Terminal.trade.',
                 key: stableKey,
                 permissions: ['storage'],
-                action: { default_title: 'Paperfund', default_popup: 'popup.html' },
+                icons: {
+                  16: 'icons/paperfund-16.png',
+                  32: 'icons/paperfund-32.png',
+                  48: 'icons/paperfund-48.png',
+                  128: 'icons/paperfund-128.png',
+                },
+                action: {
+                  default_title: 'Paperfund',
+                  default_popup: 'popup.html',
+                  default_icon: {
+                    16: 'icons/paperfund-16.png',
+                    32: 'icons/paperfund-32.png',
+                  },
+                },
                 host_permissions: [`${apiOrigin}/*`],
                 background: { service_worker: 'background.js', type: 'module' },
                 content_scripts: [
@@ -79,7 +93,7 @@ export default defineConfig(({ mode }) => {
                 ],
                 web_accessible_resources: [
                   {
-                    resources: ['content.js', 'chunks/*.js'],
+                    resources: ['content.js', 'chunks/*.js', 'icons/paperfund-mark.png'],
                     matches: [
                       'https://axiom.trade/*',
                       'https://gmgn.ai/*',

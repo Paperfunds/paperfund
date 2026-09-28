@@ -1,7 +1,7 @@
 # Paperfund: Canonical Product and Engineering Specification
 
-**Document status:** Canonical specification with Phase 5F operational validation record
-**Product status:** Authoritative trading, shadow-capable live creator-fee ingestion, reward accounting, winner allocation, and controlled payout execution complete; funded devnet payout smoke pending external devnet SOL
+**Document status:** Canonical specification through Phase 6B release preparation
+**Product status:** Authoritative competition and payout operation complete; production and Chrome Web Store release preparation implemented with explicit operator-controlled launch gates
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
 **Last updated:** 2026-09-28
 
@@ -1357,3 +1357,39 @@ origins; they are not release artifacts, which still require the operator's real
 Dependency
 audit reported eight moderate advisories in current Drizzle tooling and Solana Web3 transitive paths,
 with only unsafe semver-major/downgrade suggestions; no automated dependency mutation was applied.
+
+## 39. Phase 6B extension branding and store-release preparation record
+
+Phase 6B applies the supplied approved Paperfund mark without altering product architecture,
+competition economics, protocol routing, terminal coverage, or payout behavior. The exact source PNG
+is preserved at `assets/brand/paperfund-mark.png`; a checked-in PowerShell generator produces the
+extension's 16/32/48/128 icons, overlay/popup mark, web mark/favicon, 128-pixel store icon, required
+440×280 small promotional tile, and optional 1400×560 marquee. The extension overlay and popup use a
+compact matte-black visual system, clearer hierarchy, restrained semantic color, visible keyboard
+focus, explicit simulation labeling, and the existing Shadow DOM boundary.
+
+The website now uses the approved mark and publishes `/privacy` and `/support`. The privacy draft
+discloses public-wallet message authentication, browser storage, terminal mint context, competition,
+reward, payout, and operational records, infrastructure categories, and exclusions including private
+keys, transaction signing, advertising, referral tracking, and third-party analytics. Publisher legal
+identity, monitored support/privacy contacts, final retention periods, jurisdictional language, and
+legal review remain hard pre-submission gates.
+
+The extension version is 0.2.0. Production packaging creates an unpacked audit directory and ZIP
+with the manifest at its root. A release validator enforces Manifest V3, the single `storage`
+permission, one exact API host, the three exact supported terminal matches, local-only CSP, icon
+dimensions, and the absence of source maps, fixtures, environment files, secret markers, and obvious
+remote/evaluated code. `docs/CHROME_WEB_STORE.md` records store copy, current official requirements,
+permission justifications, data-use disclosures, screenshots and promotional assets, planned
+`paperfundapp.com` URLs, and the complete manual operator submission sequence. DNS/TLS, real public
+origins, store developer enrollment/verification, production screenshots, CORS, support email, and
+publication are not claimed complete by repository preparation.
+
+Phase 6B validation completed with 349 passing tests and 2 intentional skips, including the new web
+brand/privacy test; 32/32 extension unit/integration tests; clean formatting, lint, and typecheck;
+successful web and extension builds; passing database readiness; one passing real-stack web E2E;
+2/2 passing headed MV3 fixture acceptance tests; and 3/3 passing read-only live-route injection
+smokes for Axiom, GMGN, and Terminal.trade. Deterministic 1280×800 development screenshot candidates
+were generated and visually reviewed. The production-mode release validator passed 14 packaged files
+and produced the versioned unpacked directory and ZIP using planned, not DNS-verified,
+`paperfundapp.com` origins. No store upload or publication was attempted.

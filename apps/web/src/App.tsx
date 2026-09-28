@@ -152,7 +152,7 @@ export function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <NavLink className="wordmark" to="/" aria-label="Paperfund home">
-          <span className="wordmark-mark">P</span>
+          <BrandMark />
           <span>Paperfund</span>
         </NavLink>
         <nav aria-label="Primary navigation">
@@ -176,12 +176,20 @@ export function App() {
           </NavItem>
         </nav>
         <div className="sidebar-foot">
-          <span className="status-dot" /> Paper trading only
+          <div>
+            <span className="status-dot" /> Paper trading only
+          </div>
+          <div className="legal-links">
+            <NavLink to="/privacy">Privacy</NavLink>
+            <NavLink to="/support">Support</NavLink>
+          </div>
         </div>
       </aside>
       <main>
         <header className="topbar">
-          <div className="mobile-brand">Paperfund</div>
+          <div className="mobile-brand">
+            <BrandMark /> Paperfund
+          </div>
           <div className="round-chip">
             <span>ROUND</span>
             <strong>{currentRound ? roundLabel(currentRound) : 'Unavailable'}</strong>
@@ -228,6 +236,8 @@ export function App() {
           <Route path="/daily" element={<DailyPage user={auth.user} />} />
           <Route path="/history" element={<HistoryPage user={auth.user} />} />
           <Route path="/rules" element={<RulesPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/support" element={<SupportPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -239,6 +249,7 @@ function LandingPage() {
   return (
     <PageFrame>
       <section className="welcome launch-landing">
+        <BrandMark className="hero-mark" />
         <div className="eyebrow">FREE HOURLY SOLANA PAPER TRADING</div>
         <h1>
           Prove your edge.
@@ -275,6 +286,91 @@ function LandingPage() {
           Simulated trading only · Paper SOL has no monetary value · No trading deposits
         </span>
       </section>
+    </PageFrame>
+  );
+}
+
+function BrandMark({ className = '' }: { className?: string }) {
+  return <img className={`brand-mark ${className}`} src="/paperfund-mark.png" alt="" />;
+}
+
+function PrivacyPage() {
+  return (
+    <PageFrame>
+      <PageTitle
+        eyebrow="PRIVACY"
+        title="Paperfund privacy notice"
+        subtitle="Last updated September 28, 2026. This release-candidate notice must receive final legal and operator review before publication."
+      />
+      <article className="policy-copy">
+        <h2>What Paperfund processes</h2>
+        <p>
+          Paperfund processes your public Solana wallet address, an authentication challenge and its
+          explicit message signature, simulated competition entries and trades, balances, positions,
+          results, reward allocations, and payout records. On supported terminal pages, the
+          extension reads only the current hostname and Solana token mint needed to display the
+          matching paper-trading market.
+        </p>
+        <p>
+          Technical records may include timestamps, request route and status, network address, and
+          operational errors. Final retention periods remain a pre-publication operator and legal
+          review item.
+        </p>
+        <h2>Browser storage and authentication</h2>
+        <p>
+          Overlay preferences are stored in <code>chrome.storage.local</code>. The extension keeps
+          its opaque authenticated session in <code>chrome.storage.session</code>, which is cleared
+          when the browser or extension session ends. The web application uses a server-managed
+          session cookie. Authentication proves control of an address; it is not a transaction.
+        </p>
+        <h2>What Paperfund does not access</h2>
+        <p>
+          Paperfund does not request seed phrases or private keys, sign transactions, submit swaps,
+          or gain custody of wallet funds. Paper SOL and simulated positions have no monetary value.
+        </p>
+        <h2>Why data is used and where it goes</h2>
+        <p>
+          Data is used to authenticate users, run and audit the competition, prevent duplicate or
+          abusive actions, support operations, and verify approved rewards. It may be processed by
+          infrastructure categories required to operate the service: application hosting,
+          PostgreSQL-compatible database hosting, Redis-compatible session storage, and Solana RPC
+          providers. Paperfund currently has no advertising, referral tracking, third-party
+          analytics, or sale of personal data, and does not share data for targeted advertising.
+        </p>
+        <h2>Questions and requests</h2>
+        <p>
+          Use the <NavLink to="/support">support page</NavLink> for help or privacy requests. The
+          legal entity, privacy contact, jurisdictional rights language, and final retention
+          schedule are explicit release gates and must be completed before store submission.
+        </p>
+      </article>
+    </PageFrame>
+  );
+}
+
+function SupportPage() {
+  return (
+    <PageFrame>
+      <PageTitle
+        eyebrow="SUPPORT"
+        title="Paperfund support"
+        subtitle="Help for the Paperfund web app and multi-terminal extension."
+      />
+      <article className="policy-copy">
+        <h2>Before reporting a problem</h2>
+        <p>
+          Confirm that the extension is enabled, the current page is a supported Solana token route,
+          and the Paperfund API is available. Reload the terminal tab after an extension update.
+          Signing in requires only an explicit wallet message signature.
+        </p>
+        <h2>Report an issue</h2>
+        <p>
+          Open a report in the{' '}
+          <a href="https://github.com/Paperfunds/paperfund/issues">Paperfund issue tracker</a>.
+          Never include a seed phrase, private key, session token, or other secret. A monitored
+          support email and legal contact remain required before Chrome Web Store submission.
+        </p>
+      </article>
     </PageFrame>
   );
 }

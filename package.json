@@ -16,6 +16,7 @@
     "build": "tsc -b && npm run build --workspace @paperfund/web",
     "build:extension": "npm run build --workspace @paperfund/extension",
     "package:extension": "node scripts/package-extension.mjs",
+    "validate:extension:store": "node scripts/validate-extension-release.mjs",
     "test:extension:headed": "npm run build:extension && playwright test --config playwright.extension.config.ts --grep-invert @live",
     "test:extension:live": "npm run build:extension && playwright test --config playwright.extension.config.ts --grep @live",
     "dev:extension": "npm run dev --workspace @paperfund/extension",

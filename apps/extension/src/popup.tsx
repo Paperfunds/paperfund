@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { apiRequest } from './client.js';
 import { PAPERFUND_APP_URL } from './config.js';
 
-function Popup() {
+export function Popup() {
   const [enabled, setEnabled] = useState(true);
   const [wallet, setWallet] = useState('Not signed in');
   const [round, setRound] = useState('Unavailable');
@@ -22,10 +22,13 @@ function Popup() {
   }, []);
   return (
     <main>
-      <h1>
-        <span>P</span> Paperfund
-      </h1>
-      <p>Paper trading only</p>
+      <header>
+        <img src={chrome.runtime.getURL('icons/paperfund-mark.png')} alt="" />
+        <div>
+          <h1>Paperfund</h1>
+          <p>Paper trading only</p>
+        </div>
+      </header>
       <dl>
         <div>
           <dt>Wallet</dt>
@@ -36,31 +39,32 @@ function Popup() {
           <dd>{round}</dd>
         </div>
       </dl>
-      <section aria-label="Supported terminals">
-        <strong>Supported terminals</strong>
-        <span>✓ Axiom</span>
-        <span>✓ GMGN</span>
-        <span>✓ Terminal</span>
-      </section>
-      <label>
+      <label className="toggle-row">
+        <span>
+          <strong>Overlay</strong>
+          <small>{enabled ? 'Enabled' : 'Disabled'}</small>
+        </span>
         <input
           type="checkbox"
           checked={enabled}
+          aria-label="Overlay enabled"
           onChange={(event) => {
             setEnabled(event.target.checked);
             void chrome.storage.local.set({ overlayEnabled: event.target.checked });
           }}
-        />{' '}
-        Overlay enabled
+        />
       </label>
+      <section className="supported" aria-label="Supported terminals">
+        Axiom · GMGN.ai · Terminal.trade
+      </section>
       <a href={PAPERFUND_APP_URL} target="_blank">
-        Open Paperfund ↗
+        Open Paperfund <span aria-hidden="true">↗</span>
       </a>
     </main>
   );
 }
 
 const css = document.createElement('style');
-css.textContent = `*{box-sizing:border-box}body{margin:0;width:280px;background:#0b0f11;color:#e9eef0;font:12px system-ui,sans-serif}main{padding:16px}h1{display:flex;align-items:center;gap:8px;margin:0;font-size:16px}h1 span{display:grid;place-items:center;width:25px;height:25px;border-radius:5px;background:#76f4b1;color:#07140d}p{margin:5px 0 15px;color:#6f7d82;font-size:9px;text-transform:uppercase;letter-spacing:.1em}dl{border:1px solid #253036;margin:0 0 12px}dl div{display:flex;justify-content:space-between;padding:9px}dl div+div{border-top:1px solid #253036}dt{color:#748287}dd{margin:0;font-family:monospace}section{display:grid;grid-template-columns:1fr 1fr;margin:0 0 13px;padding:9px;border:1px solid #253036;gap:5px;color:#aeb9bc}section strong{grid-column:1/-1;color:#748287;font-size:10px}section span{color:#76f4b1;font-size:10px}label{display:flex;gap:8px;align-items:center;color:#aeb9bc}a{display:block;margin-top:14px;padding:10px;background:#76f4b1;color:#07140d;text-align:center;text-decoration:none;font-weight:800;border-radius:5px}`;
+css.textContent = `*{box-sizing:border-box}body{margin:0;width:292px;background:#0a0d0e;color:#f3f5f5;font:12px Inter,ui-sans-serif,system-ui,-apple-system,sans-serif}main{padding:16px}header{display:flex;align-items:center;gap:10px;margin-bottom:15px}header img{width:34px;height:34px;object-fit:contain;background:#fff;border-radius:4px}h1{margin:0;font-size:16px;letter-spacing:-.01em}header p{margin:3px 0 0;color:#7e898c;font-size:9px;text-transform:uppercase;letter-spacing:.12em}dl{border:1px solid #262d2f;border-radius:6px;margin:0 0 10px;background:#101415}dl div{display:flex;justify-content:space-between;padding:9px 10px}dl div+div{border-top:1px solid #262d2f}dt{color:#849093}dd{margin:0;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums}.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border:1px solid #262d2f;border-radius:6px;background:#101415}.toggle-row span{display:grid;gap:2px}.toggle-row strong{font-size:12px}.toggle-row small{color:#849093}.toggle-row input{width:32px;height:18px;margin:0;accent-color:#71e7a4}.supported{margin:10px 0 0;color:#758084;text-align:center;font-size:10px}.supported+a{display:block;margin-top:12px;padding:10px;border-radius:5px;background:#71e7a4;color:#06100a;text-align:center;text-decoration:none;font-weight:800}a:hover{background:#85efb4}a:focus-visible,input:focus-visible{outline:2px solid #f3f5f5;outline-offset:2px}`;
 document.head.append(css);
 createRoot(document.getElementById('root')!).render(<Popup />);

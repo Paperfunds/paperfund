@@ -227,6 +227,20 @@ function renderApp(path = '/trade') {
 }
 
 describe('Paperfund web app', () => {
+  it('uses the approved brand mark and publishes privacy disclosures', async () => {
+    mockApi();
+    const { unmount } = renderApp('/');
+    expect(
+      screen.getByRole('link', { name: 'Paperfund home' }).querySelector('img'),
+    ).toHaveAttribute('src', '/paperfund-mark.png');
+    unmount();
+    renderApp('/privacy');
+    expect(
+      await screen.findByRole('heading', { name: 'Paperfund privacy notice' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/does not request seed phrases or private keys/i)).toBeInTheDocument();
+  });
+
   it('explains the launch proposition and canonical rules', async () => {
     mockApi();
     renderApp('/');

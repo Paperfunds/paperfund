@@ -172,7 +172,9 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
 
   const serverNow = now + serverOffset;
   const open = round?.state === 'OPEN' && serverNow < Date.parse(round.endsAtExclusive);
-  const countdown = round ? countdownText(Date.parse(round.endsAtExclusive) - serverNow) : '--:--';
+  const remainingMilliseconds = round ? Date.parse(round.endsAtExclusive) - serverNow : null;
+  const countdown = remainingMilliseconds === null ? '--:--' : countdownText(remainingMilliseconds);
+  const closingSoon = open && remainingMilliseconds !== null && remainingMilliseconds <= 300_000;
   const currentPosition =
     positions?.positions.find((position) => position.mint === terminal.mint) ??
     account?.positions.find((position) => position.mint === terminal.mint);
@@ -295,13 +297,12 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
     >
       <header className="pf-header">
         <div className="pf-brand">
-          <span>P</span>
+          <img src={chrome.runtime.getURL('icons/paperfund-mark.png')} alt="" />
           <div>
-            <strong>Paperfund</strong>
-            <small>
-              PAPER TRADING ONLY <span className="pf-terminal">· {terminal.terminal}</span>
-            </small>
+            <strong>PAPERFUND</strong>
+            <small>PAPER TRADING ONLY</small>
           </div>
+          <span className="pf-terminal">{terminal.terminal}</span>
         </div>
         <div className="pf-head-actions">
           <button title="Disable overlay" aria-label="Disable overlay" onClick={onDisable}>
@@ -329,15 +330,19 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
             </div>
             <div>
               <small>{open ? 'TIME LEFT' : 'STATUS'}</small>
-              <b className={open ? 'green' : ''}>
+              <b className={closingSoon ? 'urgent' : open ? 'green' : ''}>
                 {open ? countdown : (round?.state ?? 'OFFLINE')}
               </b>
             </div>
           </div>
-          {notice && <div className={`pf-notice ${notice.tone}`}>{notice.text}</div>}
+          {notice && (
+            <div className={`pf-notice ${notice.tone}`} role="status" aria-live="polite">
+              {notice.text}
+            </div>
+          )}
           {!user ? (
             <div className="pf-auth">
-              <p>Compete with simulated Paper SOL. No deposits and no transaction signing.</p>
+              <p>Simulated Paper SOL only. No deposits or transaction signing.</p>
               {!wallet ? (
                 <button
                   className="primary"
@@ -511,12 +516,11 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
                         <span>
                           Unrealized P&amp;L
                           <b
-                            className={
-                              currentPosition.valuation.status === 'AVAILABLE' &&
-                              BigInt(currentPosition.valuation.unrealizedPnlLamports) >= 0n
-                                ? 'green'
-                                : 'red'
-                            }
+                            className={pnlTone(
+                              currentPosition.valuation.status === 'AVAILABLE'
+                                ? currentPosition.valuation.unrealizedPnlLamports
+                                : null,
+                            )}
                           >
                             {currentPosition.valuation.status === 'AVAILABLE'
                               ? signedSol(currentPosition.valuation.unrealizedPnlLamports)
@@ -568,6 +572,9 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
                       </div>
                     </div>
                   )}
+                  {!currentPosition && tradeReady && market?.supported && (
+                    <div className="pf-empty-position">No position in this token.</div>
+                  )}
                   <div className="pf-activity">
                     <div className="pf-section-title">RECENT ACTIVITY</div>
                     {trades.length === 0 ? (
@@ -575,7 +582,7 @@ export function Overlay({ terminal, collapsed, onCollapsed, onDisable }: Overlay
                     ) : (
                       trades.slice(0, 8).map((trade) => (
                         <div key={trade.id}>
-                          <span className={trade.side === 'BUY' ? 'green' : 'red'}>
+                          <span className={trade.side === 'BUY' ? 'green' : 'sell'}>
                             {trade.execution_context === 'FORCED_HOURLY_SETTLEMENT'
                               ? 'AUTO CLOSE'
                               : trade.side}
@@ -641,6 +648,10 @@ function MarketState({
 
 function signedSol(value: string): string {
   return `${BigInt(value) > 0n ? '+' : ''}${formatSol(value)}`;
+}
+function pnlTone(value: string | null): string {
+  if (value === null || BigInt(value) === 0n) return 'neutral';
+  return BigInt(value) > 0n ? 'green' : 'red';
 }
 function countdownText(milliseconds: number): string {
   if (milliseconds <= 0) return '00:00';
