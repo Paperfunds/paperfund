@@ -94,6 +94,22 @@ describe('parseEnvironment', () => {
     ).toThrow();
   });
 
+  it('accepts the exact canonical Paperfund production origins and CORS transports', () => {
+    const config = parseEnvironment({
+      NODE_ENV: 'production',
+      DATABASE_URL: 'postgresql://paperfund:paperfund@127.0.0.1:5432/paperfund',
+      REDIS_URL: 'redis://127.0.0.1:6379',
+      API_PUBLIC_ORIGIN: 'https://api.paperfund.app',
+      APP_PUBLIC_ORIGIN: 'https://app.paperfund.app',
+      COOKIE_SECURE: 'true',
+      ALLOWED_ORIGINS:
+        'https://app.paperfund.app,chrome-extension://lcnpjpkojoadojibfbjfohpjepkfmdln',
+    });
+
+    expect(config.API_PUBLIC_ORIGIN).toBe('https://api.paperfund.app');
+    expect(config.APP_PUBLIC_ORIGIN).toBe('https://app.paperfund.app');
+  });
+
   it('requires complete identities and explicit payout network when enabled', () => {
     const base = {
       DATABASE_URL: 'postgresql://paperfund:paperfund@127.0.0.1:5432/paperfund',

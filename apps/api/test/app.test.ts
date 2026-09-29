@@ -69,6 +69,36 @@ describe('API health endpoints', () => {
     });
   });
 
+  it('allows only configured web and extension CORS origins', async () => {
+    const app = buildApp({
+      config: {
+        LOG_LEVEL: 'silent',
+        ALLOWED_ORIGINS:
+          'https://app.paperfund.app,chrome-extension://lcnpjpkojoadojibfbjfohpjepkfmdln',
+      },
+      database: { healthCheck: async () => true },
+      redis: { healthCheck: async () => true },
+      logger: false,
+    });
+    apps.push(app);
+
+    for (const origin of [
+      'https://app.paperfund.app',
+      'chrome-extension://lcnpjpkojoadojibfbjfohpjepkfmdln',
+    ]) {
+      const response = await app.inject({ method: 'GET', url: '/health', headers: { origin } });
+      expect(response.headers['access-control-allow-origin']).toBe(origin);
+      expect(response.headers['access-control-allow-credentials']).toBe('true');
+    }
+
+    const rejected = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: 'https://untrusted.example' },
+    });
+    expect(rejected.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('exposes the opaque session only for explicitly requested extension transport', async () => {
     const auth = {
       async verifyChallenge() {

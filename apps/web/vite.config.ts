@@ -1,6 +1,8 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 
+export const WEB_DEV_ALLOWED_HOSTS = ['app.paperfund.app'] as const;
+
 function requireProductionApiOrigin(value: string | undefined, allowInsecureLocal: boolean) {
   if (!value) throw new Error('VITE_API_BASE_URL is required for a production web build.');
   const origin = new URL(value);
@@ -10,7 +12,8 @@ function requireProductionApiOrigin(value: string | undefined, allowInsecureLoca
 }
 
 export default defineConfig(({ command, mode }) => {
-  const environment = loadEnv(mode, process.env.INIT_CWD ?? process.cwd(), '');
+  const environmentDirectory = process.env.INIT_CWD ?? process.cwd();
+  const environment = loadEnv(mode, environmentDirectory, '');
   if (command === 'build' && mode === 'production')
     requireProductionApiOrigin(
       environment.VITE_API_BASE_URL ||
@@ -22,7 +25,8 @@ export default defineConfig(({ command, mode }) => {
     );
   return {
     plugins: [react()],
-    server: { port: 5173 },
+    envDir: environmentDirectory,
+    server: { port: 5173, allowedHosts: [...WEB_DEV_ALLOWED_HOSTS] },
     preview: { port: 5173 },
     test: {
       environment: 'jsdom',

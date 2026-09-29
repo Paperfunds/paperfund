@@ -3,7 +3,7 @@
 **Document status:** Canonical specification through Phase 6B release preparation
 **Product status:** Authoritative competition and payout operation complete; production and Chrome Web Store release preparation implemented with explicit operator-controlled launch gates
 **Authority:** This repository-root document is the source of truth for product and engineering decisions unless a later, explicitly approved change updates it.  
-**Last updated:** 2026-09-28
+**Last updated:** 2026-09-29
 
 ## 1. Purpose and change policy
 
@@ -1391,5 +1391,10 @@ successful web and extension builds; passing database readiness; one passing rea
 2/2 passing headed MV3 fixture acceptance tests; and 3/3 passing read-only live-route injection
 smokes for Axiom, GMGN, and Terminal.trade. Deterministic 1280×800 development screenshot candidates
 were generated and visually reviewed. The production-mode release validator passed 14 packaged files
-and produced the versioned unpacked directory and ZIP using planned, not DNS-verified,
-`paperfundapp.com` origins. No store upload or publication was attempted.
+and produced the versioned unpacked directory and ZIP using then-planned, not DNS-verified,
+origins. No store upload or publication was attempted.
+
+The canonical production domains are `https://paperfund.app`, `https://app.paperfund.app`, and
+`https://api.paperfund.app`. Cloudflare Tunnel terminates their public HTTPS connections and routes
+the app and API origins to loopback services; browser builds and exact-origin CORS must use these
+public origins without removing the existing loopback-only local development paths.

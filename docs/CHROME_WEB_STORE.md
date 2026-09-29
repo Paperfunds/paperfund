@@ -106,14 +106,15 @@ at its uploaded size.
 
 ## URLs and owner-supplied release gates
 
-Planned production URLs (not claimed live or DNS-verified):
+Canonical production URLs (tunnel routing is active; final store/publication readiness remains a
+separate release gate):
 
-- homepage: `https://paperfundapp.com`
-- web app: `https://app.paperfundapp.com`
-- API: `https://api.paperfundapp.com`
-- privacy: `https://paperfundapp.com/privacy`
-- rules: `https://paperfundapp.com/rules`
-- support: `https://paperfundapp.com/support`
+- homepage: `https://paperfund.app`
+- web app: `https://app.paperfund.app`
+- API: `https://api.paperfund.app`
+- privacy: `https://app.paperfund.app/privacy`
+- rules: `https://app.paperfund.app/rules`
+- support: `https://app.paperfund.app/support`
 
 Before building or submitting, the operator must:
 
@@ -133,8 +134,8 @@ Before building or submitting, the operator must:
 ## Build, audit, and upload
 
 ```powershell
-$env:PAPERFUND_API_BASE_URL='https://api.paperfundapp.com'
-$env:PAPERFUND_APP_URL='https://app.paperfundapp.com/trade'
+$env:PAPERFUND_API_BASE_URL='https://api.paperfund.app'
+$env:PAPERFUND_APP_URL='https://app.paperfund.app'
 npm run package:extension
 ```
 
