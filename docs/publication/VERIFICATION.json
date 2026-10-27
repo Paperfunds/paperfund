@@ -44,5 +44,14 @@
   },
   "license": "Apache-2.0 for original code; branding reserved; upstream licenses unchanged",
   "publicGate": "Remote obsolete-object/cache removal must be verified after the authorized leased rewrite. Keep private if old objects remain accessible.",
-  "productionActions": "NONE"
+  "productionActions": "NONE",
+  "remoteVerification": {
+    "synchronizationCommit": "cc36c9838a0f19a58e745eaf950bc1db48042b7c",
+    "sourceFiles": 994,
+    "componentsPresent": true,
+    "oldGMGNObjectHTTP": 200,
+    "oldFixedTestKeyObjectHTTP": 200,
+    "visibility": "private",
+    "blocker": "GitHub server-side obsolete-object cleanup required; owner request prepared in GITHUB_CLEANUP_REQUEST.md"
+  }
 }

@@ -1,5 +1,7 @@
 # Winner payout accounting and secure execution
 
+> Implementation/procedure reference. See README.md and docs/publication/STATUS.md for current status: PAPER trading is active; financial STOP and historical REVIEW holds remain, and live daily payouts are not qualified. This document is not execution authorization.
+
 Phase 5C calculates and persists exact winner obligations. Phase 5D adds an operator-controlled,
 server-only Solana execution pipeline. Real payout execution is disabled by default, requires an
 explicit approval, and reports **Paid** only after finalized on-chain reconciliation succeeds.

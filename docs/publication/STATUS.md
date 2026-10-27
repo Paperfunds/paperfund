@@ -22,4 +22,4 @@ The owner approved the scoped rewrite and force-with-lease update. See HISTORY_R
 
 ## Remaining public gate
 
-A rewritten main does not prove GitHub removed obsolete objects or cached commit/raw views. Check old sensitive/unlicensed paths after rewriting; if GitHub still serves them, request server-side cleanup through GitHub Support and keep private until verified. Rewriting cannot erase prior clones/backups. Do not make this repository public merely because its new branch tip is clean.
+After the authorized rewrite and push, authenticated GitHub requests still returned HTTP 200 for the removed GMGN excerpt at original commit `b6d3e62a85db519360287da30558959472f2b0b7` and a fixed-key E2E file at `0fb797e18dcf4df9fb879273f60a92c92fd93f26`. The repository therefore remains PRIVATE. The exact owner support request is prepared in GITHUB_CLEANUP_REQUEST.md. Public visibility requires server-side cleanup and a fresh successful old-object access check. Rewriting cannot erase prior clones/backups.

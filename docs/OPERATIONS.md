@@ -1,5 +1,7 @@
 # Operations runbook
 
+> Implementation/procedure reference. See README.md and docs/publication/STATUS.md for current status: PAPER trading is active; financial STOP and historical REVIEW holds remain, and live daily payouts are not qualified. This document is not execution authorization.
+
 This runbook covers the current Windows-hosted Paperfund stack: PostgreSQL and Redis in containers,
 the API and worker as independent Node processes, the web build behind HTTPS, read-only creator-fee
 ingestion, and operator-controlled payouts. It does not authorize a mainnet payout.

@@ -1,5 +1,7 @@
 # Creator-fee ingestion and reward accounting (Phases 5A and 5E)
 
+> Implementation/procedure reference. See README.md and docs/publication/STATUS.md for current status: PAPER trading is active; financial STOP and historical REVIEW holds remain, and live daily payouts are not qualified. This document is not execution authorization.
+
 Phase 5A is the authoritative funding-accounting layer. It records verified creator-fee revenue,
 freezes exact hourly and daily prize-pool amounts, and maintains the player-owned Reward Buffer. It
 does not allocate winners, sign transactions, hold payout keys, or transfer SOL.

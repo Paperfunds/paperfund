@@ -143,8 +143,8 @@ The command performs a fresh production build, validates the manifest, icon dime
 permissions/matches, CSP, absence of source maps/fixtures/environment files/secret markers, and
 absence of obvious remote/evaluated code. It creates:
 
-- `artifacts/paperfund-extension-0.2.0/` for final unpacked inspection;
-- `artifacts/paperfund-extension-0.2.0.zip` with `manifest.json` at the ZIP root.
+- `artifacts/paperfund-extension-0.2.2/` for final unpacked inspection;
+- `artifacts/paperfund-extension-0.2.2.zip` with `manifest.json` at the ZIP root.
 
 Load the unpacked directory in a clean Chrome profile and rerun headed acceptance. Inspect the ZIP
 contents and hashes, then upload the ZIP in the developer dashboard. Complete Store Listing,

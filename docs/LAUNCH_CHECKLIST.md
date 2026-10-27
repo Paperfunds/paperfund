@@ -1,5 +1,7 @@
 # Production launch checklist
 
+> Implementation/procedure reference. See README.md and docs/publication/STATUS.md for current status: PAPER trading is active; financial STOP and historical REVIEW holds remain, and live daily payouts are not qualified. This document is not execution authorization.
+
 This checklist is the operator gate for the first Windows-hosted Paperfund deployment. It does not
 authorize creator-fee financial promotion or a mainnet payout. Record the UTC time, operator, commit,
 and result for every checked item.

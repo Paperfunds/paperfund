@@ -133,8 +133,8 @@ npm run package:extension
 The command performs a fresh production-mode build; validates exact permissions, host matches, CSP,
 icon dimensions, and absence of remote/evaluated code, source maps, fixtures, `node_modules`, local
 `.env`, server-secret markers, or signer material; and writes both the clean load-unpacked directory
-and `artifacts/paperfund-extension-0.2.0.zip`. The manifest is at the ZIP root and the package and
-generated manifest share version `0.2.0`. See `docs/CHROME_WEB_STORE.md` for official requirements,
+and `artifacts/paperfund-extension-0.2.2.zip`. The manifest is at the ZIP root and the package and
+generated manifest share version `0.2.2`. See `docs/CHROME_WEB_STORE.md` for official requirements,
 listing copy, data disclosures, assets, and manual submission gates.
 
 ## Tests
