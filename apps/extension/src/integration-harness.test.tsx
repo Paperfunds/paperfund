@@ -249,7 +249,9 @@ describe('fixture Axiom integration harness', () => {
     view.rerender(
       <Overlay terminal={b} collapsed={false} onCollapsed={vi.fn()} onDisable={vi.fn()} />,
     );
-    expect(await screen.findByText('Not supported by Paperfund yet')).toBeVisible();
+    expect(
+      await screen.findByText('Market route temporarily unavailable.'),
+    ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'BUY · PAPER ONLY' })).not.toBeInTheDocument();
     view.rerender(
       <Overlay terminal={a} collapsed={false} onCollapsed={vi.fn()} onDisable={vi.fn()} />,
@@ -263,6 +265,7 @@ describe('fixture Axiom integration harness', () => {
         }),
       ),
     );
-    expect(await screen.findByText('SELL')).toBeVisible();
+    expect(await screen.findByText(/Sold all: received/)).toBeVisible();
+    expect(screen.queryByText('RECENT ACTIVITY')).not.toBeInTheDocument();
   });
 });

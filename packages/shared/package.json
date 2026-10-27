@@ -12,5 +12,6 @@
       "types": "./dist/browser.d.ts",
       "default": "./dist/browser.js"
     }
-  }
+  },
+  "license": "Apache-2.0"
 }

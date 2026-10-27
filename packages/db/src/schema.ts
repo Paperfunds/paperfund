@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  bigserial,
   boolean,
   check,
   date,
@@ -9,6 +10,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -16,6 +18,23 @@ import {
 
 const createdAt = timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 const updatedAt = timestamp('updated_at', { withTimezone: true }).notNull().defaultNow();
+
+export const settlementWriteoffMetadataRepairs = pgTable(
+  'settlement_writeoff_metadata_repairs',
+  {
+    journalTransactionId: text('journal_transaction_id')
+      .primaryKey()
+      .references(() => journalTransactions.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    tokenQuantity: numeric('token_quantity', { precision: 38, scale: 0 }).notNull(),
+    costBasisLamports: bigint('cost_basis_lamports', { mode: 'bigint' }).notNull(),
+    evidence: jsonb('evidence').notNull(),
+    createdAt,
+  },
+  (table) => [
+    check('settlement_writeoff_metadata_repairs_quantity', sql`${table.tokenQuantity} > 0`),
+    check('settlement_writeoff_metadata_repairs_cost', sql`${table.costBasisLamports} >= 0`),
+  ],
+);
 
 export const appMeta = pgTable('app_meta', {
   key: text('key').primaryKey(),
@@ -647,6 +666,7 @@ export const payoutExecutions = pgTable('payout_executions', {
   network: text('network').notNull(),
   treasuryAddress: text('treasury_address').notNull(),
   signerType: text('signer_type').notNull(),
+  safetyVersion: text('safety_version'),
   state: text('state').notNull(),
   totalPayoutLamports: bigint('total_payout_lamports', { mode: 'bigint' }).notNull(),
   estimatedFeeLamports: bigint('estimated_fee_lamports', { mode: 'bigint' }).notNull(),
@@ -785,3 +805,149 @@ export const ledgerEntries = pgTable(
     check('ledger_entries_amount_positive', sql`${table.amountLamports} > 0`),
   ],
 );
+
+/** Versioned, immutable display enrichment. No financial history is rewritten. */
+export const chartFillFxEvidence = pgTable(
+  'chart_fill_fx_evidence',
+  {
+    fillId: text('fill_id')
+      .notNull()
+      .references(() => fills.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    version: text('version').notNull(),
+    executedAt: timestamp('executed_at', { withTimezone: true }).notNull(),
+    source: text('source').notNull(),
+    fxAt: timestamp('fx_at', { withTimezone: true }).notNull(),
+    rate: numeric('rate', { precision: 38, scale: 18 }).notNull(),
+    evidence: jsonb('evidence').notNull(),
+    createdAt,
+  },
+  (table) => [
+    primaryKey({ columns: [table.fillId, table.version] }),
+    check('chart_fill_fx_rate_positive', sql`${table.rate} > 0`),
+  ],
+);
+
+export const chartFillFxCaptureFailures = pgTable(
+  'chart_fill_fx_capture_failures',
+  {
+    fillId: text('fill_id')
+      .notNull()
+      .references(() => fills.id, { onDelete: 'restrict', onUpdate: 'restrict' }),
+    version: text('version').notNull(),
+    status: text('status').notNull(),
+    reason: text('reason').notNull(),
+    createdAt,
+  },
+  (table) => [
+    primaryKey({ columns: [table.fillId, table.version] }),
+    check('chart_capture_status_unavailable', sql`${table.status} = 'UNAVAILABLE'`),
+  ],
+);
+
+export const payoutApprovalSnapshots = pgTable('payout_approval_snapshots', {
+  approvalId: text('approval_id')
+    .primaryKey()
+    .references(() => payoutPlanApprovals.id, {
+      onDelete: 'restrict',
+      onUpdate: 'restrict',
+    }),
+  snapshotVersion: text('snapshot_version').notNull(),
+  snapshot: jsonb('snapshot').notNull(),
+  createdAt,
+});
+
+export const payoutSignedTransactions = pgTable('payout_signed_transactions', {
+  payoutBatchId: text('payout_batch_id').primaryKey().references(() => payoutBatches.id, { onDelete: 'restrict' }),
+  transactionSignature: text('transaction_signature').notNull().unique(),
+  intentHash: text('intent_hash').notNull(),
+  unsignedTransactionBase64: text('unsigned_transaction_base64').notNull(),
+  signedTransactionBase64: text('signed_transaction_base64').notNull(),
+  recentBlockhash: text('recent_blockhash').notNull(),
+  lastValidBlockHeight: bigint('last_valid_block_height', { mode: 'bigint' }).notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+});
+
+export const payoutOperationEvents = pgTable('payout_operation_events', {
+  id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+  payoutExecutionId: text('payout_execution_id').notNull().references(() => payoutExecutions.id, { onDelete: 'restrict' }),
+  payoutBatchId: text('payout_batch_id').references(() => payoutBatches.id, { onDelete: 'restrict' }),
+  transactionSignature: text('transaction_signature'),
+  event: text('event').notNull(),
+  detail: jsonb('detail').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+});
+
+export const payoutStopState = pgTable('payout_stop_state', {
+  singleton: boolean('singleton').primaryKey().default(true),
+  stopped: boolean('stopped').notNull().default(true),
+  generation: bigint('generation', {mode:'bigint'}).notNull().default(0n),
+  reason: text('reason').notNull(),
+  changedAt: timestamp('changed_at', {withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+export const payoutSecurityEvents = pgTable('payout_security_events', {
+  id: bigserial('id', {mode:'bigint'}).primaryKey(),
+  actor: text('actor'), action: text('action').notNull(), planId: text('plan_id'),
+  outcome: text('outcome').notNull(), reason: text('reason').notNull(),
+  recordedAt: timestamp('recorded_at', {withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+export const payoutAuthorityNonces = pgTable('payout_authority_nonces', {
+  issuer: text('issuer').notNull(), nonce: text('nonce').notNull(), action: text('action').notNull(),
+  planId: text('plan_id').notNull(), snapshotHash: text('snapshot_hash').notNull(), signedRequest: jsonb('signed_request').notNull(),
+  consumedAt: timestamp('consumed_at', {withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+},table=>[primaryKey({columns:[table.issuer,table.nonce]})]);
+export const payoutApprovalAuthorizations = pgTable('payout_approval_authorizations', {
+  approvalId: text('approval_id').primaryKey().references(()=>payoutPlanApprovals.id,{onDelete:'restrict'}),
+  subject: text('subject').notNull(),signedRequest:jsonb('signed_request').notNull(),
+  recordedAt:timestamp('recorded_at',{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+// Phase 4 isolated companion evidence. No automatic registration/backfill in the live journal.
+export const payoutTreasuryReceipts = pgTable('payout_treasury_receipts', {
+  identity: text('identity').primaryKey(),
+  kind: text('kind').notNull(),
+  // creator_fee_events is an existing SQL-defined table; the companion SQL enforces this FK.
+  creatorFeeEventId: text('creator_fee_event_id'),
+  allocations: jsonb('allocations').notNull(),
+  network: text('network').notNull(),
+  treasury: text('treasury').notNull(),
+  lamports: bigint('lamports', { mode: 'bigint' }).notNull(),
+  finalizedSlot: bigint('finalized_slot', { mode: 'bigint' }).notNull(),
+  evidenceHash: text('evidence_hash').notNull(),
+});
+export const payoutTreasuryReservations = pgTable('payout_treasury_reservations', {
+  planId: text('plan_id')
+    .primaryKey()
+    .references(() => payoutPlans.id, { onDelete: 'restrict' }),
+  sourceKey: text('source_key').notNull().unique(),
+  approvalHash: text('approval_hash').notNull(),
+  fundingHash: text('funding_hash').notNull(),
+  principal: bigint('principal', { mode: 'bigint' }).notNull(),
+  feeBudget: bigint('fee_budget', { mode: 'bigint' }).notNull(),
+  recipients: jsonb('recipients').notNull(),
+  network: text('network').notNull(),
+  treasury: text('treasury').notNull(),
+  reservedAt: timestamp('reserved_at', { withTimezone: true }).notNull(),
+});
+export const payoutTreasuryDays = pgTable(
+  'payout_treasury_days',
+  {
+    planId: text('plan_id')
+      .notNull()
+      .references(() => payoutTreasuryReservations.planId, { onDelete: 'restrict' }),
+    utcDay: date('utc_day').notNull(),
+    exposure: bigint('exposure', { mode: 'bigint' }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.planId, table.utcDay] })],
+);
+export const payoutTreasurySettlements = pgTable('payout_treasury_settlements', {
+  batchId: text('batch_id')
+    .primaryKey()
+    .references(() => payoutBatches.id, { onDelete: 'restrict' }),
+  planId: text('plan_id')
+    .notNull()
+    .references(() => payoutTreasuryReservations.planId, { onDelete: 'restrict' }),
+  signature: text('signature').notNull().unique(),
+  principal: bigint('principal', { mode: 'bigint' }).notNull(),
+  fee: bigint('fee', { mode: 'bigint' }).notNull(),
+  finalizedSlot: bigint('finalized_slot', { mode: 'bigint' }).notNull(),
+});

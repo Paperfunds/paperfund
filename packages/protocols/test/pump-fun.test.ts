@@ -198,13 +198,42 @@ describe('Pump.fun deterministic execution math', () => {
     expect(createMarketStateEvidence(changed).fingerprint).not.toBe(
       createMarketStateEvidence(state).fingerprint,
     );
-    expect(new ExecutionRouter([adapter(state)]).resolve(PUMP_FUN_PROTOCOL_ID)).toBeInstanceOf(
-      PumpFunProtocolAdapter,
+    expect(new ExecutionRouter([adapter(state)]).resolve(PUMP_FUN_PROTOCOL_ID).protocolId).toBe(
+      PUMP_FUN_PROTOCOL_ID,
     );
   });
 });
 
 describe('Pump.fun Solana RPC failures', () => {
+  it('retries the same RPC read twice then returns typed unavailable, or accepts recovery', async () => {
+    let attempts = 0;
+    const requests: string[] = [];
+    const failedFetch: typeof fetch = async (_url, init) => {
+      attempts++;
+      requests.push(String(init?.body));
+      return new Response('unavailable', { status: 503 });
+    };
+    const rpc = new SolanaRpcClient({
+      url: 'https://redacted.invalid',
+      fetchImplementation: failedFetch,
+    });
+    await expect(rpc.getMultipleAccounts(['account'])).rejects.toMatchObject({
+      code: 'RPC_UNAVAILABLE',
+    });
+    expect(attempts).toBe(3);
+    expect(new Set(requests).size).toBe(1);
+    attempts = 0;
+    const recovered = new SolanaRpcClient({
+      url: 'https://redacted.invalid',
+      fetchImplementation: async () => {
+        if (++attempts < 3) return new Response('unavailable', { status: 429 });
+        return new Response(JSON.stringify({ result: { context: { slot: 123 }, value: [null] } }));
+      },
+    });
+    expect((await recovered.getMultipleAccounts(['account'])).context.slot).toBe(123);
+    expect(attempts).toBe(3);
+  });
+
   it('rejects a wrong program owner before decoding', async () => {
     const fixture = RECORDED_PUMP_FIXTURES.early;
     const fakeFetch: typeof fetch = async () =>
@@ -269,7 +298,7 @@ describe('Pump.fun Solana RPC failures', () => {
           fetchImplementation: timeoutFetch,
         }),
       ).loadMarketState(identity),
-    ).rejects.toMatchObject({ code: 'RPC_TIMEOUT' });
+    ).rejects.toMatchObject({ code: 'RPC_UNAVAILABLE' });
   });
 });
 

@@ -18,6 +18,9 @@ import { CompetitionService } from '../src/competition.js';
 import type { RedisService } from '../src/redis.js';
 
 loadDotEnv({ path: resolve(process.cwd(), '.env'), quiet: true });
+const testPort = Number(process.env['PAPERFUND_E2E_PORT'] ?? '3000');
+if (!Number.isInteger(testPort) || testPort < 1024 || testPort > 65535)
+  throw new Error('Invalid test API port.');
 const sourceDatabaseUrl = process.env['DATABASE_URL'];
 if (!sourceDatabaseUrl) throw new Error('DATABASE_URL is required for the browser smoke test.');
 
@@ -57,7 +60,10 @@ class RecordedPumpSource implements MarketStateSource {
   async loadMarketState(identity: MarketState['identity']): Promise<MarketState> {
     const state = this.states.get(identity.tokenMint);
     if (!state) throw new Error('Fixture not found.');
-    return state;
+    return {
+      ...state,
+      observedAt: new Date().toISOString() as MarketState['observedAt'],
+    };
   }
 }
 
@@ -84,6 +90,13 @@ const competition = new CompetitionService(database, router);
 const app = buildApp({
   config: {
     LOG_LEVEL: 'silent',
+    BETA_INVITE_ONLY: true,
+    BETA_WALLET_ALLOWLIST: [
+      process.env['PAPERFUND_E2E_PUBLIC_KEY'] ?? (() => { throw Error('EPHEMERAL_TEST_WALLET_REQUIRED'); })(),
+      ...(process.env['PAPERFUND_E2E_SECOND_PUBLIC_KEY']
+        ? [process.env['PAPERFUND_E2E_SECOND_PUBLIC_KEY']!]
+        : []),
+    ],
     COOKIE_SECURE: false,
     COOKIE_SAME_SITE: 'lax',
     AUTH_SESSION_TTL_SECONDS: 3600,
@@ -116,4 +129,4 @@ process.once('exit', () => {
   if (!closing) void close();
 });
 
-await app.listen({ host: '127.0.0.1', port: 3000 });
+await app.listen({ host: '127.0.0.1', port: testPort });

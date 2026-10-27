@@ -10,8 +10,18 @@
     }
   },
   "dependencies": {
+    "@meteora-ag/cp-amm-sdk": "1.5.1",
+    "@orca-so/common-sdk": "0.7.1",
+    "@orca-so/whirlpools-sdk": "0.22.0",
     "@paperfund/core": "*",
     "@paperfund/execution": "*",
-    "@solana/addresses": "^8.3.0"
-  }
+    "@pump-fun/pump-sdk": "2.0.0",
+    "@raydium-io/raydium-sdk-v2": "0.2.73-alpha",
+    "@solana/addresses": "^8.3.0",
+    "@solana/spl-token": "0.4.14",
+    "@solana/web3.js": "1.98.4",
+    "bn.js": "5.2.2",
+    "@paperfund/config": "*"
+  },
+  "license": "Apache-2.0"
 }

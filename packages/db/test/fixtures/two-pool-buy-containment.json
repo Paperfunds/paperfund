@@ -1,0 +1,51 @@
+{
+  "description": "Recorded selected-route identity projections only; reference math in admission tests is synthetic, not a pool-math replay.",
+  "routes": [
+    {
+      "mint_address": "Gk978p81tyicx7WA33dHocS6dcwf7KkfmZ716yhA5cpM",
+      "fill_id": "authoritative-buy-fill:5f128d632a8a4d35405ce871adcb5a88b54e6947448aae99bf71d89f274155ad",
+      "state_fingerprint": "5704155d10a8e215b0c487c7fa8f4398b6ace468d419cf9573dde0c78019c19d",
+      "chain_slot": "456101127",
+      "observed_at": "2026-10-12T15:46:42.075Z",
+      "hops": [
+        {
+          "pool": "5b8XR29JdKjwAjMoRYYyL1Nxz8zJ9SVrhSgg4i1pRm44",
+          "mintA": "Gk978p81tyicx7WA33dHocS6dcwf7KkfmZ716yhA5cpM",
+          "mintB": "98AG3zJUawbvDnpgbDhmxpMKva43vtgPLLPSXqo1pump",
+          "config": "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+          "vaultA": "27JfMEBAKkmF1buuxRnVJLKhkN4m2AqX85F9nRkCBK9j",
+          "vaultB": "5GHFbZx67gXdvPxCA5hSrfiQB1NwBhtpsZN7arjzUbty",
+          "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+          "platform": "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt"
+        },
+        {
+          "pool": "J7wveuS29NdZDEDuJp8C7W1BvkkLU88bWHsCtLGaCcbx",
+          "mintA": "98AG3zJUawbvDnpgbDhmxpMKva43vtgPLLPSXqo1pump",
+          "mintB": "So11111111111111111111111111111111111111112",
+          "config": null,
+          "vaultA": "AU45dsVcNz4GNHFAob2NDtwZa7zp34kKnVrDpHR93RMN",
+          "vaultB": "BS1G5keUBRUYLac7732mJJXM3HxRrGm7K199J92R5oHj",
+          "program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+        }
+      ]
+    },
+    {
+      "mint_address": "oPAiAikWTaFj9RYoRFD35ccfwhnMcB3ThgBZRHSkjTZ",
+      "fill_id": "authoritative-buy-fill:05c0f4a5bacd60c7843a362d71e6a83749ec87f4183e4c14c8085089c7702407",
+      "state_fingerprint": "d3ba63d44d3b813b77724c081cddadbdc6d8264851eb88e08c50183aaa7d1aab",
+      "chain_slot": "456102589",
+      "observed_at": "2026-10-12T15:52:03.140Z",
+      "hops": [
+        {
+          "pool": "2bDQiRwzoeqLfZ2nQ8decjqhDyAp8f1kx8WW33jwhYXH",
+          "mintA": "oPAiAikWTaFj9RYoRFD35ccfwhnMcB3ThgBZRHSkjTZ",
+          "mintB": "So11111111111111111111111111111111111111112",
+          "config": null,
+          "vaultA": "8NfZKHqERxsvQpfyFDk9JiKVBPwK27VKVkG2F31BVbQW",
+          "vaultB": "2ZHtVvYu76tEp9Gwnhwr2H5uxDrcbgzu4X22DWiveFur",
+          "program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+        }
+      ]
+    }
+  ]
+}

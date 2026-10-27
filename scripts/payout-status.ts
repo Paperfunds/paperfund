@@ -1,9 +1,6 @@
-import { config as loadDotenv } from 'dotenv';
-
 import { parseEnvironment } from '@paperfund/config';
 import { createDatabase, reconcilePayoutExecution, SolanaPayoutRpc } from '@paperfund/db';
 
-loadDotenv({ path: '.env', quiet: true });
 const planId = process.argv.slice(2).find((argument) => !argument.startsWith('--'));
 const reconcile = process.argv.includes('--reconcile');
 if (!planId) {

@@ -1,3 +1,9 @@
+import { validateNonSolPumpSwapRoutes } from './non-sol-pumpswap-routes.js';
+export {
+  APPROVED_NON_SOL_PUMPSWAP_ROUTES,
+  validateNonSolPumpSwapRoutes,
+  type NonSolPumpSwapRouteBinding,
+} from './non-sol-pumpswap-routes.js';
 import { z } from 'zod';
 
 const logLevels = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
@@ -25,6 +31,34 @@ export const environmentSchema = z
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+    PRIVATE_BETA_NON_PAYING: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    BETA_INVITE_ONLY: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    BETA_WALLET_ALLOWLIST: z
+      .string()
+      .default('')
+      .transform((v, ctx) => {
+        const wallets = v
+          .split(',')
+          .map((w) => w.trim())
+          .filter(Boolean);
+        if (
+          wallets.some((w) => !solanaAddress.test(w)) ||
+          new Set(wallets).size !== wallets.length
+        ) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Beta allowlist requires unique public Solana addresses.',
+          });
+          return z.NEVER;
+        }
+        return wallets;
+      }),
     API_PUBLIC_ORIGIN: z.string().default(''),
     APP_PUBLIC_ORIGIN: z.string().default(''),
     DATABASE_URL: z.string().url().startsWith('postgresql://'),
@@ -34,7 +68,86 @@ export const environmentSchema = z
       .refine((value) => value.startsWith('redis://') || value.startsWith('rediss://'), {
         message: 'REDIS_URL must use the redis:// or rediss:// protocol',
       }),
+    NON_SOL_PUMPSWAP_ALLOWED_ROUTES: z
+      .string()
+      .default('')
+      .transform((v, ctx) => {
+        if (v === '') return [];
+        try {
+          return validateNonSolPumpSwapRoutes(JSON.parse(v));
+        } catch {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Non-SOL allowlist must contain complete approved route identities',
+          });
+          return z.NEVER;
+        }
+      }),
+    NON_SOL_PUMPSWAP_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    GENERIC_PUMPSWAP_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    GENERIC_PUMPSWAP_BUYS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    // Explicit rollout gate: legacy operator arming never opens ordinary-user access.
+    GENERIC_PUMPSWAP_NORMAL_USER_ACCESS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
+    // Retained configuration name; IDs authorize administrative controls only.
+    GENERIC_PUMPSWAP_OPERATOR_USER_IDS: z
+      .string()
+      .default('')
+      .transform((v, ctx) => {
+        if (v === '') return [];
+        try {
+          const ids: unknown = JSON.parse(v);
+          if (
+            !Array.isArray(ids) ||
+            ids.length > 1 ||
+            ids.some((id) => typeof id !== 'string' || !/^user:[a-f0-9]{64}$/.test(id))
+          )
+            throw Error();
+          return ids as string[];
+        } catch {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              'Generic control authority requires at most one exact authenticated internal user ID',
+          });
+          return z.NEVER;
+        }
+      }),
+    GENERIC_PUMPSWAP_ENTRY_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
     SOLANA_RPC_URL: z.string().url().default('https://api.mainnet-beta.solana.com'),
+    SOLANA_WS_URL: z
+      .string()
+      .refine(
+        (v) =>
+          v === '' ||
+          (() => {
+            try {
+              return new URL(v).protocol === 'wss:';
+            } catch {
+              return false;
+            }
+          })(),
+        { message: 'SOLANA_WS_URL must use wss://' },
+      )
+      .default(''),
+    ADVISORY_MAX_CONCURRENT: z.coerce.number().int().min(2).max(64).default(4),
+    ADVISORY_BACKGROUND_CONCURRENT: z.coerce.number().int().min(1).max(8).default(2),
+    API_RATE_LIMIT_VALUATION_MAX: z.coerce.number().int().positive().default(240),
+    VALUATION_DIAGNOSTICS_ENABLED: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     SOLANA_RPC_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
     SOLANA_COMMITMENT: z.enum(['processed', 'confirmed', 'finalized']).default('confirmed'),
     LOG_LEVEL: z.enum(logLevels).default('info'),
@@ -85,7 +198,6 @@ export const environmentSchema = z
       .transform((value) => value === 'true'),
     PAYOUT_TREASURY_PUBLIC_KEY: z.string().default(''),
     PAYOUT_SIGNER_TYPE: z.enum(['DISABLED', 'LOCAL_KEYPAIR']).default('DISABLED'),
-    PAYOUT_SIGNER_SECRET_KEY: z.string().default(''),
     PAYOUT_MAX_RECIPIENTS_PER_BATCH: z.coerce.number().int().min(1).max(12).default(8),
     PAYOUT_MAINNET_MAX_PLAN_LAMPORTS: z
       .string()
@@ -122,11 +234,11 @@ export const environmentSchema = z
           path: ['PAYOUT_TREASURY_PUBLIC_KEY'],
           message: 'Live payouts require a treasury.',
         });
-      if (value.PAYOUT_SIGNER_TYPE === 'DISABLED' || !value.PAYOUT_SIGNER_SECRET_KEY)
+      if (value.PAYOUT_SIGNER_TYPE === 'DISABLED')
         context.addIssue({
           code: 'custom',
           path: ['PAYOUT_SIGNER_TYPE'],
-          message: 'Live payouts require an enabled signer and secret.',
+          message: 'Live payouts require a separately authorized signer boundary.',
         });
       if (value.PAYOUT_NETWORK === 'mainnet-beta' && !value.PAYOUT_MAINNET_CONFIRM)
         context.addIssue({
@@ -184,5 +296,46 @@ export function parseEnvironment(
   const parsed = environmentSchema.parse(environment);
   if (parsed.PAYOUT_EXECUTION_ENABLED && !environment.PAYOUT_NETWORK)
     throw new Error('PAYOUT_NETWORK must be explicitly set when live payout execution is enabled.');
+  if (
+    parsed.GENERIC_PUMPSWAP_BUYS_ENABLED &&
+    parsed.GENERIC_PUMPSWAP_OPERATOR_USER_IDS.length === 0
+  )
+    throw Error('Generic entry arming requires explicit administrative control authority');
+  if (parsed.GENERIC_PUMPSWAP_NORMAL_USER_ACCESS_ENABLED && !parsed.GENERIC_PUMPSWAP_ENABLED)
+    throw Error('Normal-user generic access requires generic routing enabled');
+  if (parsed.GENERIC_PUMPSWAP_BUYS_ENABLED && !parsed.GENERIC_PUMPSWAP_ENABLED)
+    throw Error('Generic BUY requires generic routing enabled');
+  if (parsed.NON_SOL_PUMPSWAP_ENABLED && parsed.NON_SOL_PUMPSWAP_ALLOWED_ROUTES.length === 0)
+    throw Error('Enabled non-SOL capability requires an explicit approved allowlist');
+  return parsed;
+}
+
+export function parseApplicationEnvironment(
+  environment: NodeJS.ProcessEnv | Record<string, string | undefined>,
+): AppConfig {
+  // Presence is checked without reading a private credential value. Never load a shared dotenv here.
+  for (const name of [
+    'PAYOUT_SIGNER_SECRET_KEY',
+    'PAYOUT_SIGNER_SECRET_FILE',
+    'PAYOUT_OPERATOR_PRIVATE_KEY',
+    'PAYOUT_OPERATOR_TOKEN',
+  ])
+    if (Object.prototype.hasOwnProperty.call(environment, name))
+      throw new Error(
+        'Signer/operator credentials are forbidden in ordinary application processes.',
+      );
+  const parsed = parseEnvironment(environment);
+  if (!parsed.BETA_INVITE_ONLY)
+    throw new Error(
+      'This private beta requires invite-only access. An empty allowlist denies all testers.',
+    );
+  if (
+    !parsed.PRIVATE_BETA_NON_PAYING ||
+    parsed.PAYOUT_EXECUTION_ENABLED ||
+    parsed.PAYOUT_SIGNER_TYPE !== 'DISABLED'
+  )
+    throw new Error(
+      'This release is non-paying only; real-SOL runtime qualification is unavailable.',
+    );
   return parsed;
 }

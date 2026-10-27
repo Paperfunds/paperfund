@@ -1,9 +1,11 @@
 import type {
+  ViewedPositionValuation,
   Account,
   BuyPreflight,
   BuyResult,
   HourlyResult,
   MarketSupport,
+  ChartTokenMetadata,
   Page,
   PositionValuationResponse,
   Round,
@@ -46,8 +48,10 @@ export type ApiOperation =
   | 'ENTER_ROUND'
   | 'ACCOUNT'
   | 'MARKET'
+  | 'CHART_METADATA'
   | 'PREFLIGHT'
   | 'POSITIONS'
+  | 'VIEWED_POSITION'
   | 'BUY'
   | 'SELL'
   | 'TRADES'
@@ -57,11 +61,12 @@ export interface ExtensionApiRequest {
   kind: 'PAPERFUND_API_V1';
   operation: ApiOperation;
   payload?: Record<string, string>;
+  requestId?: string;
 }
 export interface ExtensionApiResponse<T = unknown> {
   ok: boolean;
   data?: T;
-  error?: { code: string; message: string; status?: number };
+  error?: { code: string; message: string; status?: number; retryAfterMs?: number };
 }
 
 export interface ApiContract {
@@ -73,8 +78,10 @@ export interface ApiContract {
   ENTER_ROUND: { id: string; paperSolBalanceLamports: string };
   ACCOUNT: Account;
   MARKET: MarketSupport;
+  CHART_METADATA: ChartTokenMetadata;
   PREFLIGHT: BuyPreflight;
   POSITIONS: PositionValuationResponse;
+  VIEWED_POSITION: ViewedPositionValuation;
   BUY: BuyResult;
   SELL: SellResult;
   TRADES: Page<Trade>;
@@ -93,14 +100,21 @@ export function isExtensionApiRequest(value: unknown): value is ExtensionApiRequ
     'ENTER_ROUND',
     'ACCOUNT',
     'MARKET',
+    'CHART_METADATA',
     'PREFLIGHT',
     'POSITIONS',
+    'VIEWED_POSITION',
     'BUY',
     'SELL',
     'TRADES',
     'RESULTS',
   ];
   if (input.kind !== 'PAPERFUND_API_V1' || !operations.includes(input.operation as ApiOperation))
+    return false;
+  if (
+    input.operation === 'VIEWED_POSITION' &&
+    (typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(input.requestId))
+  )
     return false;
   return (
     input.payload === undefined ||

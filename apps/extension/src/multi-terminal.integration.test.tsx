@@ -43,7 +43,7 @@ function terminal(id: TerminalId): TerminalTokenState {
 }
 
 describe('multi-terminal account continuity', () => {
-  it('buys on Axiom, partially sells on GMGN, and sells all on Terminal with one account', async () => {
+  it('buys on Axiom, partially sells on GMGN, and sells all on Padre with one account', async () => {
     let cash = 10_000_000_000n;
     let quantity = 0n;
     const tradeHistory: Array<{ id: string; side: 'BUY' | 'SELL'; base: bigint }> = [];
@@ -202,13 +202,13 @@ describe('multi-terminal account continuity', () => {
 
     view.rerender(
       <Overlay
-        terminal={terminal('TERMINAL')}
+        terminal={terminal('PADRE')}
         collapsed={false}
         onCollapsed={vi.fn()}
         onDisable={vi.fn()}
       />,
     );
-    expect(await screen.findByText(/TERMINAL/)).toBeVisible();
+    expect(await screen.findByText(/PADRE/)).toBeVisible();
     fireEvent.click(await screen.findByRole('button', { name: 'SELL ALL' }));
     await waitFor(() => expect(quantity).toBe(0n));
 
@@ -285,7 +285,7 @@ describe('multi-terminal account continuity', () => {
     const contexts: Array<[TerminalId, string]> = [
       ['AXIOM', MINT_A],
       ['GMGN', MINT_B],
-      ['TERMINAL', MINT_C],
+      ['PADRE', MINT_C],
     ];
     const views = contexts.map(([id, mint]) =>
       render(
@@ -300,7 +300,7 @@ describe('multi-terminal account continuity', () => {
     for (const [index, view] of views.entries()) {
       const scoped = within(view.container);
       await scoped.findByText('Authoritative max');
-      const input = view.container.querySelector('input');
+      const input = await scoped.findByRole('textbox');
       if (!input) throw new Error('Expected an amount input.');
       fireEvent.change(input, { target: { value: '0.1' } });
       fireEvent.click(await scoped.findByRole('button', { name: 'BUY · PAPER ONLY' }));
@@ -317,6 +317,6 @@ describe('multi-terminal account continuity', () => {
       />,
     );
     expect(within(views[1]!.container).getByText(/GMGN/)).toBeVisible();
-    expect(within(views[2]!.container).getByText(/TERMINAL/)).toBeVisible();
+    expect(within(views[2]!.container).getByText(/PADRE/)).toBeVisible();
   });
 });

@@ -6,3 +6,10 @@ export * from './payout-service.js';
 export * from './payout-execution.js';
 export * from './reward-service.js';
 export * from './schema.js';
+
+export {
+  GenericCapability,
+  genericCapabilityOptions,
+  type GenericMode,
+  type GenericCapabilityOptions,
+} from './generic-capability.js';

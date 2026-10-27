@@ -1,0 +1,8 @@
+import{readFileSync,writeFileSync}from'node:fs';import{createHash}from'node:crypto';
+const dir=new URL('../../evidence/mainnet-verified/',import.meta.url),prior=JSON.parse(readFileSync(new URL('pool-provenance.json',dir))),first=JSON.parse(readFileSync(new URL(prior.file,dir)));let key=first.result.paginationKey;const pools=[...first.result.accounts],captures=[prior];
+const endpoint=readFileSync('C:/Users/stanp/Documents/ChatGPT/Paperfund-new/.env','utf8').split(/\r?\n/).find(l=>l.startsWith('SOLANA_RPC_URL=')).slice(15).trim().replace(/^(['"])(.*)\1$/,'$2');
+for(let page=0;key&&page<3;page++){
+ const request={...prior.request,id:23+page,params:[prior.request.params[0],{...prior.request.params[1],limit:10000,paginationKey:key,withContext:true}]},requestedAt=new Date().toISOString();
+ const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(25000)}),bytes=Buffer.from(await r.arrayBuffer()),body=JSON.parse(bytes),file=`${request.id}-getProgramAccountsV2-page.json`;writeFileSync(new URL(file,dir),bytes,{flag:'wx'});if(!r.ok||body.error)throw Error('READONLY_POOL_PAGE_FAILED');const value=body.result.value??body.result;pools.push(...value.accounts);captures.push({file,request,requestedAt,receivedAt:new Date().toISOString(),sha256:createHash('sha256').update(bytes).digest('hex'),sourceSlot:body.result.context?.slot??null});key=value.paginationKey;
+}
+const result={observedAt:new Date().toISOString(),pools,paginationKey:key,exhausted:key==null,captures};writeFileSync(new URL('pool-pages-proof.json',dir),JSON.stringify(result,null,2));console.log(JSON.stringify({poolCount:pools.length,exhausted:result.exhausted,pages:captures.length,paginationKey:key}));

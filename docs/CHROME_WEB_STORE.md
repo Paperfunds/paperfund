@@ -22,12 +22,12 @@ Requirements can change. Recheck these pages immediately before submission.
 **Single purpose:** Paperfund adds a paper-trading competition overlay to supported Solana trading
 terminals.
 
-**Short description:** Paper-trading competition overlay for Axiom, GMGN.ai, and Terminal.trade.
+**Short description:** Paper-trading competition overlay for Axiom, GMGN.ai, and Terminal / Padre.
 
 **Full description:**
 
 > Paperfund adds a compact simulated-trading competition overlay to supported Solana token pages on
-> Axiom, GMGN.ai, and Terminal.trade. Enter each hourly round with 10 Paper SOL, inspect an
+> Axiom, GMGN.ai, and Terminal / Padre. Enter each hourly round with 10 Paper SOL, inspect an
 > authoritative maximum order, place simulated buys and sells, monitor positions and executable
 > equity, and review activity without leaving the terminal. Paper SOL and simulated positions have
 > no monetary value. Paperfund never signs or submits terminal transactions and never asks for a
@@ -36,12 +36,12 @@ terminals.
 
 ## Permissions and executable-code review
 
-| Access               | Exact scope                                                                     | Why it is needed                                                                                                      |
-| -------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `storage`            | Extension session and preferences                                               | Keeps the opaque login session in `chrome.storage.session` and enable/collapse preferences in `chrome.storage.local`. |
-| API host             | The one origin supplied as `PAPERFUND_API_BASE_URL`                             | Lets the background worker call Paperfund's authenticated API.                                                        |
-| Content matches      | `https://axiom.trade/*`, `https://gmgn.ai/*`, `https://www.theterminal.trade/*` | Detects a supported Solana token URL and renders the overlay.                                                         |
-| Web-accessible files | Paperfund content bundle, chunks, and mark; same three matches only             | Boots the isolated Shadow DOM overlay on those hosts.                                                                 |
+| Access               | Exact scope                                                              | Why it is needed                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `storage`            | Extension session and preferences                                        | Keeps the opaque login session in `chrome.storage.session` and panel layout preferences in `chrome.storage.local`. |
+| API host             | The one origin supplied as `PAPERFUND_API_BASE_URL`                      | Lets the background worker call Paperfund's authenticated API.                                                     |
+| Content matches      | `https://axiom.trade/*`, `https://gmgn.ai/*`, `https://trade.padre.gg/*` | Detects a supported Solana token URL and renders the overlay.                                                      |
+| Web-accessible files | Paperfund content bundle, chunks, and mark; same three matches only      | Boots the isolated Shadow DOM overlay on those hosts.                                                              |
 
 There is no `all_urls`, tabs/history, clipboard, downloads, notifications, wallet-secret, transaction,
 or analytics permission. Manifest V3, a service worker, local-only extension CSP, and release
@@ -53,7 +53,7 @@ validation prohibit remote executable code, `eval`, and `new Function`.
 | -------------------------------------------------------------------- | ------------------------------------------------ | --------------------------------------------- | -------------------------------------------------------------- |
 | Public wallet address and explicit auth-message signature            | Paperfund API/database; signature is verified    | Authenticate address control                  | Final retention schedule requires legal/operator approval.     |
 | Opaque extension session                                             | `chrome.storage.session`                         | Authenticated API access                      | Ends with browser/extension session; cleared on logout/expiry. |
-| Enable/collapse preferences                                          | `chrome.storage.local`                           | Remember UI choices                           | Until cleared or extension removal.                            |
+| Enable and per-terminal position/size/collapse preferences           | `chrome.storage.local`                           | Remember UI choices                           | Until reset, cleared, or extension removal.                    |
 | Supported terminal hostname and current Solana mint                  | Current tab and Paperfund API                    | Bind the overlay to the intended paper market | No page-content scraping or browsing-history collection.       |
 | Competition entries, simulated trades, positions, results            | Paperfund API/PostgreSQL                         | Operate and audit the competition             | Financial/audit retention requires final policy approval.      |
 | Reward allocations and verified payouts                              | Paperfund API/PostgreSQL and public Solana chain | Approve, pay, and reconcile rewards           | On-chain records are public and durable.                       |
@@ -82,7 +82,7 @@ five; use all five when they remain legible:
 
 1. Axiom: authenticated round/equity and clear simulated label.
 2. GMGN.ai: current token plus BUY/MAX preflight.
-3. Terminal.trade: position, partial SELL, and SELL ALL.
+3. Terminal / Padre: position, partial SELL, and SELL ALL.
 4. Three-tab continuity/isolation or collapsed state without terminal obstruction.
 5. Completed result and truthful reward-allocation state.
 
@@ -96,7 +96,7 @@ $env:PAPERFUND_CDP_LOAD_UNPACKED='true'
 npm run test:extension:headed
 ```
 
-It captures popup, Axiom preflight, Axiom position/SELL, GMGN, and Terminal states at 1280×800 and
+It captures popup, Axiom preflight, Axiom position/SELL, GMGN, and Terminal / Padre states at 1280×800 and
 hides the deterministic fixture wallet row in authenticated screenshots. These are review aids, not
 automatically approved store artwork; recapture after final production-origin validation and select
 at most five.

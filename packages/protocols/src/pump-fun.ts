@@ -1,3 +1,10 @@
+import { safeErrorMessage } from '@paperfund/core';
+import { cutoffCaptureContext, CUTOFF_CLOCK } from './cutoff-capture.js';
+import {
+  advisoryReadContext,
+  ADVISORY_CLOCK_ACCOUNT,
+  advisoryClockTime,
+} from './rpc-read-context.js';
 import {
   address,
   getAddressDecoder,
@@ -30,6 +37,8 @@ import {
   type SellSimulationRequest,
   type SimulatedExecution,
 } from '@paperfund/execution';
+
+import { maximumConstantProductSell } from './sell-capacity.js';
 
 export const PUMP_FUN_PROTOCOL_ID: ProtocolId = identifier('PUMP_FUN', 'ProtocolId');
 export const PUMP_FUN_ADAPTER_VERSION = 'pump-bonding-curve-v1';
@@ -281,8 +290,8 @@ export function validatePumpBondingCurve(curve: DecodedPumpBondingCurve): void {
   }
   if (curve.quoteMint !== ZERO_PUBLIC_KEY && curve.quoteMint !== WRAPPED_SOL_MINT) {
     throw new ExecutionEngineError(
-      'INVALID_MARKET_STATE',
-      'This adapter supports only SOL-paired Pump bonding curves.',
+      'UNSUPPORTED_PROTOCOL',
+      'Pump quote asset requires composed execution through the canonical router.',
     );
   }
 }
@@ -302,6 +311,7 @@ export interface SolanaRpcClientOptions {
   readonly commitment?: 'processed' | 'confirmed' | 'finalized';
   readonly timeoutMs?: number;
   readonly fetchImplementation?: typeof fetch;
+  readonly log?: PumpFunLogSink;
 }
 
 export type PumpFunLogSink = (event: string, metadata: JsonObject) => void;
@@ -313,6 +323,7 @@ export class SolanaRpcClient {
   readonly #commitment: 'processed' | 'confirmed' | 'finalized';
   readonly #timeoutMs: number;
   readonly #fetch: typeof fetch;
+  readonly #log: PumpFunLogSink;
   #requestId = 0;
 
   constructor(options: SolanaRpcClientOptions) {
@@ -324,40 +335,255 @@ export class SolanaRpcClient {
     this.#commitment = options.commitment ?? 'confirmed';
     this.#timeoutMs = options.timeoutMs ?? 10_000;
     this.#fetch = options.fetchImplementation ?? fetch;
+    this.#log = options.log ?? discardLog;
+  }
+
+  /** Retry the same read at the same commitment; never change venue on transport failure. */
+  private async request(init: RequestInit): Promise<Response> {
+    const request = JSON.parse(String(init.body)) as { method: string; params: unknown[] };
+    let reason = 'Unknown RPC failure';
+    const advisory = advisoryReadContext();
+    const attempts = advisory ? 2 : 3;
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      advisory?.signal.throwIfAborted();
+      const started = performance.now();
+      let retryAfter = 0;
+      let networkEnded: number | undefined;
+      if (advisory) advisory.metrics.rpcRequests++;
+      const rpcRequest = structuredClone(request);
+      if (advisory?.minimumSlot !== undefined && request.method === 'getMultipleAccounts')
+        rpcRequest.params[1] = {
+          ...(rpcRequest.params[1] as object),
+          minContextSlot: advisory.minimumSlot,
+        };
+      try {
+        const response = await this.#fetch(this.#url, {
+          ...init,
+          body: JSON.stringify(rpcRequest),
+          signal: advisory
+            ? AbortSignal.any([
+                advisory.signal,
+                AbortSignal.timeout(Math.min(1000, this.#timeoutMs)),
+              ])
+            : AbortSignal.timeout(this.#timeoutMs),
+        });
+        if (advisory && response.status === 429) {
+          advisory.metrics.rateLimits++;
+          const header = response.headers.get('retry-after');
+          retryAfter = header
+            ? /^\d+(?:\.\d+)?$/.test(header)
+              ? Number(header) * 1000
+              : Math.max(0, Date.parse(header) - Date.now())
+            : 1000;
+        }
+        if (!Number.isFinite(retryAfter) || retryAfter < 0) retryAfter = 1000;
+        if (advisory && retryAfter > 0) advisory.metrics.rateLimitedUntil = Date.now() + retryAfter;
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const body = (await response.clone().json()) as {
+          error?: { code?: number };
+          result?: unknown;
+        };
+        if (body.error || body.result === undefined)
+          throw new Error(`Rejected JSON-RPC response (${body.error?.code ?? 'missing-result'})`);
+        if (request.method === 'getMultipleAccounts') {
+          const result = body.result as MultipleAccountsResponse;
+          if (
+            !Array.isArray(result?.value) ||
+            result.value.length !== (request.params[0] as string[]).length ||
+            !Number.isSafeInteger(result.context?.slot) ||
+            result.context.slot < 0 ||
+            result.value.some(
+              (a) =>
+                a !== null &&
+                (!a ||
+                  typeof a.owner !== 'string' ||
+                  !Array.isArray(a.data) ||
+                  typeof a.data[0] !== 'string' ||
+                  a.data[1] !== 'base64'),
+            )
+          )
+            throw new Error('Malformed RPC account snapshot');
+        }
+        if (advisory && request.method === 'getMultipleAccounts') {
+          const slot = (body.result as MultipleAccountsResponse).context.slot;
+          if (advisory.minimumSlot !== undefined && slot < advisory.minimumSlot)
+            throw new Error('RPC slot regression');
+          advisory.minimumSlot = slot;
+        }
+        networkEnded = performance.now();
+        return response;
+      } catch (error) {
+        networkEnded = performance.now();
+        reason =
+          error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name)
+            ? 'Request timed out'
+            : error instanceof Error
+              ? safeErrorMessage(error, [this.#url])
+              : 'Transport failure';
+        try {
+          this.#log('RPC_READ_RETRY', {
+            method: request.method,
+            attempt: attempt + 1,
+            commitment: this.#commitment,
+            reason,
+            finalCode: attempt === attempts - 1 ? 'RPC_UNAVAILABLE' : null,
+          });
+        } catch {
+          /* Diagnostic failures cannot change read behavior. */
+        }
+        advisory?.signal.throwIfAborted();
+        if (attempt < attempts - 1) {
+          if (advisory) advisory.metrics.retries++;
+          const delay = advisory
+            ? Math.max(retryAfter, 100 * 2 ** attempt) * (1 + Math.random() * 0.25)
+            : 100 * 2 ** attempt;
+          await new Promise<void>((resolve, reject) => {
+            const abort = () => {
+              clearTimeout(timer);
+              reject(advisory!.signal.reason);
+            };
+            const timer = setTimeout(() => {
+              advisory?.signal.removeEventListener('abort', abort);
+              resolve();
+            }, delay);
+            advisory?.signal.addEventListener('abort', abort, { once: true });
+          });
+        }
+      } finally {
+        if (advisory) advisory.metrics.rpcMs += (networkEnded ?? performance.now()) - started;
+      }
+    }
+    throw new ExecutionEngineError(
+      'RPC_UNAVAILABLE',
+      `Solana RPC unavailable after ${attempts} attempts: ${reason}`,
+    );
   }
 
   async getMultipleAccounts(addresses: readonly string[]): Promise<MultipleAccountsResponse> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
-      const response = await this.#fetch(this.#url, {
+      const capture = cutoffCaptureContext();
+      const requested =
+        capture && !addresses.includes(CUTOFF_CLOCK) ? [...addresses, CUTOFF_CLOCK] : addresses;
+      const response = await this.request({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: ++this.#requestId,
           method: 'getMultipleAccounts',
-          params: [addresses, { encoding: 'base64', commitment: this.#commitment }],
+          params: [
+            requested,
+            { encoding: 'base64', commitment: capture ? (capture.commitment ?? 'finalized') : this.#commitment },
+          ],
         }),
-        signal: controller.signal,
       });
       if (!response.ok) throw new Error(`HTTP ${response.status.toString()}`);
       const body = (await response.json()) as {
         readonly result?: MultipleAccountsResponse;
         readonly error?: { readonly code?: number; readonly message?: string };
       };
-      if (body.error || !body.result || !Array.isArray(body.result.value)) {
+      if (
+        body.error ||
+        !body.result ||
+        !Array.isArray(body.result.value) ||
+        body.result.value.length !== requested.length ||
+        !Number.isSafeInteger(body.result.context?.slot) ||
+        body.result.context.slot < 0
+      ) {
         throw new Error('Malformed or rejected JSON-RPC response');
       }
-      return body.result;
+      if (capture) capture.push(structuredClone({ addresses: requested, result: body.result }));
+      return requested.length === addresses.length
+        ? body.result
+        : { ...body.result, value: body.result.value.slice(0, addresses.length) };
     } catch (error) {
       if (error instanceof ExecutionEngineError) throw error;
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new ExecutionEngineError('RPC_TIMEOUT', 'Solana RPC request timed out.');
+        throw new ExecutionEngineError('RPC_UNAVAILABLE', 'Solana RPC request timed out.');
       }
-      throw new ExecutionEngineError('RPC_ERROR', 'Solana RPC request failed.');
-    } finally {
-      clearTimeout(timeout);
+      throw new ExecutionEngineError('RPC_UNAVAILABLE', 'Solana RPC request failed.');
+    }
+  }
+
+  /** Mint discovery only. The caller must verify every candidate against the market PDA. */
+  async getProgramAccountAddresses(
+    programId: string,
+    mint: string,
+    mintOffset: number,
+    size: number,
+  ): Promise<string[]> {
+    try {
+      const response = await this.request({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: ++this.#requestId,
+          method: 'getProgramAccounts',
+          params: [
+            programId,
+            {
+              encoding: 'base64',
+              commitment: this.#commitment,
+              filters: [{ dataSize: size }, { memcmp: { offset: mintOffset, bytes: mint } }],
+              dataSlice: { offset: 0, length: 0 },
+            },
+          ],
+        }),
+      });
+      const body = (await response.json()) as {
+        result?: Array<{ pubkey: string }>;
+        error?: { code?: number };
+      };
+      if (!response.ok || !Array.isArray(body.result))
+        throw new Error(
+          `getProgramAccounts HTTP ${response.status}, RPC code ${body.error?.code ?? 'missing-result'}.`,
+        );
+      if (body.result.length > 16) throw new Error('Discovery exceeds bounded pool count.');
+      return body.result.map((a) => a.pubkey);
+    } catch (error) {
+      throw new ExecutionEngineError(
+        'RPC_UNAVAILABLE',
+        `LAUNCHLAB_STATE_UNAVAILABLE: on-chain pool discovery failed (${safeErrorMessage(error, [this.#url], 'unknown error')}).`,
+      );
+    }
+  }
+
+  async getOwnedTokenMints(owner: string): Promise<string[]> {
+    try {
+      const mints: string[] = [];
+      for (const programId of [SPL_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+        const response = await this.request({
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: ++this.#requestId,
+            method: 'getTokenAccountsByOwner',
+            params: [
+              owner,
+              { programId },
+              {
+                encoding: 'base64',
+                commitment: this.#commitment,
+                dataSlice: { offset: 0, length: 32 },
+              },
+            ],
+          }),
+        });
+        const body = (await response.json()) as {
+          result?: { value: Array<{ account: RpcAccount }> };
+        };
+        if (!response.ok || !body.result) throw new Error('Token account discovery failed.');
+        mints.push(
+          ...body.result.value.map(({ account }) =>
+            addressDecoder.decode(Buffer.from(account.data[0], 'base64')),
+          ),
+        );
+      }
+      return [...new Set(mints)];
+    } catch {
+      throw new ExecutionEngineError('RPC_UNAVAILABLE', 'Solana token-context discovery failed.');
     }
   }
 }
@@ -422,7 +648,14 @@ export class PumpFunSolanaMarketStateSource implements MarketStateSource {
         'Requested market is not the bonding-curve PDA for the requested mint.',
       );
     }
-    const addresses = [bondingCurveAddress, globalAddress, feeConfigAddress, identity.tokenMint];
+    const advisory = advisoryReadContext();
+    const addresses = [
+      bondingCurveAddress,
+      globalAddress,
+      feeConfigAddress,
+      identity.tokenMint,
+      ...(advisory ? [ADVISORY_CLOCK_ACCOUNT] : []),
+    ];
     const response = await this.rpc.getMultipleAccounts(addresses);
     if (response.value.length !== addresses.length) {
       throw new ExecutionEngineError(
@@ -478,6 +711,9 @@ export class PumpFunSolanaMarketStateSource implements MarketStateSource {
     }
     const normalizedState: PumpNormalizedState = {
       model: 'PUMP_FUN_BONDING_CURVE',
+      ...(advisory
+        ? { chainTime: advisoryClockTime(response.value[4], response.context.slot) }
+        : {}),
       programId: PUMP_PROGRAM_ID,
       feeProgramId: PUMP_FEE_PROGRAM_ID,
       bondingCurveAddress,
@@ -721,7 +957,9 @@ function simulatePumpSellAmount(tokenInput: bigint, state: PumpMathState): PumpS
   const netSolOutput = grossSolOutput - fees.total;
   if (grossSolOutput <= 0n || netSolOutput <= 0n || grossSolOutput > state.realSol) {
     throw new ExecutionEngineError(
-      'INVALID_EXECUTION_RESULT',
+      grossSolOutput > state.realSol
+        ? 'INSUFFICIENT_EXECUTABLE_LIQUIDITY'
+        : 'ZERO_EXECUTABLE_OUTPUT',
       'Pump SELL exceeds real reserves or produces no net SOL.',
     );
   }
@@ -771,6 +1009,25 @@ function assertIdentity(expected: MarketIdentity, actual: MarketIdentity): void 
 export class PumpFunProtocolAdapter implements ProtocolAdapter {
   readonly protocolId = PUMP_FUN_PROTOCOL_ID;
   readonly adapterVersion = PUMP_FUN_ADAPTER_VERSION;
+
+  async maxExecutableSellQuantity(request: PositionExitValuationRequest, marketState: MarketState) {
+    assertIdentity(request.identity, marketState.identity);
+    const state = mathState(marketState);
+    if (
+      state.protocolFeeBps + (state.creatorFeeApplies ? state.creatorFeeBps : 0n) >=
+      BPS_DENOMINATOR
+    )
+      return tokenBaseUnits(0n);
+    return tokenBaseUnits(
+      maximumConstantProductSell(
+        request.tokenQuantity,
+        state.virtualToken,
+        state.virtualSol,
+        (gross) => gross <= state.realSol && gross < state.virtualSol,
+        (gross) => gross - feesFor(gross, state).total,
+      ),
+    );
+  }
 
   constructor(
     readonly source: MarketStateSource,

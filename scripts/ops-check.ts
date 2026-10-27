@@ -1,7 +1,8 @@
+import { safeOpsErrorMessage, opsDiagnosticJson } from './safe-diagnostics.js';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { parseEnvironment } from '@paperfund/config';
 import { createDatabase } from '@paperfund/db';
 
@@ -30,13 +31,13 @@ try {
     `${count.toString()}/${journal.entries.length.toString()} applied`,
   );
 } catch (error) {
-  record('database', 'FAIL', error instanceof Error ? error.message : 'unavailable');
+  record('database', 'FAIL', safeOpsErrorMessage(error, 'unavailable'));
 }
 try {
   await redis.connect();
   record('redis', (await redis.ping()) === 'PONG' ? 'PASS' : 'FAIL', 'local dependency');
 } catch (error) {
-  record('redis', 'FAIL', error instanceof Error ? error.message : 'unavailable');
+  record('redis', 'FAIL', safeOpsErrorMessage(error, 'unavailable'));
 }
 try {
   const started = performance.now();
@@ -73,7 +74,7 @@ try {
     requiredNetworks: [...requiredNetworks],
   });
 } catch (error) {
-  record('solanaRpc', 'FAIL', error instanceof Error ? error.message : 'unavailable');
+  record('solanaRpc', 'FAIL', safeOpsErrorMessage(error, 'unavailable'));
 }
 try {
   const response = await fetch(
@@ -82,11 +83,7 @@ try {
   );
   record('api', response.ok ? 'PASS' : 'FAIL', `HTTP ${response.status.toString()}`);
 } catch (error) {
-  record(
-    'api',
-    production ? 'FAIL' : 'WARN',
-    error instanceof Error ? error.message : 'not running',
-  );
+  record('api', production ? 'FAIL' : 'WARN', safeOpsErrorMessage(error, 'not running'));
 }
 try {
   const value = JSON.parse(await readFile(resolve(environment.WORKER_HEARTBEAT_FILE), 'utf8')) as {
@@ -101,11 +98,7 @@ try {
   const fresh = ageMs <= Math.max(30_000, environment.WORKER_TICK_INTERVAL_MS * 3);
   record('worker', fresh ? 'PASS' : production ? 'FAIL' : 'WARN', { ageMs, ...value });
 } catch (error) {
-  record(
-    'worker',
-    production ? 'FAIL' : 'WARN',
-    error instanceof Error ? error.message : 'no heartbeat',
-  );
+  record('worker', production ? 'FAIL' : 'WARN', safeOpsErrorMessage(error, 'no heartbeat'));
 }
 if (environment.CREATOR_FEE_INGESTION_ENABLED) {
   const sourceId = `SOLANA_PUMP:${environment.CREATOR_FEE_NETWORK}:${environment.PAPERFUND_TOKEN_MINT}`;
@@ -136,6 +129,6 @@ record('publicOrigins', production ? 'PASS' : 'WARN', {
 });
 
 const failed = results.some((item) => item.status === 'FAIL');
-process.stdout.write(`${JSON.stringify({ status: failed ? 'FAIL' : 'PASS', results }, null, 2)}\n`);
+process.stdout.write(`${opsDiagnosticJson({ status: failed ? 'FAIL' : 'PASS', results })}\n`);
 await Promise.allSettled([database.close(), redis.quit()]);
 if (failed) process.exitCode = 1;

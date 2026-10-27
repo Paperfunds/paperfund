@@ -106,4 +106,26 @@ describe('Phase 4A hourly lifecycle worker', () => {
     const restartRows = await database.pool.query('select id from hourly_rounds');
     expect(restartRows.rows).toHaveLength(3);
   });
+
+  describe('private beta daily completeness', () => {
+    it('keeps a UTC day incomplete when canonical hourly dependencies are missing', async () => {
+      const router = new ExecutionRouter();
+      await runHourlyLifecycleTick(database, router, new Date('2026-09-26T00:00:00Z'));
+      const rows = await database.pool.query(
+        "select state from daily_competitions where utc_date='2026-09-25'",
+      );
+      expect(rows.rows[0].state).toBe('FINALIZING');
+      const count = await database.pool.query(
+        "select count(*)::int n from hourly_rounds where starts_at>='2026-09-25' and starts_at<'2026-09-26'",
+      );
+      expect(count.rows[0].n).toBeLessThan(24);
+      for (let hour = 0; hour < 24; hour++)
+        await runHourlyLifecycleTick(database, router, new Date(Date.UTC(2026, 8, 25, hour)));
+      await runHourlyLifecycleTick(database, router, new Date('2026-09-26T00:00:00Z'));
+      const complete = await database.pool.query(
+        "select state from daily_competitions where utc_date='2026-09-25'",
+      );
+      expect(complete.rows[0].state).toBe('FINALIZED');
+    });
+  });
 });

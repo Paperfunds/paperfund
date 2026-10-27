@@ -64,6 +64,76 @@
       "when": 1790630000000,
       "tag": "0008_operational_shadow_ingestion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790899200000,
+      "tag": "0009_settlement_writeoff_recovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791460800000,
+      "tag": "0010_chart_fill_fx_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791460800001,
+      "tag": "0011_captured_chart_fx",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792337400000,
+      "tag": "0012_approval_binding",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792337400001,
+      "tag": "0013_concurrency_recovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792337400002,
+      "tag": "0014_payout_authority",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792337400003,
+      "tag": "0015_payout_treasury",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792337400004,
+      "tag": "0016_legacy_liquidation_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792337400005,
+      "tag": "0017_beta_runtime_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792337400006,
+      "tag": "0018_mainnet_source_acceptance",
+      "breakpoints": true
     }
   ]
 }

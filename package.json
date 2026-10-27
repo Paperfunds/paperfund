@@ -38,16 +38,19 @@
     "start:worker": "npm run start --workspace @paperfund/worker",
     "ops:check": "tsx scripts/ops-check.ts",
     "payout:approve": "tsx scripts/payout-approve.ts",
+    "settlement:round": "tsx scripts/settlement-round.ts",
     "payout:execute": "tsx scripts/payout-execute.ts",
     "payout:status": "tsx scripts/payout-status.ts",
     "payout:reconcile": "tsx scripts/payout-status.ts --reconcile",
     "payout:devnet-smoke-seed": "tsx scripts/devnet-payout-smoke-seed.ts",
     "creator-fees:backfill": "tsx scripts/creator-fees-backfill.ts",
-    "creator-fees:status": "tsx scripts/creator-fees-status.ts"
+    "creator-fees:status": "tsx scripts/creator-fees-status.ts",
+    "test:publication": "vitest run packages/core/test apps/api/isolated/current-quotes/router.test.ts apps/api/isolated/current-quotes/cutoff.test.ts packages/protocols/test/secret-diagnostics.test.ts scripts/browser-config-security.test.ts scripts/extension-script-validation.test.ts && node --test apps/api/isolated/current-quotes/production-public/policy.test.mjs apps/api/isolated/current-quotes/production-public/discovery.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
+    "@types/bn.js": "^5.2.0",
     "@types/node": "^22.0.0",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
@@ -57,5 +60,6 @@
     "typescript-eslint": "^8.70.1",
     "vite": "7.3.6",
     "vitest": "^5.0.1"
-  }
+  },
+  "license": "Apache-2.0"
 }

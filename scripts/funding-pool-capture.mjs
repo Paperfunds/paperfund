@@ -1,0 +1,9 @@
+import{readFileSync,writeFileSync}from'node:fs';import{createHash}from'node:crypto';
+const dir=new URL('../../evidence/mainnet-verified/',import.meta.url),m=JSON.parse(readFileSync(new URL('provenance.json',dir))),summary=JSON.parse(readFileSync(new URL('summary.json',dir)));
+const setting=readFileSync('C:/Users/stanp/Documents/ChatGPT/Paperfund-new/.env','utf8').split(/\r?\n/).find(l=>l.startsWith('SOLANA_RPC_URL='));const endpoint=setting.slice(15).trim().replace(/^(['"])(.*)\1$/,'$2');
+// Official Pool layout: discriminator(8)+bump(1)+index(2)+creator(32)=base_mint offset 43.
+const request={jsonrpc:'2.0',id:m.captures.length+2,method:'getProgramAccountsV2',params:['pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',{commitment:'finalized',encoding:'base64',limit:1000,filters:[{memcmp:{offset:43,bytes:summary.mint??summary.addresses.mint}}]}]},requestedAt=new Date().toISOString();
+const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(30000)}),bytes=Buffer.from(await r.arrayBuffer()),body=JSON.parse(bytes);
+const file=`${String(request.id).padStart(4,'0')}-getProgramAccountsV2.json`;writeFileSync(new URL(file,dir),bytes,{flag:'wx'});
+if(!r.ok||body.error)throw Error('READONLY_PUMP_AMM_FILTER_FAILED');writeFileSync(new URL('pool-provenance.json',dir),JSON.stringify({providerOrigin:new URL(endpoint).origin,scope:'SUPPLEMENTAL_READ_ONLY_BASE_MINT_POOL_FILTER',file,request,requestedAt,receivedAt:new Date().toISOString(),http:r.status,sha256:createHash('sha256').update(bytes).digest('hex')},null,2));
+writeFileSync(new URL('pump-swap-pools.json',dir),JSON.stringify({observedAt:new Date().toISOString(),pools:body.result.accounts,paginationKey:body.result.paginationKey??null},null,2));console.log(JSON.stringify({baseMintPools:body.result.accounts.length,paginationKey:body.result.paginationKey??null}));

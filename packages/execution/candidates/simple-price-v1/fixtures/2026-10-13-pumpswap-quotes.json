@@ -1,0 +1,1693 @@
+{
+  "capturedAt": "2026-10-13T16:43:45.497Z",
+  "label": "READ_ONLY_REVIEW_RECEIPT_TIMES_NOT_EXECUTION_AUTHORITY",
+  "policy": {
+    "version": "QUOTE_REVIEW_ONLY_UNAPPROVED",
+    "maxAgeMs": 30000,
+    "maxFutureMs": 1000,
+    "maxSkewMs": 30000,
+    "maxDiscrepancyBps": "300",
+    "maxMovementBps": "20000",
+    "trustedSources": {
+      "chain": "solana-native-state",
+      "external": "jupiter"
+    },
+    "solQuote": "So11111111111111111111111111111111111111112"
+  },
+  "records": [
+    {
+      "pool": {
+        "name": "normal",
+        "mint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+        "pool": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J"
+      },
+      "state": {
+        "identity": {
+          "protocolId": "PUMP_SWAP",
+          "marketId": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+          "tokenMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump"
+        },
+        "observedAt": "2026-10-13T16:42:55.749Z",
+        "chainSlot": "456511667",
+        "chainBlockId": null,
+        "adapterVersion": "pump-swap-canonical-v1",
+        "normalizationVersion": "pump-swap-state-v1",
+        "normalizedState": {
+          "model": "PUMP_SWAP_CANONICAL_POOL",
+          "programId": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+          "feeProgramId": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+          "poolAddress": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+          "canonicalCreator": "9XDYTfQKwW8sHPqnFdUreMmtmffmkHVPGTNV2e3LKxNW",
+          "baseMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+          "quoteMint": "So11111111111111111111111111111111111111112",
+          "baseVault": "5jMpkf4JF4noHftLgNKyPNh6roVfPSGSjuEk3U4eLKRa",
+          "quoteVault": "43DVcZR4kQFjh4Xm2i3DcneRxNjZp7HMud8yDrJWrDr8",
+          "baseTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "quoteTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "tokenDecimals": "6",
+          "mintSupply": "999208349699598",
+          "baseReserves": "673244843558455",
+          "rawQuoteReserves": "123029076483",
+          "virtualQuoteReserves": "-92132",
+          "effectiveQuoteReserves": "123028984351",
+          "coinCreator": "5L5k7gtNLbeXdzpvNrFshg1E1id1ceUDfc6vPUTxp98q",
+          "isMayhemMode": false,
+          "isCashbackCoin": false,
+          "disableFlags": "0",
+          "lpFeeBps": "2",
+          "protocolFeeBps": "93",
+          "creatorFeeBps": "30",
+          "creatorFeeApplies": true,
+          "feeTierMarketCapLamportsThreshold": "0",
+          "feeConfigAccountLength": "4097",
+          "poolAccountLength": "300",
+          "stateSlots": {
+            "configuration": "456511667",
+            "reserves": "456511667"
+          }
+        }
+      },
+      "stateError": null,
+      "calibration": {
+        "identity": {
+          "mint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+          "market": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+          "quote": "So11111111111111111111111111111111111111112"
+        },
+        "observations": [
+          {
+            "source": "chain",
+            "upstream": "solana-native-state",
+            "reference": "96117b581c830993ebc86201bba95eb833760304d99b146ee4c3cc44cc131303",
+            "price": {
+              "n": "123028984351",
+              "d": "673244843558455"
+            },
+            "identity": {
+              "mint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "market": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+              "quote": "So11111111111111111111111111111111111111112"
+            },
+            "observedAtMs": 1791909775749,
+            "slot": "456511667",
+            "tradeable": true
+          },
+          {
+            "source": "external",
+            "upstream": "jupiter",
+            "reference": "3f9cb178cf39b75ba7b89812ac03b8ca5ea5650ec80233e6f7103108e4ef891b",
+            "price": {
+              "n": "9876543",
+              "d": "54042521624"
+            },
+            "identity": {
+              "mint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "market": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+              "quote": "So11111111111111111111111111111111111111112"
+            },
+            "observedAtMs": 1791909777365,
+            "slot": "456511675",
+            "tradeable": true
+          }
+        ],
+        "conversion": null,
+        "fees": [
+          {
+            "category": "LP",
+            "bps": "2"
+          },
+          {
+            "category": "PROTOCOL",
+            "bps": "93"
+          },
+          {
+            "category": "CREATOR",
+            "bps": "30"
+          }
+        ],
+        "feeReference": "96117b581c830993ebc86201bba95eb833760304d99b146ee4c3cc44cc131303",
+        "feeObservedAtMs": 1791909775749,
+        "quality": {
+          "depthLamports": "122689622363",
+          "baseSpreadBps": "0",
+          "reference": "3f9cb178cf39b75ba7b89812ac03b8ca5ea5650ec80233e6f7103108e4ef891b",
+          "observedAtMs": 1791909777365
+        }
+      },
+      "rows": [
+        {
+          "input": "10000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "10000000",
+              "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "outAmount": "54042521624",
+              "otherAmountThreshold": "53772309016",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "inAmount": "10000000",
+                    "outAmount": "54042521624",
+                    "updateContextSlot": "456511675"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511675,
+              "timeTaken": 0.000194555,
+              "swapUsdValue": "1.07467828670964",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "54042521624"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:42:57.365Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "inAmount": "54042521624",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "9751517",
+              "otherAmountThreshold": "9702760",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0438534382150239966921682493",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "54042521624",
+                    "outAmount": "9751517",
+                    "updateContextSlot": "456511683"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511682,
+              "timeTaken": 0.000176028,
+              "swapUsdValue": "1.0480099532346891808257",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "9751517",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:42:58.905Z"
+          },
+          "currentBuy": {
+            "input": "9999999",
+            "output": "54042521624"
+          },
+          "candidateBuy": {
+            "input": "10000000",
+            "output": "54042515096"
+          },
+          "currentSell": {
+            "input": "54042521624",
+            "output": "9751517"
+          },
+          "candidateSell": {
+            "input": "54042521624",
+            "output": "9751515"
+          }
+        },
+        {
+          "input": "100000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "100000000",
+              "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "outAmount": "540035174157",
+              "otherAmountThreshold": "537334998287",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "inAmount": "100000000",
+                    "outAmount": "540035174157",
+                    "updateContextSlot": "456511689"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511690,
+              "timeTaken": 0.000163188,
+              "swapUsdValue": "10.746740330315770",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "540035174157",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:00.476Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "inAmount": "540035174157",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "97374518",
+              "otherAmountThreshold": "96887646",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0444331645948739076201005381",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "540035174157",
+                    "outAmount": "97374518",
+                    "updateContextSlot": "456511696"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511697,
+              "timeTaken": 0.000158381,
+              "swapUsdValue": "10.466186051258961907158",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "97374518",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:02.021Z"
+          },
+          "currentBuy": {
+            "input": "99999999",
+            "output": "540035174157"
+          },
+          "candidateBuy": {
+            "input": "100000000",
+            "output": "540033981431"
+          },
+          "currentSell": {
+            "input": "540035174157",
+            "output": "97374518"
+          },
+          "candidateSell": {
+            "input": "540035174157",
+            "output": "97374301"
+          }
+        },
+        {
+          "input": "1000000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "1000000000",
+              "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "outAmount": "5361644893910",
+              "otherAmountThreshold": "5334836669441",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "inAmount": "1000000000",
+                    "outAmount": "5361644893910",
+                    "updateContextSlot": "456511703"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511703,
+              "timeTaken": 0.000201561,
+              "swapUsdValue": "107.4820937323215",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "5361644893910",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:03.572Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "inAmount": "5361644893910",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "959896883",
+              "otherAmountThreshold": "955097399",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0511042564833980462019566371",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "5361644893910",
+                    "outAmount": "959896883",
+                    "updateContextSlot": "456511724"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511724,
+              "timeTaken": 0.000183739,
+              "swapUsdValue": "103.1862619836725512993157",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "959896883"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:08.160Z"
+          },
+          "currentBuy": {
+            "input": "999999999",
+            "output": "5361644893910"
+          },
+          "candidateBuy": {
+            "input": "1000000000",
+            "output": "5361526794140"
+          },
+          "currentSell": {
+            "input": "5361644893910",
+            "output": "959896883"
+          },
+          "candidateSell": {
+            "input": "5361644893910",
+            "output": "959875906"
+          }
+        },
+        {
+          "input": "2000000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "2000000000",
+              "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "outAmount": "10638565480404",
+              "otherAmountThreshold": "10585372653002",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "inAmount": "2000000000",
+                    "outAmount": "10638565480404",
+                    "updateContextSlot": "456511730"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511730,
+              "timeTaken": 0.000173419,
+              "swapUsdValue": "215.0607271491030",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "10638565480404",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:09.711Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+              "inAmount": "10638565480404",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "1889929246",
+              "otherAmountThreshold": "1880479600",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0582195907521336020981090802",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "10638565480404",
+                    "outAmount": "1889929246",
+                    "updateContextSlot": "456511737"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511737,
+              "timeTaken": 0.000202251,
+              "swapUsdValue": "203.2067161675586662194552",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "GseMAnNDvntR5uFePZ51yZBXzNSn7GdFPkfHwfr6d77J": "1889929246",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:11.248Z"
+          },
+          "currentBuy": {
+            "input": "1999999999",
+            "output": "10638565480404"
+          },
+          "candidateBuy": {
+            "input": "2000000000",
+            "output": "10638100510826"
+          },
+          "currentSell": {
+            "input": "10638565480404",
+            "output": "1889929246"
+          },
+          "candidateSell": {
+            "input": "10638565480404",
+            "output": "1889847928"
+          }
+        }
+      ]
+    },
+    {
+      "pool": {
+        "name": "deep",
+        "mint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+        "pool": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x"
+      },
+      "state": {
+        "identity": {
+          "protocolId": "PUMP_SWAP",
+          "marketId": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+          "tokenMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump"
+        },
+        "observedAt": "2026-10-13T16:43:11.430Z",
+        "chainSlot": "456511738",
+        "chainBlockId": null,
+        "adapterVersion": "pump-swap-canonical-v1",
+        "normalizationVersion": "pump-swap-state-v1",
+        "normalizedState": {
+          "model": "PUMP_SWAP_CANONICAL_POOL",
+          "programId": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+          "feeProgramId": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+          "poolAddress": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+          "canonicalCreator": "HzjU9NmRC8GTwLWtaFEWkw2RoGV2sarK89JvcvCAuxjQ",
+          "baseMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+          "quoteMint": "So11111111111111111111111111111111111111112",
+          "baseVault": "2z8PBraUjSgFKvaYArMejAkSgKqcqLLh4NBc5oSkkEFb",
+          "quoteVault": "7T7sA6FQPxqSbjyeK8egKwNp5GmpEpoZxxGaTfnEuiaS",
+          "baseTokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "quoteTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "tokenDecimals": "6",
+          "mintSupply": "999998718510030",
+          "baseReserves": "844181156126435",
+          "rawQuoteReserves": "4137832418",
+          "virtualQuoteReserves": "17584505288",
+          "effectiveQuoteReserves": "21722337706",
+          "coinCreator": "C4kjEMzYMDUTvYhfd7FatY4Q6pSChwvdYgErLNjmQUrj",
+          "isMayhemMode": false,
+          "isCashbackCoin": false,
+          "disableFlags": "0",
+          "lpFeeBps": "2",
+          "protocolFeeBps": "93",
+          "creatorFeeBps": "30",
+          "creatorFeeApplies": true,
+          "feeTierMarketCapLamportsThreshold": "0",
+          "feeConfigAccountLength": "4097",
+          "poolAccountLength": "301",
+          "stateSlots": {
+            "configuration": "456511738",
+            "reserves": "456511738"
+          }
+        }
+      },
+      "stateError": null,
+      "calibration": {
+        "identity": {
+          "mint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+          "market": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+          "quote": "So11111111111111111111111111111111111111112"
+        },
+        "observations": [
+          {
+            "source": "chain",
+            "upstream": "solana-native-state",
+            "reference": "168532f12309e4d2fbec13cbb993f9de0f075805d035ad3e88c7d33d242147b0",
+            "price": {
+              "n": "21722337706",
+              "d": "844181156126435"
+            },
+            "identity": {
+              "mint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "market": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+              "quote": "So11111111111111111111111111111111111111112"
+            },
+            "observedAtMs": 1791909791430,
+            "slot": "456511738",
+            "tradeable": true
+          },
+          {
+            "source": "external",
+            "upstream": "jupiter",
+            "reference": "5bb935408bfa33c35e93bac4ea48ccbb4829915610cd8fb9b1f284380cd8d61d",
+            "price": {
+              "n": "9876543",
+              "d": "383651187363"
+            },
+            "identity": {
+              "mint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "market": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+              "quote": "So11111111111111111111111111111111111111112"
+            },
+            "observedAtMs": 1791909792972,
+            "slot": "456511745",
+            "tradeable": true
+          }
+        ],
+        "conversion": null,
+        "fees": [
+          {
+            "category": "LP",
+            "bps": "2"
+          },
+          {
+            "category": "PROTOCOL",
+            "bps": "93"
+          },
+          {
+            "category": "CREATOR",
+            "bps": "30"
+          }
+        ],
+        "feeReference": "168532f12309e4d2fbec13cbb993f9de0f075805d035ad3e88c7d33d242147b0",
+        "feeObservedAtMs": 1791909791430,
+        "quality": {
+          "depthLamports": "21710475634",
+          "baseSpreadBps": "0",
+          "reference": "5bb935408bfa33c35e93bac4ea48ccbb4829915610cd8fb9b1f284380cd8d61d",
+          "observedAtMs": 1791909792972
+        }
+      },
+      "rows": [
+        {
+          "input": "10000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "10000000",
+              "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "outAmount": "383651187363",
+              "otherAmountThreshold": "381732931427",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "inAmount": "10000000",
+                    "outAmount": "383651187363",
+                    "updateContextSlot": "456511745"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511745,
+              "timeTaken": 0.000195074,
+              "swapUsdValue": "1.075336763897327",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:12.972Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "inAmount": "383651187363",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "9744221",
+              "otherAmountThreshold": "9695500",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0352780778123867828955029628",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "383651187363",
+                    "outAmount": "9744221",
+                    "updateContextSlot": "456511752"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511752,
+              "timeTaken": 0.000195863,
+              "swapUsdValue": "1.0478422339302986956245",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:14.512Z"
+          },
+          "currentBuy": {
+            "input": "9999999",
+            "output": "383651187363"
+          },
+          "candidateBuy": {
+            "input": "10000000",
+            "output": "383651130927"
+          },
+          "currentSell": {
+            "input": "383651187363",
+            "output": "9744221"
+          },
+          "candidateSell": {
+            "input": "383651187363",
+            "output": "9744219"
+          }
+        },
+        {
+          "input": "100000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "100000000",
+              "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "outAmount": "3820884467788",
+              "otherAmountThreshold": "3801780045450",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "inAmount": "100000000",
+                    "outAmount": "3820884467788",
+                    "updateContextSlot": "456511773"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511773,
+              "timeTaken": 0.000190237,
+              "swapUsdValue": "10.754205122730990",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:19.101Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "inAmount": "3820884467788",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "96651959",
+              "otherAmountThreshold": "96168700",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0391817457906691005136552065",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "3820884467788",
+                    "outAmount": "96651959",
+                    "updateContextSlot": "456511781"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511781,
+              "timeTaken": 0.000193835,
+              "swapUsdValue": "10.3935128285831638113633",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:20.640Z"
+          },
+          "currentBuy": {
+            "input": "99999999",
+            "output": "3820884467788"
+          },
+          "candidateBuy": {
+            "input": "100000000",
+            "output": "3820875057377"
+          },
+          "currentSell": {
+            "input": "3820884467788",
+            "output": "96651959"
+          },
+          "candidateSell": {
+            "input": "3820884467788",
+            "output": "96651720"
+          }
+        },
+        {
+          "input": "1000000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "1000000000",
+              "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "outAmount": "36713318258714",
+              "otherAmountThreshold": "36529751667421",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0333858701783286842357652282",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "inAmount": "1000000000",
+                    "outAmount": "36713318258714",
+                    "updateContextSlot": "456511788"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511787,
+              "timeTaken": 0.000200039,
+              "swapUsdValue": "107.5295193801021",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:22.188Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "inAmount": "36713318258714",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "894012143",
+              "otherAmountThreshold": "889542083",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0750216284554330568310882738",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "36713318258714",
+                    "outAmount": "894012143",
+                    "updateContextSlot": "456511793"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511793,
+              "timeTaken": 0.000209411,
+              "swapUsdValue": "96.1418382933238472172991",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:23.732Z"
+          },
+          "currentBuy": {
+            "input": "999999999",
+            "output": "36713318258714"
+          },
+          "candidateBuy": {
+            "input": "1000000000",
+            "output": "36712445940738"
+          },
+          "currentSell": {
+            "input": "36713318258714",
+            "output": "894012143"
+          },
+          "candidateSell": {
+            "input": "36713318258714",
+            "output": "893991786"
+          }
+        },
+        {
+          "input": "2000000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "2000000000",
+              "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "outAmount": "70366411375836",
+              "otherAmountThreshold": "70014579318957",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0739206011704096168019604799",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "inAmount": "2000000000",
+                    "outAmount": "70366411375836",
+                    "updateContextSlot": "456511799"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511800,
+              "timeTaken": 0.000248714,
+              "swapUsdValue": "215.1168276331732",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:25.289Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+              "inAmount": "70366411375836",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "1650451509",
+              "otherAmountThreshold": "1642199252",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.1091237614331494009222220229",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "GQE8drmWfJBQ5djpHy39o4cFZNR1BDwcNb1eobGk531x",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "70366411375836",
+                    "outAmount": "1650451509",
+                    "updateContextSlot": "456511822"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511822,
+              "timeTaken": 0.00017907,
+              "swapUsdValue": "177.4761436432965446460225",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "12PUFAUzgLj1onv3wSqX9ZagZBiaxofEjTd24CnQpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:29.876Z"
+          },
+          "currentBuy": {
+            "input": "1999999999",
+            "output": "70366411375836"
+          },
+          "candidateBuy": {
+            "input": "2000000000",
+            "output": "70363206861887"
+          },
+          "currentSell": {
+            "input": "70366411375836",
+            "output": "1650451509"
+          },
+          "candidateSell": {
+            "input": "70366411375836",
+            "output": "1650382128"
+          }
+        }
+      ]
+    },
+    {
+      "pool": {
+        "name": "shallow",
+        "mint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+        "pool": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ"
+      },
+      "state": {
+        "identity": {
+          "protocolId": "PUMP_SWAP",
+          "marketId": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+          "tokenMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump"
+        },
+        "observedAt": "2026-10-13T16:43:30.093Z",
+        "chainSlot": "456511823",
+        "chainBlockId": null,
+        "adapterVersion": "pump-swap-canonical-v1",
+        "normalizationVersion": "pump-swap-state-v1",
+        "normalizedState": {
+          "model": "PUMP_SWAP_CANONICAL_POOL",
+          "programId": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+          "feeProgramId": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+          "poolAddress": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+          "canonicalCreator": "2Z2oDpc2K75JTeERiYmjSiG7Xo81qq5bv52nPGzBAsSt",
+          "baseMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+          "quoteMint": "So11111111111111111111111111111111111111112",
+          "baseVault": "2JMDCUsGuADrodb8GtqkBkbjqwWrr3jyrqDt5CpHhQ2Q",
+          "quoteVault": "9uEmoPEDoRfsSQLnSQjhwEVzG5KBD1tktPtJti27uRKL",
+          "baseTokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "quoteTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "tokenDecimals": "6",
+          "mintSupply": "972080965418973",
+          "baseReserves": "865786215219907",
+          "rawQuoteReserves": "3835202609",
+          "virtualQuoteReserves": "17584416507",
+          "effectiveQuoteReserves": "21419619116",
+          "coinCreator": "HC8yx3muLib97HFp1DbrJbHi59TRh6bsNysPBuSjkhBA",
+          "isMayhemMode": false,
+          "isCashbackCoin": false,
+          "disableFlags": "0",
+          "lpFeeBps": "2",
+          "protocolFeeBps": "93",
+          "creatorFeeBps": "30",
+          "creatorFeeApplies": true,
+          "feeTierMarketCapLamportsThreshold": "0",
+          "feeConfigAccountLength": "4097",
+          "poolAccountLength": "301",
+          "stateSlots": {
+            "configuration": "456511823",
+            "reserves": "456511823"
+          }
+        }
+      },
+      "stateError": null,
+      "calibration": {
+        "identity": {
+          "mint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+          "market": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+          "quote": "So11111111111111111111111111111111111111112"
+        },
+        "observations": [
+          {
+            "source": "chain",
+            "upstream": "solana-native-state",
+            "reference": "1c4da2a87143cd9a386309f212fe2e2391b1259ebf5e4459ee2b1ba7de568ccc",
+            "price": {
+              "n": "21419619116",
+              "d": "865786215219907"
+            },
+            "identity": {
+              "mint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "market": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+              "quote": "So11111111111111111111111111111111111111112"
+            },
+            "observedAtMs": 1791909810093,
+            "slot": "456511823",
+            "tradeable": true
+          },
+          {
+            "source": "external",
+            "upstream": "jupiter",
+            "reference": "75d71e8618d1946d1c7b00b765a3fc976e716d8ac5dcf0299b864328651fbf82",
+            "price": {
+              "n": "9876543",
+              "d": "399028198736"
+            },
+            "identity": {
+              "mint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "market": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+              "quote": "So11111111111111111111111111111111111111112"
+            },
+            "observedAtMs": 1791909811638,
+            "slot": "456511831",
+            "tradeable": true
+          }
+        ],
+        "conversion": null,
+        "fees": [
+          {
+            "category": "LP",
+            "bps": "2"
+          },
+          {
+            "category": "PROTOCOL",
+            "bps": "93"
+          },
+          {
+            "category": "CREATOR",
+            "bps": "30"
+          }
+        ],
+        "feeReference": "1c4da2a87143cd9a386309f212fe2e2391b1259ebf5e4459ee2b1ba7de568ccc",
+        "feeObservedAtMs": 1791909810093,
+        "quality": {
+          "depthLamports": "21409996454",
+          "baseSpreadBps": "0",
+          "reference": "75d71e8618d1946d1c7b00b765a3fc976e716d8ac5dcf0299b864328651fbf82",
+          "observedAtMs": 1791909811638
+        }
+      },
+      "rows": [
+        {
+          "input": "10000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "10000000",
+              "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "outAmount": "399028198736",
+              "otherAmountThreshold": "397033057743",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0308033566044065904828436821",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "inAmount": "10000000",
+                    "outAmount": "399028198736",
+                    "updateContextSlot": "456511831"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511831,
+              "timeTaken": 0.000187104,
+              "swapUsdValue": "1.075365858226605",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:31.638Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "inAmount": "399028198736",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "9744096",
+              "otherAmountThreshold": "9695376",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "399028198736",
+                    "outAmount": "9744096",
+                    "updateContextSlot": "456511837"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511837,
+              "timeTaken": 0.000168605,
+              "swapUsdValue": "1.0478538369354349485024",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:33.181Z"
+          },
+          "currentBuy": {
+            "input": "9999999",
+            "output": "399028198736"
+          },
+          "candidateBuy": {
+            "input": "10000000",
+            "output": "399028156463"
+          },
+          "currentSell": {
+            "input": "399028198736",
+            "output": "9744096"
+          },
+          "candidateSell": {
+            "input": "399028198736",
+            "output": "9744094"
+          }
+        },
+        {
+          "input": "100000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "100000000",
+              "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "outAmount": "3973799556823",
+              "otherAmountThreshold": "3953930559039",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0347865544971750358981005528",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "inAmount": "100000000",
+                    "outAmount": "3973799556823",
+                    "updateContextSlot": "456511844"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511845,
+              "timeTaken": 0.000193817,
+              "swapUsdValue": "10.753433446205620",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:34.722Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "inAmount": "3973799556823",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "96639652",
+              "otherAmountThreshold": "96156454",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "3973799556823",
+                    "outAmount": "96639652",
+                    "updateContextSlot": "456511851"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511851,
+              "timeTaken": 0.000154708,
+              "swapUsdValue": "10.3908084987788668826568",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:36.273Z"
+          },
+          "currentBuy": {
+            "input": "99999999",
+            "output": "3973799556823"
+          },
+          "candidateBuy": {
+            "input": "100000000",
+            "output": "3973791399419"
+          },
+          "currentSell": {
+            "input": "3973799556823",
+            "output": "96639652"
+          },
+          "candidateSell": {
+            "input": "3973799556823",
+            "output": "96639453"
+          }
+        },
+        {
+          "input": "1000000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "1000000000",
+              "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "outAmount": "38161603966368",
+              "otherAmountThreshold": "37970795946537",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.072804192259517626347122478",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "inAmount": "1000000000",
+                    "outAmount": "38161603966368",
+                    "updateContextSlot": "456511873"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511873,
+              "timeTaken": 0.000194438,
+              "swapUsdValue": "107.5027857735157",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:40.855Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "inAmount": "38161603966368",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "892960208",
+              "otherAmountThreshold": "888495407",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0369694532741741623966762363",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "38161603966368",
+                    "outAmount": "892960208",
+                    "updateContextSlot": "456511881"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511880,
+              "timeTaken": 0.000149818,
+              "swapUsdValue": "95.9911601743951615378704",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:42.399Z"
+          },
+          "currentBuy": {
+            "input": "999999999",
+            "output": "38161603966368"
+          },
+          "candidateBuy": {
+            "input": "1000000000",
+            "output": "38160848019299"
+          },
+          "currentSell": {
+            "input": "38161603966368",
+            "output": "892960208"
+          },
+          "candidateSell": {
+            "input": "38161603966368",
+            "output": "892943263"
+          }
+        },
+        {
+          "input": "2000000000",
+          "buyQuote": {
+            "quote": {
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "inAmount": "2000000000",
+              "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "outAmount": "73101101621404",
+              "otherAmountThreshold": "72735596113297",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.1118793306283598281184156384",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "So11111111111111111111111111111111111111112",
+                    "outputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "inAmount": "2000000000",
+                    "outAmount": "73101101621404",
+                    "updateContextSlot": "456511887"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511887,
+              "timeTaken": 0.000187437,
+              "swapUsdValue": "214.9891297726710",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true",
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:43.950Z"
+          },
+          "sellQuote": {
+            "quote": {
+              "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+              "inAmount": "73101101621404",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outAmount": "1646869919",
+              "otherAmountThreshold": "1638635570",
+              "swapMode": "ExactIn",
+              "slippageBps": 50,
+              "platformFee": null,
+              "priceImpactPct": "0.0727318027333414531189703881",
+              "routePlan": [
+                {
+                  "swapInfo": {
+                    "ammKey": "ATB9NBwxotPJPK43tyRuSecgKQBF5GmYuWohvr6f8tkZ",
+                    "label": "Pump.fun Amm",
+                    "inputMint": "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump",
+                    "outputMint": "So11111111111111111111111111111111111111112",
+                    "inAmount": "73101101621404",
+                    "outAmount": "1646869919",
+                    "updateContextSlot": "456511895"
+                  },
+                  "percent": 100,
+                  "bps": null
+                }
+              ],
+              "contextSlot": 456511894,
+              "timeTaken": 0.000161563,
+              "swapUsdValue": "177.0491492739551908189606",
+              "mostReliableAmmsQuoteReport": {
+                "info": {
+                  "6FDw6jns8g7czuRucp5993RBNRPvqtMfv5Jv3hjnpump": "Not found",
+                  "Czfq3xZZDmsdGdUyrNLtRhGc47cXcZtLG4crryfu44zE": "Not used RG: FullLiquidIntermediate, contains ALT: true"
+                }
+              },
+              "longtailMarketQuoteReport": null,
+              "useIncurredSlippageForQuoting": null,
+              "useRewards": null,
+              "otherRoutePlans": null,
+              "loadedLongtailToken": false,
+              "instructionVersion": null,
+              "transactionVersion": 0
+            },
+            "receivedAt": "2026-10-13T16:43:45.496Z"
+          },
+          "currentBuy": {
+            "input": "1999999999",
+            "output": "73101101621404"
+          },
+          "candidateBuy": {
+            "input": "2000000000",
+            "output": "73098327700791"
+          },
+          "currentSell": {
+            "input": "73101101621404",
+            "output": "1646869919"
+          },
+          "candidateSell": {
+            "input": "73101101621404",
+            "output": "1646812291"
+          }
+        }
+      ]
+    }
+  ]
+}

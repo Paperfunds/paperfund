@@ -8,14 +8,36 @@ import {
   AxiomTerminalAdapter,
   GMGNTerminalAdapter,
   TerminalAdapterRegistry,
-  TerminalTradeAdapter,
+  PadreTerminalAdapter,
   isSolanaAddress,
+  isActionableTerminal,
   type TerminalAdapter,
   type TerminalId,
 } from './terminal.js';
 
 const MINT_A = '7LSsEoJGhLeZzGvDofTdNg7M3JttxQqGWNLo6vWMpump';
 const MINT_B = '6pobtrZo2hS8ntAwXsP7283ye6oTGdrVj7RqghYQpump';
+
+it('hides overview routes and restores token routes during navigation on every terminal', () => {
+  const registry = new TerminalAdapterRegistry();
+  for (const url of [
+    'https://axiom.trade/pulse',
+    'https://axiom.trade/discover',
+    'https://axiom.trade/trackers',
+    'https://axiom.trade/portfolio',
+    'https://gmgn.ai/sol',
+    'https://trade.padre.gg/trenches',
+  ]) {
+    expect(isActionableTerminal(registry.detect(url))).toBe(false);
+  }
+  for (const url of [
+    `https://axiom.trade/meme/${MINT_A}`,
+    `https://gmgn.ai/sol/token/${MINT_A}`,
+    `https://trade.padre.gg/trade/solana/${MINT_A}`,
+  ]) {
+    expect(isActionableTerminal(registry.detect(url))).toBe(true);
+  }
+});
 
 const fixtures: Array<{
   id: TerminalId;
@@ -42,12 +64,12 @@ const fixtures: Array<{
     malformed: 'https://gmgn.ai/sol/token/not-a-mint',
   },
   {
-    id: 'TERMINAL',
-    adapter: new TerminalTradeAdapter(),
-    valid: (mint) => `https://www.theterminal.trade/token/${mint}?network=solana`,
-    unsupported: 'https://www.theterminal.trade/trenches?network=solana',
-    nonSolana: `https://www.theterminal.trade/token/${MINT_A}?network=ethereum`,
-    malformed: 'https://www.theterminal.trade/token/not-a-mint?network=solana',
+    id: 'PADRE',
+    adapter: new PadreTerminalAdapter(),
+    valid: (mint) => `https://trade.padre.gg/trade/solana/${mint}`,
+    unsupported: 'https://trade.padre.gg/trenches',
+    nonSolana: `https://trade.padre.gg/trade/ethereum/${MINT_A}`,
+    malformed: 'https://trade.padre.gg/trade/solana/not-a-mint',
   },
 ];
 

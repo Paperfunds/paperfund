@@ -1,0 +1,20 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@paperfund/db": [
+        "../../../../packages/db/src/index.ts"
+      ]
+    },
+    "noEmit": true,
+    "composite": false
+  },
+  "include": [
+    "./runtime.ts",
+    "../../../../packages/db/isolated/linked-pair/verified-api-crash-child.ts",
+    "./production-composition.ts",
+    "./finalized-connector.ts",
+    "./production.integration.test.ts",
+    "./production-entry.ts"
+  ]
+}

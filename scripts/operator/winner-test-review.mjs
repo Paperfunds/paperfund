@@ -1,0 +1,8 @@
+import fs from 'node:fs';import {withReadonlyDatabase} from './treasury.mjs';import {loadWinnerTestSource} from './winner-test-runtime.mjs';import {prepareWinnerTest} from './winner-test-core.mjs';import {developerRpc} from './developer-transfer-review.mjs';import {readSetting} from './common.mjs';
+export async function prepareOperatorWinnerTest(){
+ const intent=JSON.parse(fs.readFileSync('artifacts/operator/winner-test-intent-draft.json'));
+ const source=await withReadonlyDatabase(client=>loadWinnerTestSource({intent,config:{},client,transactionOpen:true}));
+ const review=await prepareWinnerTest(source.plan,developerRpc(await readSetting('SOLANA_RPC_URL')),{protectedFloor:source.protectedFloor});
+ const envelope={review,reviewSha256:(await import('./claim-core.mjs')).digest(JSON.stringify(review))};fs.writeFileSync('artifacts/operator/winner-test-review.json',JSON.stringify(envelope,null,2));return envelope;
+}
+export function operatorWinnerTestStatus(){let value;try{value=JSON.parse(fs.readFileSync('artifacts/operator/winner-test-review.json'));}catch{value={ready:false,status:'WAITING_FOR_INVITED_FINALIZED_RESULTS',intent:JSON.parse(fs.readFileSync('artifacts/operator/winner-test-intent-draft.json')),transactionAuthority:'NONE'};}const read=file=>{try{return JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));}catch{return null;}};const root=(process.env.ProgramData??'C:/ProgramData')+'/PaperfundSignerAcceptance/';return {...value,request:read('artifacts/operator/native-winner-test-request.json'),native:read(root+'native-winner-test-launch.public.json'),execution:read(root+'claim-WinnerTest.public.json'),recovery:read(root+'claim-ReconcileWinnerTest.public.json')};}

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>Paperfund local operator</title
+  ><link rel="stylesheet" href="/ui.css" />
+  <script type="module" src="/ui.mjs"></script>
+  <body>
+    <header><b>PF / PAPERFUND</b><span>LOCAL OPERATOR</span></header>
+    <main>
+      <h1>Operator console</h1>
+      <p class="warning">Financial STOP — competition payouts are disabled. Manual creator claims require exact local approval.</p>
+      <p id="session">Opening local session…</p>
+      <section>
+        <h2>Public PAPER trading</h2>
+        <p>Target: api.paperfund.app. Connect the configured trusted-operator wallet and sign the login message, then enable trading. PAPER is simulated. Financial STOP, disabled signing/payouts and all settlement REVIEW holds stay in force.</p>
+        <button id="paper-connect">Connect operator wallet</button>
+        <button id="paper-enable" disabled>Enable public PAPER trading</button>
+        <button id="paper-pause" disabled>Pause BUYs — EXIT_ONLY</button>
+        <button id="paper-refresh">Refresh PAPER status</button>
+        <pre id="paper-result">Operator wallet sign-in required.</pre>
+      </section>
+      <nav>
+        <button id="refresh">Refresh system</button
+        ><button id="discover">Discover actual creator fees</button
+        ><button id="claim">Prepare & simulate creator claim</button>
+      </nav>
+      <section><h2>One-time invited winner test</h2><p>Operator test budget; not creator-fee revenue. Production competition STOP stays asserted. No payment without separate protected local YES.</p><button id="winner-test-prepare">Prepare invited winner payout</button><button id="winner-test-authorize" disabled>Review &amp; authorize ONE winner test</button><button id="winner-test-reconcile">Reconcile winner test — read-only</button><pre id="winner-test-result">Waiting for genuine finalized invited-account results.</pre></section>
+      <section>
+        <h2>System & authorization</h2>
+        <div id="system-summary" class="grid"></div>
+        <details>
+          <summary>Technical evidence</summary>
+          <pre id="system">Loading…</pre>
+        </details>
+      </section>
+      <section>
+        <h2>Wallet & treasury</h2>
+        <p id="wallet"></p>
+        <div id="treasury-summary" class="grid"></div>
+        <details>
+          <summary>Treasury evidence</summary>
+          <pre id="treasury">Loading…</pre>
+        </details>
+        <div id="fee-summary" class="grid"></div>
+        <details open>
+          <summary>Hourly fee monitor</summary>
+          <pre id="monitor">Checking persisted observer state…</pre>
+        </details>
+        <details>
+          <summary>Creator-fee evidence</summary>
+          <pre id="fees">Run fee discovery for fresh finalized mainnet observations.</pre>
+        </details>
+      </section>
+      <section>
+        <h2>Competitions & REVIEW holds</h2>
+        <div id="round-summary"></div>
+        <details>
+          <summary>Competition evidence and source snapshots</summary>
+          <pre id="competitions"></pre>
+        </details>
+      </section>
+      <section>
+        <h2>Automation — claims and rewards</h2>
+        <p>
+          One-time protected standing authorization is required. The exposed burner key is excluded
+          from unattended production. STOP, qualification and funding checks always apply.
+        </p>
+        <div id="automation-summary" class="grid"></div>
+        <button id="automation-claim-now">Claim Fees Now</button>
+        <button id="automation-claims">Auto Claim Fees — OFF</button>
+        <button id="automation-hourly">Hourly Rewards — OFF</button>
+        <button id="automation-daily">Daily Rewards — OFF</button>
+        <button id="automation-stop">Emergency automation STOP</button>
+        <button id="automation-reconcile">Reconcile existing transactions</button>
+        <button id="automation-draft">Export standing-policy draft</button>
+        <div id="automation-history"></div>
+        <details>
+          <summary>Standing policy, limits, expiry, revocation and blockers</summary>
+          <pre id="automation-detail">Loading persisted status…</pre>
+        </details>
+        <pre id="automation-action"></pre>
+      </section>
+      <section>
+        <h2>Exact single-transaction claim review</h2>
+        <p>
+          Review only. Financial STOP remains asserted. Exact protected authorization and local
+          signer confirmation are required before execution.
+        </p>
+        <div id="claim-summary" class="grid"></div>
+        <p id="claim-expiry"></p>
+        <details>
+          <summary>Exact transaction, simulation and approval hashes</summary>
+          <pre id="claim-detail">Prepare a fresh claim review.</pre>
+        </details>
+        <p id="claim-signer">Imported wallet check pending in isolated signer.</p>
+        <button id="manual-claim-test" disabled>Test Windows confirmation — read-only</button>
+        <button id="manual-claim" disabled>Review & authorize ONE manual mainnet claim</button>
+        <p>Existing burner, manual test only. Local administrator consent and the signer Windows password are required. Confirm the exact transaction in the protected local dialog; no hash copying. Maximum gross 0.02 SOL, maximum fee 0.000005 SOL. No transfers or prize authority.</p>
+        <pre id="claim-result">No transaction authorized.</pre>
+      </section>
+      <section>
+        <h2>One-time mainnet developer transfer test</h2>
+        <p>Recipient: 53sJCZ59TSkVynoD9SfaAXZMKyZtvRgN9QZTrzqRXrbx. Manual test only; not token-attributed or database-credited. No competition payout authority.</p>
+        <button id="developer-transfer-prepare">Prepare & simulate developer transfer</button>
+        <button id="developer-transfer-authorize" disabled>Review & authorize ONE developer transfer</button>
+        <button id="developer-transfer-reconcile">Reconcile developer transfer — read-only</button>
+        <div id="developer-transfer-summary" class="grid"></div>
+        <p id="developer-transfer-expiry"></p>
+        <pre id="developer-transfer-result">No transfer authorized.</pre>
+      </section>
+      <section>
+        <h2>Winner payouts — review and funding</h2>
+        <button id="reward-refresh">Refresh verified winner accounting</button>
+        <div id="reward-summary" class="grid"></div>
+        <h3>Completed competitions</h3>
+        <div id="reward-competitions"></div>
+        <label
+          >Immutable payout plan
+          <select id="reward-plan"></select
+        ></label>
+        <div id="reward-plan-summary" class="grid"></div>
+        <div id="reward-recipients"></div>
+        <details>
+          <summary>Provider, UTC, devnet and exact acceptance blockers</summary>
+          <pre id="reward-evidence"></pre>
+        </details>
+        <p>
+          REVIEW plans cannot be approved or paid. A displayed FINALIZED round does not establish
+          financial ACCEPTED status. Recipient addresses below come from immutable source snapshots.
+        </p>
+        <label>Immutable plan ID <input id="plan" maxlength="256" /></label
+        ><button id="review">Prepare / review pinned recipients</button
+        ><button disabled>Approve</button><button disabled>Sign & broadcast</button>
+        <p>
+          Approval requires qualified evidence, funded reservations, approved limits and separate
+          enrolled authorization/execution identities. The accepted candidate has no mainnet
+          ACCEPTED branch. Existing authenticated winner wallets are retained in immutable source
+          snapshots.
+        </p>
+        <pre id="payout"></pre>
+      </section>
+      <section>
+        <h2>Fresh competition evidence</h2>
+        <p>Read-only collection. 100 ms UTC limit; unsupported or incomplete evidence stays REVIEW. No financial authority.</p>
+        <pre id="round-evidence">Waiting for evidence collector.</pre>
+      </section>
+      <section>
+        <h2>Wallet setup & recovery</h2>
+        <p>
+          Use scripts/operator/wallet-import.ps1 in a separate non-administrator Windows signer
+          account. This console never accepts a private key. Keep the signer account separate from
+          API and worker identities. Import validates the derived public address before storing a
+          DPAPI CurrentUser encrypted record.
+        </p>
+        <p>
+          Shutdown: STOP_PAPERFUND_BETA.cmd reports the safe service sequence. Preserve uncertain
+          signatures and reservations; reconcile before resuming. The launcher does not kill
+          existing services.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

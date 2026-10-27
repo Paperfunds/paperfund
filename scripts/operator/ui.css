@@ -1,0 +1,124 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #0d1115;
+  color: #dce4ea;
+  font: 15px system-ui;
+}
+header {
+  padding: 22px 5%;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #28303a;
+}
+header b {
+  color: #73e4ad;
+}
+header span {
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+main {
+  max-width: 1160px;
+  margin: auto;
+  padding: 25px;
+}
+h1 {
+  font-size: 30px;
+}
+.warning {
+  border-left: 4px solid #f4bd61;
+  background: #29231a;
+  padding: 16px;
+  color: #f4d49f;
+}
+section {
+  margin: 20px 0;
+  background: #141b22;
+  padding: 22px;
+  border: 1px solid #28313b;
+  border-radius: 8px;
+}
+h2 {
+  font-size: 18px;
+  margin-top: 0;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    12px/1.6 Consolas,
+    monospace;
+  max-height: 480px;
+  overflow: auto;
+  color: #b8cedc;
+}
+button,
+input {
+  padding: 11px;
+  background: #263a33;
+  color: #dce4ea;
+  border: 1px solid #446354;
+  border-radius: 5px;
+  margin: 5px;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+input {
+  width: 330px;
+}
+p {
+  line-height: 1.6;
+  color: #b7c6d1;
+}
+nav {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  margin: 15px 0;
+}
+.metric {
+  background: #0e151b;
+  border: 1px solid #2b3740;
+  border-radius: 6px;
+  padding: 14px;
+}
+.metric small {
+  display: block;
+  color: #a7b9c5;
+  margin-bottom: 6px;
+}
+.metric strong {
+  font-size: 18px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+details {
+  margin-top: 15px;
+}
+summary {
+  color: #8da7b6;
+  cursor: pointer;
+  font-size: 13px;
+}
+.round-row {
+  padding: 12px 0;
+  border-bottom: 1px solid #29343e;
+  font:
+    13px Consolas,
+    monospace;
+}
+
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}td,th{text-align:left;padding:9px;border-bottom:1px solid #243039;overflow-wrap:anywhere}td:first-child{max-width:260px}select{max-width:100%;padding:10px;background:#152124;color:#e9f3ed}#reward-recipients td:nth-child(2){font-family:monospace}

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { config as loadDotEnv } from 'dotenv';
@@ -10,6 +11,7 @@ import { identifier } from '@paperfund/core';
 import {
   ExecutionEngineError,
   ExecutionRouter,
+  type JsonObject,
   type MarketIdentity,
   type MarketState,
   type MarketStateSource,
@@ -31,14 +33,19 @@ import { createDatabase } from '../src/database.js';
 import {
   applyFill,
   createAsset,
+  createDailyCompetition,
   createHourlyRound,
   createMarket,
   createOrder,
   createUser,
   executePaperBuy,
+  executePaperSell,
+  executePaperSellAll,
   getAccountFinancialState,
   initializeCompetitionAccount,
   reconcileAccountLedger,
+  replayPersistedFill,
+  settleHourlyRound,
 } from '../src/financial-service.js';
 
 loadDotEnv({ path: resolve(process.cwd(), '.env'), quiet: true });
@@ -226,7 +233,12 @@ beforeAll(async () => {
   const { adminUrl, testUrl } = urls();
   adminPool = new Pool({ connectionString: adminUrl });
   await adminPool.query(`create database "${databaseName}"`);
-  database = createDatabase(testUrl);
+    // Explicit positive permission in this disposable financial-rule fixture; production defaults deny.
+    database = createDatabase(testUrl, { authorizePaperBuy: async (context) => {
+      if (context.client && context.accountId)
+        await context.client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', ['paperfund-paper-entry:' + context.accountId]);
+      return true;
+    } });
   await migrate(database.client, { migrationsFolder });
   await migrate(database.client, { migrationsFolder });
 });
@@ -506,6 +518,204 @@ describe('authoritative paper BUY', () => {
         'tampered',
       ]),
     ).rejects.toThrow(/immutable/);
+  });
+});
+
+const containmentRoutes = JSON.parse(
+  readFileSync(new URL('./fixtures/two-pool-buy-containment.json', import.meta.url), 'utf8'),
+) as { routes: { mint_address: string; hops: JsonObject[] }[] };
+const affectedPools = [
+  'J7wveuS29NdZDEDuJp8C7W1BvkkLU88bWHsCtLGaCcbx',
+  '2bDQiRwzoeqLfZ2nQ8decjqhDyAp8f1kx8WW33jwhYXH',
+];
+
+function routeRouter(target: Fixture, normalizedState: JsonObject): ExecutionRouter {
+  const adapter = new ReferenceProtocolAdapter([marketFixture(target)]);
+  const load = adapter.loadMarketState.bind(adapter);
+  adapter.loadMarketState = async (identity) => {
+    const state = await load(identity);
+    return { ...state, normalizedState: { ...state.normalizedState, ...normalizedState } };
+  };
+  return new ExecutionRouter([adapter]);
+}
+
+async function containmentSnapshot(target: Fixture) {
+  // The suite owns a disposable database. Compare full rows, not just row counts.
+  const records: Record<string, unknown> = {};
+  for (const table of [
+    'competition_accounts',
+    'positions',
+    'orders',
+    'fills',
+    'journal_transactions',
+    'ledger_entries',
+    'competition_token_slots',
+    'idempotency_records',
+    'market_state_evidence',
+    'order_market_state_evidence',
+  ]) {
+    records[table] = (await database.pool.query(`select * from ${table} order by id`)).rows;
+  }
+  return { account: await getAccountFinancialState(database, target.accountId), records };
+}
+
+describe('temporary two-pool new-BUY containment', () => {
+  it.each(containmentRoutes.routes)(
+    'rejects recorded route $mint_address without mutations',
+    async ({ hops }) => {
+      const target = await fixture('contained-recorded');
+      const before = await containmentSnapshot(target);
+      await expect(
+        buy(target, 1_000_000_000n, `${target.prefix}:blocked`, routeRouter(target, { hops })),
+      ).rejects.toMatchObject({
+        code: 'UNSUPPORTED_PROTOCOL',
+        message: expect.stringContaining('temporarily unsupported'),
+      });
+      expect(await containmentSnapshot(target)).toEqual(before);
+      expect((await reconcileAccountLedger(database, target.accountId)).reconciled).toBe(true);
+    },
+  );
+
+  it.each(affectedPools.flatMap((pool) => [0, 1, 2].map((position) => ({ pool, position }))))(
+    'checks exact pool $pool at hop $position',
+    async ({ pool, position }) => {
+      const target = await fixture('contained-hop');
+      const hops = [0, 1, 2].map((index) => ({
+        pool: index === position ? pool : `unrelated-pool-${index}`,
+      }));
+      const before = await containmentSnapshot(target);
+      await expect(
+        buy(target, 1_000_000_000n, `${target.prefix}:blocked`, routeRouter(target, { hops })),
+      ).rejects.toMatchObject({ code: 'UNSUPPORTED_PROTOCOL' });
+      expect(await containmentSnapshot(target)).toEqual(before);
+    },
+  );
+
+  it('allows same-token alternative routes and ignores unselected candidates and address lookalikes', async () => {
+    const target = await fixture('alternative');
+    const key = `${target.prefix}:retry`;
+    await expect(
+      buy(
+        target,
+        1_000_000_000n,
+        key,
+        routeRouter(target, { hops: [{ pool: affectedPools[0]! }] }),
+      ),
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_PROTOCOL' });
+    const selected = affectedPools.flatMap((pool) => [
+      { pool: pool.slice(0, -1) },
+      { pool: `${pool}x` },
+      { pool: pool.toLowerCase() },
+      { pool: 'unrelated-pool', mintA: pool, vaultA: pool },
+    ]);
+    const result = await buy(
+      target,
+      1_000_000_000n,
+      key,
+      routeRouter(target, {
+        hops: selected,
+        candidateRoutes: [[{ pool: affectedPools[0]! }], [{ pool: affectedPools[1]! }]],
+        diagnostic: affectedPools[0]!,
+      }),
+    );
+    expect(result.paperSolBalanceLamports).toBe(9_000_000_000n);
+    // A committed idempotency retry must return its original fill, even if routing changes.
+    await expect(
+      buy(
+        target,
+        1_000_000_000n,
+        key,
+        routeRouter(target, { hops: [{ pool: affectedPools[0]! }] }),
+      ),
+    ).resolves.toEqual(result);
+    expect(
+      (await replayPersistedFill(database, router([marketFixture(target)]), result.fillId)).matched,
+    ).toBe(true);
+  });
+
+  it('keeps an existing affected holding available for unrelated BUY equity valuation', async () => {
+    const target = await fixture('contained-existing-equity');
+    await seedPosition(target, target.marketId, 100n, 1_000_000_000n, 'legacy');
+    const alternative = { ...target, ...(await addMarket(target.prefix, 'unrelated')) };
+    const adapter = new ReferenceProtocolAdapter([
+      marketFixture(target),
+      marketFixture(alternative),
+    ]);
+    const load = adapter.loadMarketState.bind(adapter);
+    adapter.loadMarketState = async (identity) => {
+      const state = await load(identity);
+      return {
+        ...state,
+        normalizedState: {
+          ...state.normalizedState,
+          hops: [
+            { pool: identity.marketId === target.marketId ? affectedPools[0]! : 'unrelated-pool' },
+          ],
+        },
+      };
+    };
+    await expect(
+      buy(
+        alternative,
+        1_000_000_000n,
+        `${target.prefix}:unrelated`,
+        new ExecutionRouter([adapter]),
+      ),
+    ).resolves.toMatchObject({ paperSolBalanceLamports: 8_000_000_000n });
+    expect((await reconcileAccountLedger(database, target.accountId)).reconciled).toBe(true);
+  });
+
+  it.each(affectedPools)('preserves SELL, SELL ALL, and replay through %s', async (pool) => {
+    const target = await fixture('contained-exit');
+    await seedPosition(target, target.marketId, 100n, 1_000_000_000n, 'legacy');
+    const executionRouter = routeRouter(target, { hops: [{ pool }] });
+    const partial = await executePaperSell(database, executionRouter, {
+      competitionAccountId: target.accountId,
+      marketId: target.marketId,
+      requestedTokenQuantity: 25n,
+      idempotencyKey: `${target.prefix}:partial`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 1000),
+    });
+    expect(partial.position.remainingBaseUnits).toBe(75n);
+    const final = await executePaperSellAll(database, executionRouter, {
+      competitionAccountId: target.accountId,
+      marketId: target.marketId,
+      idempotencyKey: `${target.prefix}:all`,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 2000),
+    });
+    expect(final.position.remainingBaseUnits).toBe(0n);
+    for (const fill of [partial, final]) {
+      expect((await replayPersistedFill(database, executionRouter, fill.fillId)).matched).toBe(
+        true,
+      );
+    }
+    expect((await reconcileAccountLedger(database, target.accountId)).reconciled).toBe(true);
+  });
+
+  it.each(affectedPools)('preserves forced settlement through %s', async (pool) => {
+    const target = await fixture('contained-settlement');
+    const utcDate = target.startsAt.toISOString().slice(0, 10);
+    const start = new Date(`${utcDate}T00:00:00.000Z`);
+    if (
+      !(await database.pool.query('select id from daily_competitions where utc_date=$1', [utcDate]))
+        .rowCount
+    ) {
+      await createDailyCompetition(database, {
+        id: `containment-daily:${utcDate}`,
+        utcDate,
+        startsAt: start,
+        endsAtExclusive: new Date(start.getTime() + 86400000),
+      });
+    }
+    await seedPosition(target, target.marketId, 100n, 1_000_000_000n, 'legacy');
+    const executionRouter = routeRouter(target, { hops: [{ pool }] });
+    const result = await settleHourlyRound(database, executionRouter, {
+      hourlyRoundId: target.roundId,
+      authoritativeTimestamp: new Date(target.startsAt.getTime() + 3_600_000),
+    });
+    expect(result).toMatchObject({ state: 'FINALIZED', failures: [] });
+    expect(result.forcedSells).toHaveLength(1);
+    expect((await reconcileAccountLedger(database, target.accountId)).reconciled).toBe(true);
   });
 });
 

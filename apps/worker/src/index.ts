@@ -1,11 +1,13 @@
-import { config as loadDotenv } from 'dotenv';
+import { safeWorkerErrorMessage, workerDiagnosticJson } from './safe-diagnostics.js';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseEnvironment } from '@paperfund/config';
+import { parseApplicationEnvironment } from '@paperfund/config';
 import {
   createDatabase,
+  GenericCapability,
+  genericCapabilityOptions,
   recordCreatorFeeIngestionFailure,
   recordCreatorFeeIngestionRetries,
   runCreatorFeeIngestionTick,
@@ -18,11 +20,19 @@ import {
 } from '@paperfund/db';
 import { createProductionExecutionRouter } from '@paperfund/protocols';
 
-loadDotenv({ path: fileURLToPath(new URL('../../../.env', import.meta.url)), quiet: true });
-
-const config = parseEnvironment(process.env);
+const config = parseApplicationEnvironment(process.env);
 const database = createDatabase(config.DATABASE_URL);
+const genericCapability = new GenericCapability(database, {
+  ...genericCapabilityOptions(config),
+  systemSettlement: true,
+});
 const router = createProductionExecutionRouter({
+  genericPumpSwapEnabled: config.GENERIC_PUMPSWAP_ENABLED,
+  genericPumpSwapBuysEnabled: false,
+  genericAccessResolver: (mint, quote, settlement) =>
+    genericCapability.resolve(mint, quote, settlement),
+  nonSolPumpSwapEnabled: config.NON_SOL_PUMPSWAP_ENABLED,
+  nonSolPumpSwapRoutes: config.NON_SOL_PUMPSWAP_ALLOWED_ROUTES,
   rpcUrl: config.SOLANA_RPC_URL,
   rpcTimeoutMs: config.SOLANA_RPC_TIMEOUT_MS,
   commitment: config.SOLANA_COMMITMENT,
@@ -54,6 +64,11 @@ const heartbeatPath = isAbsolute(config.WORKER_HEARTBEAT_FILE)
   ? config.WORKER_HEARTBEAT_FILE
   : resolve(repositoryRoot, config.WORKER_HEARTBEAT_FILE);
 const heartbeat = {
+  genericPumpSwapEnabled: config.GENERIC_PUMPSWAP_ENABLED,
+  genericPumpSwapEntriesArmed: config.GENERIC_PUMPSWAP_BUYS_ENABLED,
+  genericOperatorCount: config.GENERIC_PUMPSWAP_OPERATOR_USER_IDS.length,
+  nonSolPumpSwapEnabled: config.NON_SOL_PUMPSWAP_ENABLED,
+  nonSolPumpSwapAllowedMints: config.NON_SOL_PUMPSWAP_ALLOWED_ROUTES.map((r) => r.mint),
   processId: process.pid,
   startedAt: new Date().toISOString(),
   lastTickStartedAt: null as string | null,
@@ -65,12 +80,20 @@ const heartbeat = {
 async function writeHeartbeat() {
   const temporary = `${heartbeatPath}.${process.pid.toString()}.tmp`;
   await mkdir(dirname(heartbeatPath), { recursive: true });
-  await writeFile(temporary, `${JSON.stringify(heartbeat)}\n`, { encoding: 'utf8', mode: 0o600 });
+  await writeFile(temporary, `${workerDiagnosticJson(heartbeat)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
   await rename(temporary, heartbeatPath);
 }
 
 function log(level: 'info' | 'error', event: string, metadata: Record<string, unknown>) {
-  const entry = JSON.stringify({ level, event, ...metadata, timestamp: new Date().toISOString() });
+  const entry = workerDiagnosticJson({
+    level,
+    event,
+    ...metadata,
+    timestamp: new Date().toISOString(),
+  });
   if (level === 'error') console.error(entry);
   else console.log(entry);
 }
@@ -110,19 +133,18 @@ async function tick() {
         });
       } catch (healthError) {
         log('error', 'creator_fee_ingestion_health_write_failed', {
-          message:
-            healthError instanceof Error ? healthError.message : 'Unknown health write failure',
+          message: safeWorkerErrorMessage(healthError, 'Unknown health write failure'),
         });
       }
       log('error', 'creator_fee_ingestion_tick_failed', {
         errorCode:
           error instanceof Error && 'code' in error ? String(error.code) : 'INTERNAL_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown creator-fee ingestion failure',
+        message: safeWorkerErrorMessage(error, 'Unknown creator-fee ingestion failure'),
       });
       heartbeat.lastError = {
         at: new Date().toISOString(),
         scope: 'creator_fee_ingestion',
-        message: error instanceof Error ? error.message : 'Unknown creator-fee ingestion failure',
+        message: safeWorkerErrorMessage(error, 'Unknown creator-fee ingestion failure'),
       };
     }
   }
@@ -141,36 +163,50 @@ async function tick() {
       configurationVersion: 'phase-5a-v1',
     });
     const rewardDays = await runDailyRewardFinalizationTick(database, now);
-    const payoutPlans = await runPayoutPlanGenerationTick(database, now);
+    const payoutPlans = config.PRIVATE_BETA_NON_PAYING ? [] : await runPayoutPlanGenerationTick(database, now);
     for (const roundId of rewardRounds) log('info', 'reward_pool_frozen', { roundId });
     for (const dailyCompetitionId of rewardDays)
       log('info', 'daily_reward_pool_frozen', { dailyCompetitionId });
     for (const payoutPlanId of payoutPlans)
       log('info', 'shadow_payout_plan_validated', { payoutPlanId });
     for (const event of events) {
-      log('info', event.type.toLowerCase(), {
-        roundId: event.roundId,
-        failures: event.failures,
-      });
+      log(
+        event.type === 'SETTLEMENT_OPERATIONAL_ERROR' ? 'error' : 'info',
+        event.type.toLowerCase(),
+        {
+          roundId: event.roundId,
+          failures: event.failures,
+          failureDetails: event.failureDetails,
+        },
+      );
     }
-    heartbeat.lastLifecycleSuccessAt = new Date().toISOString();
-    if (!creatorFeeSource) heartbeat.lastError = null;
+    const operationalError = events.find((event) => event.type === 'SETTLEMENT_OPERATIONAL_ERROR');
+    if (operationalError) {
+      heartbeat.lastError = {
+        at: new Date().toISOString(),
+        scope: 'settlement',
+        message: `${operationalError.roundId}: ${operationalError.failureDetails?.[0]?.message ?? 'Settlement requires operator intervention.'}`,
+      };
+    } else {
+      heartbeat.lastLifecycleSuccessAt = new Date().toISOString();
+      if (!creatorFeeSource) heartbeat.lastError = null;
+    }
   } catch (error) {
     log('error', 'round_lifecycle_tick_failed', {
       errorCode: error instanceof Error && 'code' in error ? String(error.code) : 'INTERNAL_ERROR',
-      message: error instanceof Error ? error.message : 'Unknown worker failure',
+      message: safeWorkerErrorMessage(error, 'Unknown worker failure'),
     });
     heartbeat.lastError = {
       at: new Date().toISOString(),
       scope: 'round_lifecycle',
-      message: error instanceof Error ? error.message : 'Unknown worker failure',
+      message: safeWorkerErrorMessage(error, 'Unknown worker failure'),
     };
   } finally {
     try {
       await writeHeartbeat();
     } catch (error) {
       log('error', 'worker_heartbeat_write_failed', {
-        message: error instanceof Error ? error.message : 'Unknown heartbeat write failure',
+        message: safeWorkerErrorMessage(error, 'Unknown heartbeat write failure'),
       });
     }
     if (!stopping) timer = setTimeout(() => void tick(), config.WORKER_TICK_INTERVAL_MS);

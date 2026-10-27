@@ -42,6 +42,7 @@ export function shorten(value: string, size = 5): string {
 export function venueName(protocol?: string | null): string {
   if (protocol === 'PUMP_FUN') return 'Pump.fun';
   if (protocol === 'PUMP_SWAP') return 'PumpSwap';
+  if (protocol === 'SOLANA_ROUTE') return 'Solana routed market';
   return protocol ?? '—';
 }
 
@@ -81,6 +82,27 @@ export interface Position {
   costBasisPaperSolLamports: string;
   realizedPnlLamports: string;
   valuation: PositionValuation;
+  sellPreflight?: SellPreflight;
+  updatedAt?: string;
+}
+export interface SellPreflight {
+  status: 'FULL' | 'LIQUIDITY_LIMITED' | 'NO_EXECUTABLE_LIQUIDITY';
+  full: SellExitQuote;
+  maxExecutableQuantityBaseUnits: string;
+  maxExecutableOutputLamports: string;
+  executablePortionCostBasisLamports: string;
+  executablePortionPnlLamports: string | null;
+  percentages: Record<'25' | '50' | '75' | '100', SellExitQuote>;
+  currentProtocol: string;
+  evidenceFingerprint: string;
+  observedAt: string;
+  chainSlot: string | null;
+}
+export interface SellExitQuote {
+  executable: boolean;
+  quantityBaseUnits: string;
+  outputLamports: string | null;
+  reason: string | null;
 }
 export interface Account {
   accountId: string;
@@ -99,6 +121,7 @@ export interface PositionValuationResponse {
   cashLamports: string;
   startingPaperSolLamports: string;
   valuationStatus: 'AVAILABLE' | 'UNAVAILABLE';
+  equityValuationStatus?: 'FULL' | 'PARTIAL_LIQUIDITY' | 'UNAVAILABLE';
   executablePositionsLamports: string | null;
   portfolioEquityLamports: string | null;
   livePnlLamports: string | null;
@@ -106,6 +129,8 @@ export interface PositionValuationResponse {
   positions: Position[];
 }
 export interface BuyPreflight {
+  blockingReason?: string | null;
+  unavailablePositions?: Array<{ id: string; mint: string; reason: string | null }>;
   accountId: string;
   roundId: string;
   cashLamports: string;
@@ -123,20 +148,78 @@ export interface BuyPreflight {
   protocol: string | null;
   marketStatus: string;
   valuationStatus: 'AVAILABLE' | 'UNAVAILABLE';
+  equityValuationStatus?: 'FULL' | 'PARTIAL_LIQUIDITY' | 'UNAVAILABLE';
   unavailablePositionIds: string[];
   serverTime: string;
 }
+
+export function buyPreflightMessage(preflight: BuyPreflight | null | undefined): string | null {
+  if (!preflight) return null;
+  if (!preflight.marketSupported)
+    return `Current token market unavailable: ${preflight.marketStatus}.`;
+  if (preflight.blockingReason === 'GENERIC_OPERATOR_ENTRY_DISABLED')
+    return 'BUY unavailable: generic-market entries are currently disabled. Existing positions can still be sold.';
+  if (
+    preflight.blockingReason === 'PORTFOLIO_EQUITY_UNAVAILABLE' ||
+    preflight.equityValuationStatus === 'UNAVAILABLE' ||
+    (!preflight.equityValuationStatus && preflight.valuationStatus !== 'AVAILABLE')
+  )
+    return 'BUY paused: portfolio equity cannot be established because an open position has no authoritative full-exit value. Partial SELL may still be available.';
+  if (preflight.blockingReason) return `BUY unavailable: ${preflight.blockingReason}.`;
+  if (preflight.equityValuationStatus === 'PARTIAL_LIQUIDITY')
+    return 'BUY uses conservative equity: illiquid position remainder is valued at 0 Paper SOL.';
+  if (!preflight.slotAvailable) return 'All token slots for this round have been used.';
+  return null;
+}
+/** Read-only identity metadata; never evidence of executable liquidity. */
+export interface ChartTokenMetadata {
+  requestedContext: string;
+  mint: string;
+  tokenProgram: string;
+  tokenDecimals: number;
+  tokenSupplyBaseUnits: string;
+  chainSlot: string;
+}
 export interface MarketSupport {
+  tokenSupplyBaseUnits?: string | null;
   mint: string;
   supported: boolean;
   executionProtocol?: string;
-  status?: 'MIGRATED_POOL' | 'ACTIVE_BONDING_CURVE';
+  status?: 'MIGRATED_POOL' | 'ACTIVE_BONDING_CURVE' | 'RESOLVED_ROUTE';
+  requestedContext?: string;
+  diagnostics?: string;
   marketId?: string;
   originMarketId?: string;
   tokenDecimals?: number;
   reason?: string;
 }
+export type HistoricalChartFx =
+  | { status: 'UNAVAILABLE'; reason: string }
+  | {
+      status: 'AVAILABLE';
+      version: string;
+      source: string;
+      sourceObservationId?: string;
+      feedId?: string;
+      requestedAt: string;
+      fxAt: string;
+      rate: string;
+      rawPrice?: string;
+      exponent?: number;
+      confidence?: string;
+      retrievedAt: string;
+      responseHash?: string;
+      fillTimestamp?: string;
+    };
 export interface Trade {
+  competition_account_id?: string;
+  owner_user_id?: string;
+  chart_closures?: { id: string; quantity: string | null; at: string }[] | null;
+  sol_usd_fx?: HistoricalChartFx;
+  cost_basis_lamports_removed?: string;
+  sol_usd_at_execution?: string | null;
+  token_supply_base_units?: string | null;
+  token_decimals?: number;
   id: string;
   order_id: string;
   hourly_round_id: string;
@@ -189,11 +272,51 @@ export interface BuyResult {
   executedAt: string;
 }
 export interface SellResult {
+  newCashBalanceLamports?: string;
+  remainingQuantityBaseUnits?: string;
+  remainingCostBasisLamports?: string;
   tokenMint: string;
   executionProtocol: string;
   tokenAmountSoldBaseUnits: string;
   paperSolCreditedLamports: string;
   feeLamports: string;
   realizedPnlLamports: string;
+  costBasisRemovedLamports?: string;
   executedAt: string;
+}
+
+/** Authenticated advisory snapshot; completion time is not on-chain observation time. */
+export interface ViewedPositionValuation {
+  userId: string;
+  accountId: string | null;
+  roundId: string | null;
+  mint: string;
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'NOT_HELD' | 'ROUND_CLOSED';
+  reason: string | null;
+  revision: string | null;
+  financialVersion: string | null;
+  requestId?: string;
+  positionUpdatedAt: string | null;
+  position: Position | null;
+  snapshotAt: string | null;
+  chainTime: string | null;
+  chainSlot: string | null;
+  completedAt: string;
+  retryAfterMs?: number;
+  metrics?: {
+    sqlMs: number;
+    routeMs: number;
+    routeDiscoveryMs?: number;
+    captureRouteMs?: number;
+    captureRpcRequests?: number;
+    captureRpcMs?: number;
+    quoteMs: number;
+    rpcRequests: number;
+    rpcMs: number;
+    retries: number;
+    rateLimits: number;
+    shared: boolean;
+    concurrent: number;
+    concurrentRequests?: number;
+  };
 }

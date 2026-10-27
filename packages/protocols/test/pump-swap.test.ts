@@ -96,6 +96,35 @@ function writeKey(buffer: Buffer, offset: number, value: string) {
 }
 
 describe('PumpSwap canonical adapter', () => {
+  it('accepts signed negative virtual quote reserves but rejects inconsistent effective reserves', async () => {
+    const adapter = new PumpSwapProtocolAdapter(new RecordedSource(state()));
+    const signed = state({ virtualQuoteReserves: '-10000000000', effectiveQuoteReserves: '80000000000' });
+    await expect(adapter.valuePositionForExit({ identity, tokenQuantity: tokenBaseUnits(1_000_000n) }, signed))
+      .resolves.toMatchObject({ paperSolValue: expect.any(BigInt) });
+    await expect(adapter.valuePositionForExit({ identity, tokenQuantity: tokenBaseUnits(1_000_000n) },
+      state({ effectiveQuoteReserves: '80000000000' })))
+      .rejects.toMatchObject({ code: 'INVALID_MARKET_STATE' });
+  });
+  it('finds exact capacity from raw reserves when virtual quote liquidity exceeds actual funding', async () => {
+    const snapshot = state({ rawQuoteReserves: '1000000', virtualQuoteReserves: '89999000000' });
+    const adapter = new PumpSwapProtocolAdapter(new RecordedSource(snapshot));
+    const request = { identity, tokenQuantity: tokenBaseUnits(1_000_000_000_000n) };
+    await expect(adapter.valuePositionForExit(request, snapshot)).rejects.toMatchObject({
+      code: 'INSUFFICIENT_EXECUTABLE_LIQUIDITY',
+    });
+    const max = await adapter.maxExecutableSellQuantity(request, snapshot);
+    expect(max).toBeGreaterThan(0n);
+    expect(max).toBeLessThan(request.tokenQuantity);
+    await expect(
+      adapter.valuePositionForExit({ ...request, tokenQuantity: max }, snapshot),
+    ).resolves.toMatchObject({ tokenQuantity: max });
+    await expect(
+      adapter.valuePositionForExit(
+        { ...request, tokenQuantity: tokenBaseUnits(max + 1n) },
+        snapshot,
+      ),
+    ).rejects.toMatchObject({ code: 'INSUFFICIENT_EXECUTABLE_LIQUIDITY' });
+  });
   it('derives the official canonical pool and creator linkage', async () => {
     expect(await canonicalPumpSwapPoolAddress(mint)).toBe(pool);
     expect(await pumpPoolAuthorityAddress(mint)).toBe(

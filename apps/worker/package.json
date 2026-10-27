@@ -12,5 +12,6 @@
     "@paperfund/db": "*",
     "@paperfund/protocols": "*",
     "dotenv": "^18.0.3"
-  }
+  },
+  "license": "Apache-2.0"
 }

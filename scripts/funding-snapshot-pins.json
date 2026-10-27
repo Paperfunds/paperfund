@@ -1,0 +1,34 @@
+{
+  "captureManifestSha256": "a3ce2e770180f0e86052e2f50b4ba2575e4756748610562f1afcbc2e1b7361e5",
+  "officialPinsSha256": "9a0e7927d0e5456b6389be82bc8625f71e6239eca5e77b7724a7638e2eacb0b4",
+  "acceptedParserSha256": "2ed3d872403cd94b8dd17133622642e9eb7390597ce637a16c8fd1f60a10a5ad",
+  "settlementEngineSha256": "3616ae4b14c00ac1e728b7d7072993cf09f5c1a450eb0782e69372580e9185ed",
+  "securityFiles": [
+    {
+      "path": "packages/db/src/payout-treasury.ts",
+      "sha256": "7dae126e672c57bb8abc12621a5b3af5e6a0c31789e4551be5664b419a27bd22"
+    },
+    {
+      "path": "packages/db/src/payout-security.ts",
+      "sha256": "351b3e7faa19e26d105495152ea1591167aa14751f472931e786251cb19b81e4"
+    },
+    {
+      "path": "packages/db/src/payout-approval.ts",
+      "sha256": "00c3f17337831d7fcdedea351948e814dd84b1a3150f0e8aad069838d723fc7c"
+    },
+    {
+      "path": "packages/db/src/payout-execution.ts",
+      "sha256": "35973f646d20073681319f4c1254dfba9818f561c8d713cd378bfe47ef863d11"
+    }
+  ],
+  "sdk": [
+    {
+      "name": "@pump-fun/pump-sdk",
+      "sha256": "a9221d8285482087b6510b237d75e0245f545031505ea11d17cdfdbeab29915f"
+    },
+    {
+      "name": "@pump-fun/pump-swap-sdk",
+      "sha256": "1ede6b4184a808cf986cd20a89d7c7487c4623054065238c5b9656f6b7309547"
+    }
+  ]
+}

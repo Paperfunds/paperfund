@@ -1,0 +1,13 @@
+-- Explicit approved installation only, after all three staged schemas and existing roles.
+grant select on current_quote_settlement_policies,current_quote_cutoff_captures,current_quote_cutoff_seals,
+ current_quote_settlement_steps,current_quote_capture_certificates,current_quote_capture_faults,current_quote_capture_finality
+ to paperfund_beta_api,paperfund_beta_worker,paperfund_beta_observer,paperfund_mainnet_signer,paperfund_mainnet_acceptance_publisher;
+grant insert on current_quote_cutoff_captures,current_quote_cutoff_seals,current_quote_settlement_steps,
+ current_quote_capture_faults,current_quote_capture_finality to paperfund_beta_worker;
+grant update(id) on current_quote_cutoff_seals to paperfund_beta_worker;
+grant usage,select on sequence current_quote_capture_faults_id_seq to paperfund_beta_worker;
+grant execute on function certify_current_quote_capture(text) to paperfund_beta_worker;
+grant select on payout_stop_state to paperfund_beta_worker;
+grant select on payout_creator_distribution_evidence to paperfund_mainnet_signer,paperfund_mainnet_acceptance_publisher,paperfund_beta_observer;
+grant insert on payout_creator_distribution_evidence to paperfund_mainnet_signer;
+-- No policy enrollment, proof editing, payout authority, STOP update or new login privilege.

@@ -1,0 +1,11 @@
+# Architecture and source authority
+
+The extension and website send authenticated requests to the API. Wallet signatures establish sessions; server authorization binds orders to hourly accounts. Quote/routing code supplies evidence. Transactions persist orders, fills, balances and balanced journals. The worker advances UTC rounds and settles before scoring/reward finalization. Payout tooling separately verifies funding, approvals, STOP and recovery before external action.
+
+`apps/api/src/main.ts` alone is not the public production assembly. It additionally uses `apps/api/isolated/current-quotes/production-public/api-entry.mjs`, policy/discovery modules, current-quote router/capture and verified-route evidence. These entry files are packaging inputs; relative runtime imports are generated during release assembly.
+
+The October 27 worker combines `apps/worker/src/index.ts`, `apps/worker/isolated/reward-bootstrap.ts`, `current-cutoff.ts`, current-quote settlement/proof and protocol cutoff capture. `scripts/operator/prepare-reward-accounting-candidate.mjs` defines assembly. Four SQL files in `packages/db/isolated/current-quotes` implement settlement, durable evidence, platform accounting and grants, separately from Drizzle migrations.
+
+Earlier builders depend on pinned manifests, protected configuration and frozen dependency closures. They are operational source, not contributor deployment commands. A baseline build is not claimed byte-identical to the frozen API: seven v6 source-input entries differ from working source. Actual deployed first-party API and current DURABLE_QUOTE_V2 worker source are also preserved under `reference/` with original/published hashes and an explicit privacy transformation. This supplies source-inspection coverage without substituting an older worker. Extension 0.2.2 reproducibility is checked separately against the approved ZIP.
+
+PAPER BUY/SELL does not submit user swaps to Solana. Claims and treasury transfers are separate real-SOL operations. Ledger calculations do not authorize signing. Missing/stale evidence, inconsistent accounting, unsupported routes, absent approval and STOP fail closed. Recovery preserves immutable evidence and duplicate prevention.

@@ -1,0 +1,31 @@
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { useChartHistoryMetadata } from './use-chart-history-metadata.js';
+const request = vi.hoisted(() => vi.fn());
+vi.mock('./client.js', () => ({ apiRequest: request }));
+afterEach(() => { vi.useRealTimers(); request.mockReset(); });
+it('retains same-context verified metadata through a failure and recovers without replacing historical supply', async () => {
+  vi.useFakeTimers();
+  const metadata = { requestedContext: 'pool', mint: 'mint', tokenProgram: 'program', tokenDecimals: 6, tokenSupplyBaseUnits: '975024561658805', chainSlot: '1' };
+  request.mockResolvedValueOnce(metadata).mockRejectedValueOnce(Error('RPC')).mockResolvedValueOnce({ ...metadata, chainSlot: '2' });
+  const h = renderHook(() => useChartHistoryMetadata('owner', 'pool'));
+  await act(async () => {});
+  expect(h.result.current.metadata).toEqual(metadata);
+  await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+  expect(h.result.current.metadata).toEqual(metadata);
+  expect(h.result.current.issue).toBe('CHART_TOKEN_METADATA_RECONNECTING');
+  await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+  expect(h.result.current.metadata?.chainSlot).toBe('2');
+  expect(h.result.current.issue).toBeNull(); h.unmount();
+});
+it('immediately isolates navigation/account changes and ignores late responses', async () => {
+  let resolve!: (data: unknown) => void;
+  request.mockImplementation(() => new Promise(r => { resolve = r; }));
+  const h = renderHook(({ owner, context }) => useChartHistoryMetadata(owner, context), { initialProps: { owner: 'a', context: 'poolA' } });
+  const old = resolve;
+  h.rerender({ owner: 'b', context: 'poolB' });
+  await act(async () => { old({ requestedContext: 'poolA', mint: 'mintA' }); });
+  expect(h.result.current.metadata).toBeNull();
+  await act(async () => { resolve({ requestedContext: 'poolB', mint: 'mintB' }); });
+  expect(h.result.current.metadata?.mint).toBe('mintB'); h.unmount();
+});

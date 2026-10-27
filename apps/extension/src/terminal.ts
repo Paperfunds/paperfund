@@ -1,6 +1,6 @@
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
-export type TerminalId = 'AXIOM' | 'GMGN' | 'TERMINAL';
+export type TerminalId = 'AXIOM' | 'GMGN' | 'PADRE';
 
 export function isSolanaAddress(value: string): boolean {
   if (!value || value.length > 44 || [...value].some((c) => !BASE58_ALPHABET.includes(c)))
@@ -25,6 +25,12 @@ export interface TerminalTokenState {
   mint: string | null;
   status: 'SUPPORTED_ROUTE' | 'NO_MARKET' | 'DETECTION_UNAVAILABLE';
   url: string;
+}
+
+export function isActionableTerminal(
+  state: TerminalTokenState | null,
+): state is TerminalTokenState & { mint: string } {
+  return state?.status === 'SUPPORTED_ROUTE' && state.mint !== null;
 }
 
 export interface TerminalAdapter {
@@ -92,24 +98,21 @@ export class GMGNTerminalAdapter implements TerminalAdapter {
   }
 }
 
-export class TerminalTradeAdapter implements TerminalAdapter {
-  readonly id = 'TERMINAL' as const;
+export class PadreTerminalAdapter implements TerminalAdapter {
+  readonly id = 'PADRE' as const;
 
   matches(url: URL): boolean {
-    return url.protocol === 'https:' && url.hostname === 'www.theterminal.trade';
+    return url.protocol === 'https:' && url.hostname === 'trade.padre.gg';
   }
 
   detect(rawUrl: string): TerminalTokenState {
     const url = parseUrl(rawUrl);
     if (!url || !this.matches(url)) return state(this.id, rawUrl, 'DETECTION_UNAVAILABLE');
     const segments = url.pathname.split('/').filter(Boolean);
-    if (segments[0] !== 'token') return state(this.id, rawUrl, 'NO_MARKET');
-    const mint = segments[1] ?? '';
-    if (
-      segments.length !== 2 ||
-      url.searchParams.get('network') !== 'solana' ||
-      !isSolanaAddress(mint)
-    )
+    if (segments[0] !== 'trade') return state(this.id, rawUrl, 'NO_MARKET');
+    if (segments[1] !== 'solana') return state(this.id, rawUrl, 'NO_MARKET');
+    const mint = segments[2] ?? '';
+    if (segments.length !== 3 || !isSolanaAddress(mint))
       return state(this.id, rawUrl, 'DETECTION_UNAVAILABLE');
     return state(this.id, rawUrl, 'SUPPORTED_ROUTE', mint);
   }
@@ -120,7 +123,7 @@ export class TerminalAdapterRegistry {
     private readonly adapters: readonly TerminalAdapter[] = [
       new AxiomTerminalAdapter(),
       new GMGNTerminalAdapter(),
-      new TerminalTradeAdapter(),
+      new PadreTerminalAdapter(),
     ],
   ) {}
 

@@ -1,0 +1,1 @@
+import {defineConfig} from 'vitest/config';import {resolve} from 'node:path';export default defineConfig({cacheDir:'artifacts/operator/reward-vite-cache',resolve:{alias:{'@paperfund/core':resolve('packages/core/src/index.ts')}},test:{include:['scripts/operator/reward-distribution.test.ts'],fileParallelism:false,testTimeout:30000,hookTimeout:30000}});

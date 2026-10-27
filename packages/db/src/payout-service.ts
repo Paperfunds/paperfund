@@ -1,3 +1,4 @@
+import {assertLegacySource} from './legacy-settlement.js';
 import {
   DAILY_PAYOUT_CURVE_VERSION,
   HOURLY_PAYOUT_CURVE_VERSION,
@@ -292,6 +293,7 @@ export async function generateShadowPayoutPlan(
     readonly now: Date;
   },
 ) {
+  await assertLegacySource(database,input.competitionType,input.sourceId);
   const curve = curveFor(input.competitionType);
   const planId = `payout:${input.competitionType.toLowerCase()}:${input.sourceId}:${curve.version}`;
   const client = await database.pool.connect();
@@ -684,6 +686,7 @@ export async function getPayoutPlanAudit(database: DatabaseService, planId: stri
 export async function validatePayoutPlan(database: DatabaseService, planId: string) {
   const audit = await getPayoutPlanAudit(database, planId);
   if (!audit) throw new PayoutPlanError('PAYOUT_PLAN_NOT_FOUND', 'Payout plan not found.');
+  await assertLegacySource(database,audit.competitionType,audit.hourlyRoundId ?? audit.dailyCompetitionId!);
   const sourceId = audit.hourlyRoundId ?? audit.dailyCompetitionId!;
   const curve = curveFor(audit.competitionType);
   const rows = await sourceRows(

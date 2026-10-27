@@ -1,0 +1,843 @@
+[
+  {
+    "side": "SELL",
+    "base_quantity": "199357658117",
+    "actual_input_lamports": null,
+    "actual_output_lamports": "35573647",
+    "executed_at": "2026-10-08T01:05:11.938Z",
+    "fee_breakdown": {
+      "fees": [
+        {
+          "asset": "TOKEN",
+          "amount": "840585530948",
+          "category": "LP_CLAIM_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "210146382736",
+          "category": "PROTOCOL_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "854598099054",
+          "category": "TOKEN_TRANSFER_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "837506137073",
+          "category": "TOKEN_TRANSFER_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "86179381506",
+          "category": "LP_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "12311340215",
+          "category": "PROTOCOL_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "4103780071",
+          "category": "FUND_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        }
+      ],
+      "canonicalRoute": {
+        "fees": [
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "840585530948"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "LP_CLAIM_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "210146382736"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "PROTOCOL_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "854598099054"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "TOKEN_TRANSFER_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "837506137073"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "TOKEN_TRANSFER_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "86179381506"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "LP_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "12311340215"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "PROTOCOL_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "4103780071"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "FUND_FEE"
+          }
+        ],
+        "hops": [
+          {
+            "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+            "input": "199357658117",
+            "chainSlot": "454391597",
+            "direction": "SELL",
+            "inputMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+            "programId": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+            "stateSlot": "454391597",
+            "outputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "nextSqrtPrice": "1714871667540755268",
+            "outputAfterTransfer": "41875306853627",
+            "outputBeforeTransfer": "42729904952681"
+          },
+          {
+            "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+            "input": "41875306853627",
+            "reserveA": "50087794700",
+            "reserveB": "57595949059415220",
+            "chainSlot": "454391597",
+            "direction": "SELL",
+            "inputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "stateSlot": "454391597",
+            "outputMint": "So11111111111111111111111111111111111111112",
+            "outputAfterTransfer": "35573647",
+            "outputBeforeTransfer": "35573647"
+          }
+        ],
+        "mint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+        "input": "199357658117",
+        "output": "35573647",
+        "orderId": "authoritative-sell-all-order:76b9b6a82bb5ef11b06854963cad7af0325057c97b7405c79f02cf8542ed8f02",
+        "protocol": "SOLANA_ROUTE",
+        "chainSlot": "454391597",
+        "direction": "SELL",
+        "routeHash": "bb0736a6d558da4c077d385407e5d0a82983f395dbc1903abc04eadcd4886015",
+        "inputAsset": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+        "observedAt": "2026-10-08T01:05:12.015Z",
+        "executionId": "authoritative-sell-all-execution:76b9b6a82bb5ef11b06854963cad7af0325057c97b7405c79f02cf8542ed8f02",
+        "outputAsset": "PAPER_SOL",
+        "requestedInput": "199357658117",
+        "stateFingerprint": "afd9be0402717ea2ea45cdfafe03ddf350a87ea4c2f3ac1ccb46b84fd7f205e5"
+      },
+      "executionDetails": {
+        "hops": [
+          {
+            "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+            "input": "199357658117",
+            "direction": "B_TO_A",
+            "inputMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+            "programId": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+            "stateSlot": "454391597",
+            "outputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "nextSqrtPrice": "1714871667540755268",
+            "outputAfterTransfer": "41875306853627",
+            "outputBeforeTransfer": "42729904952681"
+          },
+          {
+            "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+            "input": "41875306853627",
+            "reserveA": "50087794700",
+            "reserveB": "57595949059415220",
+            "direction": "B_TO_A",
+            "inputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "stateSlot": "454391597",
+            "outputMint": "So11111111111111111111111111111111111111112",
+            "outputAfterTransfer": "35573647",
+            "outputBeforeTransfer": "35573647"
+          }
+        ],
+        "canonicalRoute": {
+          "fees": [
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "840585530948"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "LP_CLAIM_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "210146382736"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "PROTOCOL_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "854598099054"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "TOKEN_TRANSFER_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "837506137073"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "TOKEN_TRANSFER_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "86179381506"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "LP_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "12311340215"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "PROTOCOL_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "4103780071"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "FUND_FEE"
+            }
+          ],
+          "hops": [
+            {
+              "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+              "input": "199357658117",
+              "chainSlot": "454391597",
+              "direction": "SELL",
+              "inputMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+              "programId": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+              "stateSlot": "454391597",
+              "outputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+              "nextSqrtPrice": "1714871667540755268",
+              "outputAfterTransfer": "41875306853627",
+              "outputBeforeTransfer": "42729904952681"
+            },
+            {
+              "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+              "input": "41875306853627",
+              "reserveA": "50087794700",
+              "reserveB": "57595949059415220",
+              "chainSlot": "454391597",
+              "direction": "SELL",
+              "inputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+              "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+              "stateSlot": "454391597",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "outputAfterTransfer": "35573647",
+              "outputBeforeTransfer": "35573647"
+            }
+          ],
+          "mint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+          "input": "199357658117",
+          "output": "35573647",
+          "orderId": "authoritative-sell-all-order:76b9b6a82bb5ef11b06854963cad7af0325057c97b7405c79f02cf8542ed8f02",
+          "protocol": "SOLANA_ROUTE",
+          "chainSlot": "454391597",
+          "direction": "SELL",
+          "routeHash": "bb0736a6d558da4c077d385407e5d0a82983f395dbc1903abc04eadcd4886015",
+          "inputAsset": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+          "observedAt": "2026-10-08T01:05:12.015Z",
+          "executionId": "authoritative-sell-all-execution:76b9b6a82bb5ef11b06854963cad7af0325057c97b7405c79f02cf8542ed8f02",
+          "outputAsset": "PAPER_SOL",
+          "requestedInput": "199357658117",
+          "stateFingerprint": "afd9be0402717ea2ea45cdfafe03ddf350a87ea4c2f3ac1ccb46b84fd7f205e5"
+        }
+      }
+    },
+    "id": "market-state:afd9be0402717ea2ea45cdfafe03ddf350a87ea4c2f3ac1ccb46b84fd7f205e5",
+    "protocol_id": "SOLANA_ROUTE",
+    "market_id": "solana-route:48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+    "observed_at": "2026-10-08T01:05:12.015Z",
+    "chain_slot": "454391597",
+    "chain_block_id": null,
+    "adapter_version": "solana-composed-route-v1",
+    "normalization_version": "solana-route-accounts-launchlab-v2",
+    "normalized_state": {
+      "hops": [
+        {
+          "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+          "mintA": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+          "mintB": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+          "config": null,
+          "vaultA": "EJKSWQCo6RcAYJu2bFqU8zKeCqXhBzjj1AVcMbxPn1jn",
+          "vaultB": "6hKzvvmNNVPFaaoygazvbA69jusQ3Rktkfahy8jHAjVp",
+          "program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+        },
+        {
+          "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+          "mintA": "So11111111111111111111111111111111111111112",
+          "mintB": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+          "config": "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2",
+          "vaultA": "HCX2xH3ykNQessV4auSa4kLd6fQWDqx4NqrRNAaDkdA8",
+          "vaultB": "8hBe12uGwSiyALXH8mRv39GSWFYh5omvBt1fbm76zwWF",
+          "program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+        }
+      ],
+      "model": "SOLANA_COMPOSED_ROUTE",
+      "accounts": {
+        "So11111111111111111111111111111111111111112": {
+          "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "SysvarC1ock11111111111111111111111111111111": {
+          "owner": "Sysvar1111111111111111111111111111111111111",
+          "base64": "LXcVGwAAAAC2csVqAAAAABsEAAAAAAAAHAQAAAAAAABG7MZqAAAAAA=="
+        },
+        "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA5KYNkydZ3A0JAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACNoZ5vIGlxhI7JtqmeiNywKS+YRJrX/UuZk7t35DpemaWjOocWwEwBFAwAAAAAAAAAAil14RWMByABFAwAAAAAAAAAAil14RWMByAA="
+        },
+        "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQDwfu1iAwAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARIAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC5vB6nNfkCeNSy148C33LQHhShMnx8D5b+DoNlqrBdvEwCyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALm8Hqc1+QJ41LLXjwLfctAeFKEyfHwPlv4Og2WqsF28JAAAAQmFieUJhdG9uCQAAAEJBQllCQVRPTlAAAABodHRwczovL2lwZnMuaW8vaXBmcy9iYWZrcmVpaHpyNHB5ZnVpdTYzZXFpNXFkcGhvaW9hbHNtcGcyNnV3bWI2N2ZhcDNqNzZzY2huaHF4NAAAAAA="
+        },
+        "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk": {
+          "owner": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+          "base64": "8ZptBBGxbbwALTEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAUAAAAAAABAAAAAAAAAGCk3AB5BwAAAQAKAHgAiBMe7MZqAAAAAMsQx7q4jQYAAAAAAAAAAABHqgTy4STHCgAAAAAAAAAAYKTcAAAAAAAAAAAAAAAAALCRWQAAAAAAAAAAAAAAAADp3L9xYxAuCgAAAAAAAAAALZCpFxa8I/fxgF4vDQ5vrXopRCM2cIoyhJjB/8HD8L4ubwepzX5AnjUstePAt9y0B4UoTJ8fA+W/g6DZaqwXb8WXp1nsz11oHcOI9VZ6pVMDEPymL5UhChUYobw83Az5VJ8mJHx6PK1VL3b46ZTR/62cSS0VfSgEB8VA9+bR8NcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALGNT2k8zUrDJdRNgHwQAAAAAAAAAAAAAAAAAAAAAAADddXC5FQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFA7AQABAAAAAAAAAAAAAACbV2lOqRpchLHE/v8AAAAANIUFFTIaigwAAAAAAAAAAAbsxmoAAAAAAQABAQAAAQBGbbjAMfSWFQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL+YMgFZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA3XVwuRUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAEROJ6r8t9t4kVovRHwpgJy0T8D1amEXyRQqm8JjNlnbTIs4QKlQAAB2u1rEzAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        },
+        "6hKzvvmNNVPFaaoygazvbA69jusQ3Rktkfahy8jHAjVp": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "Lm8Hqc1+QJ41LLXjwLfctAeFKEyfHwPlv4Og2WqsF2/yzNU1rKXxc2rIIt0Hc+TZL72KWbKUA1AClakBHHOp5R2u1rEzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "8hBe12uGwSiyALXH8mRv39GSWFYh5omvBt1fbm76zwWF": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "LZCpFxa8I/fxgF4vDQ5vrXopRCM2cIoyhJjB/8HD8L7rANn1spK0IUrH0De01vBkULlkYA3zcwUrtehPL46aZ+cSdiEq0swAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIACACaJM6ZMQAAAA=="
+        },
+        "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2": {
+          "owner": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "base64": "2vQhaMvLK2//AAAAxAkAAAAAAADA1AEAAAAAAECcAAAAAAAAgNHwCAAAAAAF2xU6D/SH9pzeiQAf7ExGlbbUIV6iRLh71Otyh/hXqNcGSjj20XsRPl9m3PtjuHN//OJkSr8KALmLNDVtY4WD9AEAAAAAAABQwwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        },
+        "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz": {
+          "owner": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "base64": "9+3j9dfD3kazIT+6i/nIf6keR4GWKMOD4AvqfpjHoD4DuhBpz8P28/vikYdnFef5PUs07xAAdu1r0v/PlgdzvLsCu3kIypyl8K5WwmpuTet8OlfCR42VNu4xB/y56HE9GaiQ3Gv4RPlyTRG3ctqT/qxQEs1UvLvFah0ZjTFospjvou2AcSbMMP+5ROjK4GaBUWSZtqcJ/m7TGcXI7IoTyW4vgrwPtTHWBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEtkKkXFrwj9/GAXi8NDm+teilEIzZwijKEmMH/wcPwvgbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpBt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/wg5pGJOdcfM6XrcrFFlmH8kGYz+zu5fi6K0MqB3ZCIUv0ACQkJ19OdGL0mAAC3KmUCAAAAAMFHgmH3LAAAuplUAAAAAAByrsPb/AUAAFXtqWgAAAAAGwQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "EJKSWQCo6RcAYJu2bFqU8zKeCqXhBzjj1AVcMbxPn1jn": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "LZCpFxa8I/fxgF4vDQ5vrXopRCM2cIoyhJjB/8HD8L7yzNU1rKXxc2rIIt0Hc+TZL72KWbKUA1AClakBHHOp5W8xccuYVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIACAAAAAAAAAAAAA=="
+        },
+        "HCX2xH3ykNQessV4auSa4kLd6fQWDqx4NqrRNAaDkdA8": {
+          "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "base64": "BpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAHrANn1spK0IUrH0De01vBkULlkYA3zcwUrtehPL46aZ33cMKwLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAAA4thYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      },
+      "mintSupply": "953197106561029",
+      "routePolicy": "FIXED_TOPOLOGY_V1",
+      "tokenDecimals": "6",
+      "absentAccounts": [],
+      "candidateRoutes": [
+        [
+          {
+            "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+            "mintA": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "mintB": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+            "config": null,
+            "vaultA": "EJKSWQCo6RcAYJu2bFqU8zKeCqXhBzjj1AVcMbxPn1jn",
+            "vaultB": "6hKzvvmNNVPFaaoygazvbA69jusQ3Rktkfahy8jHAjVp",
+            "program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+          },
+          {
+            "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+            "mintA": "So11111111111111111111111111111111111111112",
+            "mintB": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "config": "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2",
+            "vaultA": "HCX2xH3ykNQessV4auSa4kLd6fQWDqx4NqrRNAaDkdA8",
+            "vaultB": "8hBe12uGwSiyALXH8mRv39GSWFYh5omvBt1fbm76zwWF",
+            "program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+          }
+        ]
+      ]
+    },
+    "raw_source": null,
+    "state_fingerprint": "afd9be0402717ea2ea45cdfafe03ddf350a87ea4c2f3ac1ccb46b84fd7f205e5",
+    "created_at": "2026-10-08T01:05:12.026Z",
+    "mint_address": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+    "symbol": null,
+    "decimals": 6
+  },
+  {
+    "side": "BUY",
+    "base_quantity": "199357658117",
+    "actual_input_lamports": "984699562",
+    "actual_output_lamports": null,
+    "executed_at": "2026-10-08T01:04:58.378Z",
+    "fee_breakdown": {
+      "fees": [
+        {
+          "asset": "PAPER_SOL",
+          "amount": "2067871",
+          "category": "LP_FEE"
+        },
+        {
+          "asset": "PAPER_SOL",
+          "amount": "295409",
+          "category": "PROTOCOL_FEE"
+        },
+        {
+          "asset": "PAPER_SOL",
+          "amount": "98469",
+          "category": "FUND_FEE"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "22155035451516",
+          "category": "TOKEN_TRANSFER_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "21711934742486",
+          "category": "TOKEN_TRANSFER_FEE",
+          "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "3921777104",
+          "category": "LP_CLAIM_FEE",
+          "tokenMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump"
+        },
+        {
+          "asset": "TOKEN",
+          "amount": "980444276",
+          "category": "PROTOCOL_FEE",
+          "tokenMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump"
+        }
+      ],
+      "canonicalRoute": {
+        "fees": [
+          {
+            "amount": {
+              "asset": "PAPER_SOL",
+              "amount": {
+                "$bigint": "2067871"
+              }
+            },
+            "category": "LP_FEE"
+          },
+          {
+            "amount": {
+              "asset": "PAPER_SOL",
+              "amount": {
+                "$bigint": "295409"
+              }
+            },
+            "category": "PROTOCOL_FEE"
+          },
+          {
+            "amount": {
+              "asset": "PAPER_SOL",
+              "amount": {
+                "$bigint": "98469"
+              }
+            },
+            "category": "FUND_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "22155035451516"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "TOKEN_TRANSFER_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "21711934742486"
+              },
+              "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+            },
+            "category": "TOKEN_TRANSFER_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "3921777104"
+              },
+              "tokenMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump"
+            },
+            "category": "LP_CLAIM_FEE"
+          },
+          {
+            "amount": {
+              "asset": "TOKEN",
+              "amount": {
+                "$bigint": "980444276"
+              },
+              "tokenMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump"
+            },
+            "category": "PROTOCOL_FEE"
+          }
+        ],
+        "hops": [
+          {
+            "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+            "input": "984699562",
+            "reserveA": "50087794700",
+            "reserveB": "57595949059415220",
+            "chainSlot": "454391546",
+            "direction": "BUY",
+            "inputMint": "So11111111111111111111111111111111111111112",
+            "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "stateSlot": "454391546",
+            "outputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "outputAfterTransfer": "1085596737124282",
+            "outputBeforeTransfer": "1107751772575798"
+          },
+          {
+            "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+            "input": "1085596737124282",
+            "chainSlot": "454391546",
+            "direction": "BUY",
+            "inputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "programId": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+            "stateSlot": "454391546",
+            "outputMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+            "nextSqrtPrice": "72305151937883208",
+            "outputAfterTransfer": "199357658117",
+            "outputBeforeTransfer": "199357658117"
+          }
+        ],
+        "mint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+        "input": "984699562",
+        "output": "199357658117",
+        "orderId": "authoritative-buy-order:ca7df617e94467089838855c4a3d4092dc361b4b1d611a97ab87da6492892230",
+        "protocol": "SOLANA_ROUTE",
+        "chainSlot": "454391546",
+        "direction": "BUY",
+        "routeHash": "1e7f27cdf9e30865493b1a713618da59bf5859977bef75753d5e4e894145746e",
+        "inputAsset": "PAPER_SOL",
+        "observedAt": "2026-10-08T01:04:58.453Z",
+        "executionId": "authoritative-buy-execution:ca7df617e94467089838855c4a3d4092dc361b4b1d611a97ab87da6492892230",
+        "outputAsset": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+        "requestedInput": "984699562",
+        "stateFingerprint": "81a4c9fd352484519c35ba723c42aa901b4047c48940bcb6c06c1ff3d7fe1f08"
+      },
+      "executionDetails": {
+        "hops": [
+          {
+            "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+            "input": "984699562",
+            "reserveA": "50087794700",
+            "reserveB": "57595949059415220",
+            "direction": "A_TO_B",
+            "inputMint": "So11111111111111111111111111111111111111112",
+            "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+            "stateSlot": "454391546",
+            "outputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "outputAfterTransfer": "1085596737124282",
+            "outputBeforeTransfer": "1107751772575798"
+          },
+          {
+            "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+            "input": "1085596737124282",
+            "direction": "A_TO_B",
+            "inputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "programId": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+            "stateSlot": "454391546",
+            "outputMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+            "nextSqrtPrice": "72305151937883208",
+            "outputAfterTransfer": "199357658117",
+            "outputBeforeTransfer": "199357658117"
+          }
+        ],
+        "canonicalRoute": {
+          "fees": [
+            {
+              "amount": {
+                "asset": "PAPER_SOL",
+                "amount": {
+                  "$bigint": "2067871"
+                }
+              },
+              "category": "LP_FEE"
+            },
+            {
+              "amount": {
+                "asset": "PAPER_SOL",
+                "amount": {
+                  "$bigint": "295409"
+                }
+              },
+              "category": "PROTOCOL_FEE"
+            },
+            {
+              "amount": {
+                "asset": "PAPER_SOL",
+                "amount": {
+                  "$bigint": "98469"
+                }
+              },
+              "category": "FUND_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "22155035451516"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "TOKEN_TRANSFER_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "21711934742486"
+                },
+                "tokenMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV"
+              },
+              "category": "TOKEN_TRANSFER_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "3921777104"
+                },
+                "tokenMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump"
+              },
+              "category": "LP_CLAIM_FEE"
+            },
+            {
+              "amount": {
+                "asset": "TOKEN",
+                "amount": {
+                  "$bigint": "980444276"
+                },
+                "tokenMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump"
+              },
+              "category": "PROTOCOL_FEE"
+            }
+          ],
+          "hops": [
+            {
+              "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+              "input": "984699562",
+              "reserveA": "50087794700",
+              "reserveB": "57595949059415220",
+              "chainSlot": "454391546",
+              "direction": "BUY",
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "programId": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+              "stateSlot": "454391546",
+              "outputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+              "outputAfterTransfer": "1085596737124282",
+              "outputBeforeTransfer": "1107751772575798"
+            },
+            {
+              "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+              "input": "1085596737124282",
+              "chainSlot": "454391546",
+              "direction": "BUY",
+              "inputMint": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+              "programId": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+              "stateSlot": "454391546",
+              "outputMint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+              "nextSqrtPrice": "72305151937883208",
+              "outputAfterTransfer": "199357658117",
+              "outputBeforeTransfer": "199357658117"
+            }
+          ],
+          "mint": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+          "input": "984699562",
+          "output": "199357658117",
+          "orderId": "authoritative-buy-order:ca7df617e94467089838855c4a3d4092dc361b4b1d611a97ab87da6492892230",
+          "protocol": "SOLANA_ROUTE",
+          "chainSlot": "454391546",
+          "direction": "BUY",
+          "routeHash": "1e7f27cdf9e30865493b1a713618da59bf5859977bef75753d5e4e894145746e",
+          "inputAsset": "PAPER_SOL",
+          "observedAt": "2026-10-08T01:04:58.453Z",
+          "executionId": "authoritative-buy-execution:ca7df617e94467089838855c4a3d4092dc361b4b1d611a97ab87da6492892230",
+          "outputAsset": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+          "requestedInput": "984699562",
+          "stateFingerprint": "81a4c9fd352484519c35ba723c42aa901b4047c48940bcb6c06c1ff3d7fe1f08"
+        }
+      }
+    },
+    "id": "market-state:81a4c9fd352484519c35ba723c42aa901b4047c48940bcb6c06c1ff3d7fe1f08",
+    "protocol_id": "SOLANA_ROUTE",
+    "market_id": "solana-route:48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+    "observed_at": "2026-10-08T01:04:58.453Z",
+    "chain_slot": "454391546",
+    "chain_block_id": null,
+    "adapter_version": "solana-composed-route-v1",
+    "normalization_version": "solana-route-accounts-launchlab-v2",
+    "normalized_state": {
+      "hops": [
+        {
+          "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+          "mintA": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+          "mintB": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+          "config": null,
+          "vaultA": "EJKSWQCo6RcAYJu2bFqU8zKeCqXhBzjj1AVcMbxPn1jn",
+          "vaultB": "6hKzvvmNNVPFaaoygazvbA69jusQ3Rktkfahy8jHAjVp",
+          "program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+        },
+        {
+          "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+          "mintA": "So11111111111111111111111111111111111111112",
+          "mintB": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+          "config": "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2",
+          "vaultA": "HCX2xH3ykNQessV4auSa4kLd6fQWDqx4NqrRNAaDkdA8",
+          "vaultB": "8hBe12uGwSiyALXH8mRv39GSWFYh5omvBt1fbm76zwWF",
+          "program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+        }
+      ],
+      "model": "SOLANA_COMPOSED_ROUTE",
+      "accounts": {
+        "So11111111111111111111111111111111111111112": {
+          "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "SysvarC1ock11111111111111111111111111111111": {
+          "owner": "Sysvar1111111111111111111111111111111111111",
+          "base64": "+nYVGwAAAAC2csVqAAAAABsEAAAAAAAAHAQAAAAAAAA57MZqAAAAAA=="
+        },
+        "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA5KYNkydZ3A0JAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACNoZ5vIGlxhI7JtqmeiNywKS+YRJrX/UuZk7t35DpemaWjOocWwEwBFAwAAAAAAAAAAil14RWMByABFAwAAAAAAAAAAil14RWMByAA="
+        },
+        "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQDwfu1iAwAGAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARIAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC5vB6nNfkCeNSy148C33LQHhShMnx8D5b+DoNlqrBdvEwCyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALm8Hqc1+QJ41LLXjwLfctAeFKEyfHwPlv4Og2WqsF28JAAAAQmFieUJhdG9uCQAAAEJBQllCQVRPTlAAAABodHRwczovL2lwZnMuaW8vaXBmcy9iYWZrcmVpaHpyNHB5ZnVpdTYzZXFpNXFkcGhvaW9hbHNtcGcyNnV3bWI2N2ZhcDNqNzZzY2huaHF4NAAAAAA="
+        },
+        "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk": {
+          "owner": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG",
+          "base64": "8ZptBBGxbbwALTEBAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAUAAAAAAABAAAAAAAAAGCk3AB5BwAAAQAKAHgAiBMe7MZqAAAAAMsQx7q4jQYAAAAAAAAAAABHqgTy4STHCgAAAAAAAAAAYKTcAAAAAAAAAAAAAAAAALCRWQAAAAAAAAAAAAAAAADp3L9xYxAuCgAAAAAAAAAALZCpFxa8I/fxgF4vDQ5vrXopRCM2cIoyhJjB/8HD8L4ubwepzX5AnjUstePAt9y0B4UoTJ8fA+W/g6DZaqwXb8WXp1nsz11oHcOI9VZ6pVMDEPymL5UhChUYobw83Az5VJ8mJHx6PK1VL3b46ZTR/62cSS0VfSgEB8VA9+bR8NcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALGNT2k8zUrDJdRNgHwQAAAAAAAAAAAAAAAAAAAAAAADddXC5FQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFA7AQABAAAAAAAAAAAAAACbV2lOqRpchLHE/v8AAAAANIUFFTIaigwAAAAAAAAAAAbsxmoAAAAAAQABAQAAAQBGbbjAMfSWFQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAL+YMgFZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA3XVwuRUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAEROJ6r8t9t4kVovRHwpgJy0T8D1amEXyRQqm8JjNlnbTIs4QKlQAAB2u1rEzAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        },
+        "6hKzvvmNNVPFaaoygazvbA69jusQ3Rktkfahy8jHAjVp": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "Lm8Hqc1+QJ41LLXjwLfctAeFKEyfHwPlv4Og2WqsF2/yzNU1rKXxc2rIIt0Hc+TZL72KWbKUA1AClakBHHOp5R2u1rEzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        },
+        "8hBe12uGwSiyALXH8mRv39GSWFYh5omvBt1fbm76zwWF": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "LZCpFxa8I/fxgF4vDQ5vrXopRCM2cIoyhJjB/8HD8L7rANn1spK0IUrH0De01vBkULlkYA3zcwUrtehPL46aZ+cSdiEq0swAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIACACaJM6ZMQAAAA=="
+        },
+        "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2": {
+          "owner": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "base64": "2vQhaMvLK2//AAAAxAkAAAAAAADA1AEAAAAAAECcAAAAAAAAgNHwCAAAAAAF2xU6D/SH9pzeiQAf7ExGlbbUIV6iRLh71Otyh/hXqNcGSjj20XsRPl9m3PtjuHN//OJkSr8KALmLNDVtY4WD9AEAAAAAAABQwwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        },
+        "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz": {
+          "owner": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C",
+          "base64": "9+3j9dfD3kazIT+6i/nIf6keR4GWKMOD4AvqfpjHoD4DuhBpz8P28/vikYdnFef5PUs07xAAdu1r0v/PlgdzvLsCu3kIypyl8K5WwmpuTet8OlfCR42VNu4xB/y56HE9GaiQ3Gv4RPlyTRG3ctqT/qxQEs1UvLvFah0ZjTFospjvou2AcSbMMP+5ROjK4GaBUWSZtqcJ/m7TGcXI7IoTyW4vgrwPtTHWBpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEtkKkXFrwj9/GAXi8NDm+teilEIzZwijKEmMH/wcPwvgbd9uHXZaGT2cvhRs7reawctIXtX1s3kTqM9YV+/wCpBt324e51j94YQl285GzN2rYa/E2DuQ0n/r35KNihi/wg5pGJOdcfM6XrcrFFlmH8kGYz+zu5fi6K0MqB3ZCIUv0ACQkJ19OdGL0mAAC3KmUCAAAAAMFHgmH3LAAAuplUAAAAAAByrsPb/AUAAFXtqWgAAAAAGwQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "EJKSWQCo6RcAYJu2bFqU8zKeCqXhBzjj1AVcMbxPn1jn": {
+          "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          "base64": "LZCpFxa8I/fxgF4vDQ5vrXopRCM2cIoyhJjB/8HD8L7yzNU1rKXxc2rIIt0Hc+TZL72KWbKUA1AClakBHHOp5W8xccuYVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgIACAAAAAAAAAAAAA=="
+        },
+        "HCX2xH3ykNQessV4auSa4kLd6fQWDqx4NqrRNAaDkdA8": {
+          "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+          "base64": "BpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAHrANn1spK0IUrH0De01vBkULlkYA3zcwUrtehPL46aZ33cMKwLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEAAAA4thYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      },
+      "mintSupply": "953197106561029",
+      "routePolicy": "FIXED_TOPOLOGY_V1",
+      "tokenDecimals": "6",
+      "absentAccounts": [],
+      "candidateRoutes": [
+        [
+          {
+            "pool": "5xKyUfE8TP6tccvimijoGSzBnU5naydPMtgf7rvwmisk",
+            "mintA": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "mintB": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+            "config": null,
+            "vaultA": "EJKSWQCo6RcAYJu2bFqU8zKeCqXhBzjj1AVcMbxPn1jn",
+            "vaultB": "6hKzvvmNNVPFaaoygazvbA69jusQ3Rktkfahy8jHAjVp",
+            "program": "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
+          },
+          {
+            "pool": "De469KJo5CPBGEpqkMamKyECBgMcgr2jSRHZdKyRqfvz",
+            "mintA": "So11111111111111111111111111111111111111112",
+            "mintB": "44sHXMkPeciUpqhecfCysVs7RcaxeM24VPMauQouBREV",
+            "config": "D4FPEruKEHrG5TenZ2mpDGEfu1iUvTiqBxvpU8HLBvC2",
+            "vaultA": "HCX2xH3ykNQessV4auSa4kLd6fQWDqx4NqrRNAaDkdA8",
+            "vaultB": "8hBe12uGwSiyALXH8mRv39GSWFYh5omvBt1fbm76zwWF",
+            "program": "CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C"
+          }
+        ]
+      ]
+    },
+    "raw_source": null,
+    "state_fingerprint": "81a4c9fd352484519c35ba723c42aa901b4047c48940bcb6c06c1ff3d7fe1f08",
+    "created_at": "2026-10-08T01:04:58.378Z",
+    "mint_address": "48Fx5EWQ2RSUshqiNzx1VfWSvFwNgMft2nxbqwbXpump",
+    "symbol": null,
+    "decimals": 6
+  }
+]

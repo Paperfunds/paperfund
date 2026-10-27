@@ -1,0 +1,376 @@
+{
+  "purpose": "Exact first-party JavaScript reference for current frozen API and durable reward worker, alongside latest TypeScript. No third-party dependency code, private runtime profiles or evidence receipts are included. Historical PAPER account identifier is pseudonymized where present. These are inspection references, not deployment packages.",
+  "files": [
+    {
+      "path": "reference/production-api/runtime/admission.mjs",
+      "originalSHA256": "f442ea0d43c1497b85a81e31bc5fb1f53bf6052ced2a23a41ac5f7eb38ff54c1",
+      "publishedSHA256": "f442ea0d43c1497b85a81e31bc5fb1f53bf6052ced2a23a41ac5f7eb38ff54c1",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/api.mjs",
+      "originalSHA256": "62b7cdd50a9054b2c33c2ddecd27b957c491230bb3277c8a52771421f7ade2fc",
+      "publishedSHA256": "62b7cdd50a9054b2c33c2ddecd27b957c491230bb3277c8a52771421f7ade2fc",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/current-quote-runtime.mjs",
+      "originalSHA256": "7c571609f8588498b2c7350f1b95dbe4658c2462e5da79b94ea79b3bee4e7394",
+      "publishedSHA256": "fd49c7315bd2610d952f6941492009a7b2717989369d6c86eb411ce4c5990575",
+      "privacyTransformed": true,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/discovery.mjs",
+      "originalSHA256": "1b27ad109dbc08e754a96060cc754218a959dc6bb9b2bc7610278c5822163939",
+      "publishedSHA256": "1b27ad109dbc08e754a96060cc754218a959dc6bb9b2bc7610278c5822163939",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/drain.mjs",
+      "originalSHA256": "cdc00eb095ff161de396507bd328f16fe9df172f101440eb7a3ae8c709027ee7",
+      "publishedSHA256": "cdc00eb095ff161de396507bd328f16fe9df172f101440eb7a3ae8c709027ee7",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/main.mjs",
+      "originalSHA256": "96cd785ad4abfb9878948ce6a0e5854fffdd119848047f87e3864cedd79ffb4b",
+      "publishedSHA256": "a99bd7fc58e308797e83bb39e13662914ff6f758fcc6250d6c3c30339722ab95",
+      "privacyTransformed": true,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/policy.mjs",
+      "originalSHA256": "572b7747365d6dd513a19ce85491a5efeef4770294ff11caa4218d53882a34ce",
+      "publishedSHA256": "572b7747365d6dd513a19ce85491a5efeef4770294ff11caa4218d53882a34ce",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/production-routes.mjs",
+      "originalSHA256": "e588916f0f5dedee3ba2b583ff1f2f78a48855872fd434eb659c6cbd62c83b28",
+      "publishedSHA256": "6737b16339b6bc6082f00b31c8b689e535ba02c5e121aebcc2cba572f4edb17e",
+      "privacyTransformed": true,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/redis.mjs",
+      "originalSHA256": "7b53691320ea3e4abf8f5c6aca48fbf258ac32ef349bdba8e4cb084642767b61",
+      "publishedSHA256": "7b53691320ea3e4abf8f5c6aca48fbf258ac32ef349bdba8e4cb084642767b61",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/config/dist/index.js",
+      "originalSHA256": "8783770a173a7a70a708c8c01d20ad6c2ad0694bc4b638eb5267536d82b18759",
+      "publishedSHA256": "8783770a173a7a70a708c8c01d20ad6c2ad0694bc4b638eb5267536d82b18759",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/config/dist/non-sol-pumpswap-routes.js",
+      "originalSHA256": "b8826188479027205ece9a9cbe35396d520a1cc85bb579a6f318c17a0beac0bc",
+      "publishedSHA256": "b8826188479027205ece9a9cbe35396d520a1cc85bb579a6f318c17a0beac0bc",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/account.js",
+      "originalSHA256": "38ff97364ae93179bf4dce1062e29ca2b76e9ed14231baf2499dd17282b2906c",
+      "publishedSHA256": "38ff97364ae93179bf4dce1062e29ca2b76e9ed14231baf2499dd17282b2906c",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/brand.js",
+      "originalSHA256": "180b8e51bb77861f84739916ae17c0980a0e52c2b8c81d494aed16f59df61a8c",
+      "publishedSHA256": "180b8e51bb77861f84739916ae17c0980a0e52c2b8c81d494aed16f59df61a8c",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/buy-validation.js",
+      "originalSHA256": "0c84a72cc8b3bedd099e1b8b8e7c5564966f7c6b5b728c241c66f4df136bec78",
+      "publishedSHA256": "0c84a72cc8b3bedd099e1b8b8e7c5564966f7c6b5b728c241c66f4df136bec78",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/configuration.js",
+      "originalSHA256": "53c2091d172c9e77e11bbf905991a3801870a305ef72bf9957388e9cb7b71c2e",
+      "publishedSHA256": "53c2091d172c9e77e11bbf905991a3801870a305ef72bf9957388e9cb7b71c2e",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/daily-scoring.js",
+      "originalSHA256": "4103b0f8011ad4a23763446f5b2021417140bc1750c818ca980aa9b749932eb8",
+      "publishedSHA256": "4103b0f8011ad4a23763446f5b2021417140bc1750c818ca980aa9b749932eb8",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/execution-application.js",
+      "originalSHA256": "7353e5eb33606e7c8f5d300725152cff07654e6b0de0bc107e814a14f3464f2c",
+      "publishedSHA256": "7353e5eb33606e7c8f5d300725152cff07654e6b0de0bc107e814a14f3464f2c",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/hourly-round.js",
+      "originalSHA256": "82687322b00a044be799928413675f08aa0b2e44b5dca7f7eaa128f08e854340",
+      "publishedSHA256": "82687322b00a044be799928413675f08aa0b2e44b5dca7f7eaa128f08e854340",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/hourly-settlement.js",
+      "originalSHA256": "4c818df982d567c6fff35fc49ab159e74de7a425e135aaf5f6366275d9a041a9",
+      "publishedSHA256": "4c818df982d567c6fff35fc49ab159e74de7a425e135aaf5f6366275d9a041a9",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/identifiers.js",
+      "originalSHA256": "85108eea7a7f7efcd18479970f3db3d6a374d8bf1a2d8b5665e506177638deb8",
+      "publishedSHA256": "85108eea7a7f7efcd18479970f3db3d6a374d8bf1a2d8b5665e506177638deb8",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/index.js",
+      "originalSHA256": "3ca57dc333777154bdf8c6acfedfdfef50feaabde14c866326d7f7a8658958f1",
+      "publishedSHA256": "3ca57dc333777154bdf8c6acfedfdfef50feaabde14c866326d7f7a8658958f1",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/leaderboards.js",
+      "originalSHA256": "51d5d44eb4c7591af79566bcf7868fc15e1f4d4ab7e1b27293bddbf2e4bd9849",
+      "publishedSHA256": "51d5d44eb4c7591af79566bcf7868fc15e1f4d4ab7e1b27293bddbf2e4bd9849",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/money.js",
+      "originalSHA256": "f60bb1c489dcea0bfa0f106f9c24878f84e63bc311644da1f5d29ff9e9f1f067",
+      "publishedSHA256": "f60bb1c489dcea0bfa0f106f9c24878f84e63bc311644da1f5d29ff9e9f1f067",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/payout-allocation.js",
+      "originalSHA256": "fb8c8313b3914bd4fd525151fa50e0f72c8f96ac4733205c7c837b93162926b9",
+      "publishedSHA256": "fb8c8313b3914bd4fd525151fa50e0f72c8f96ac4733205c7c837b93162926b9",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/payout-execution.js",
+      "originalSHA256": "677748af5d2ef226ef3111be90445fc553b378416044e0125680dbbaa25e41ac",
+      "publishedSHA256": "677748af5d2ef226ef3111be90445fc553b378416044e0125680dbbaa25e41ac",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/percentages.js",
+      "originalSHA256": "81f1bfa302d0fb53f1a6ba815c9df6580f196d80b3ffd246d6169fb5eb50825a",
+      "publishedSHA256": "81f1bfa302d0fb53f1a6ba815c9df6580f196d80b3ffd246d6169fb5eb50825a",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/portfolio.js",
+      "originalSHA256": "680a0f5cea279c3dd9e90ea45b4ddab49ed7c4de6b81108bfe193f78c9ac7ea0",
+      "publishedSHA256": "680a0f5cea279c3dd9e90ea45b4ddab49ed7c4de6b81108bfe193f78c9ac7ea0",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/reward-economics.js",
+      "originalSHA256": "bed83a982a0952ba54cafa1d8fcb2f3ed2ca49a2bdb9cc0d288f043ffc8f7b1a",
+      "publishedSHA256": "bed83a982a0952ba54cafa1d8fcb2f3ed2ca49a2bdb9cc0d288f043ffc8f7b1a",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/security-diagnostics.js",
+      "originalSHA256": "8c9baa2f0a98f9b734537926a9239b7d6689905a76b728aa63e2a252d4308467",
+      "publishedSHA256": "8c9baa2f0a98f9b734537926a9239b7d6689905a76b728aa63e2a252d4308467",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/states.js",
+      "originalSHA256": "758d8c78c5113e2a1015532e3372f100b463adadc15afc201557fa1fc19005f9",
+      "publishedSHA256": "758d8c78c5113e2a1015532e3372f100b463adadc15afc201557fa1fc19005f9",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/time.js",
+      "originalSHA256": "d79009f2115c997c4d2173e6e555356ac25d62885f68d46cd25e841950c2636e",
+      "publishedSHA256": "d79009f2115c997c4d2173e6e555356ac25d62885f68d46cd25e841950c2636e",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/token-slots.js",
+      "originalSHA256": "9481b4b8f988a49fde1d5a916ecea220a3ea47c2188072a5e18026f2e33f796c",
+      "publishedSHA256": "9481b4b8f988a49fde1d5a916ecea220a3ea47c2188072a5e18026f2e33f796c",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/core/dist/types.js",
+      "originalSHA256": "01ae2a5b120382f9a648ced7ee8507493a134f216d100fc61600c6c9738235d2",
+      "publishedSHA256": "01ae2a5b120382f9a648ced7ee8507493a134f216d100fc61600c6c9738235d2",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/execution/dist/index.js",
+      "originalSHA256": "54aeb6be920a8b3689b6f3bd9818f0a9a477b70f2eea00d4f04b8e87020bff07",
+      "publishedSHA256": "54aeb6be920a8b3689b6f3bd9818f0a9a477b70f2eea00d4f04b8e87020bff07",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/chart-supply.js",
+      "originalSHA256": "6536c12909baffa8eb56225c5c692bd17a7cbecad3f17ecfb77c7816444409ce",
+      "publishedSHA256": "6536c12909baffa8eb56225c5c692bd17a7cbecad3f17ecfb77c7816444409ce",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/composed-pump-orca.js",
+      "originalSHA256": "8abc488a71324dea590cc283ccdf48f72a8bde5dac364301ead0274191880495",
+      "publishedSHA256": "8abc488a71324dea590cc283ccdf48f72a8bde5dac364301ead0274191880495",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/generic-access-context.js",
+      "originalSHA256": "c48a79538ad975a7e73ad47944a06b3b2d5de3084e2893ce87f4fca1380e5eae",
+      "publishedSHA256": "c48a79538ad975a7e73ad47944a06b3b2d5de3084e2893ce87f4fca1380e5eae",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/generic-pump-swap.js",
+      "originalSHA256": "aaf5630cfc9d68236b5d0c4047363422783f64004a4caefc41630530c837d353",
+      "publishedSHA256": "aaf5630cfc9d68236b5d0c4047363422783f64004a4caefc41630530c837d353",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/index.js",
+      "originalSHA256": "5e750947835613e78d41927486b413a493492ca01b3b51517939d8d7fd935d0b",
+      "publishedSHA256": "5e750947835613e78d41927486b413a493492ca01b3b51517939d8d7fd935d0b",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/non-sol-pump-swap.js",
+      "originalSHA256": "29f7e5a5eb0a60604f62bc606565836201a8e23399d0270d89ba336c98eabea5",
+      "publishedSHA256": "29f7e5a5eb0a60604f62bc606565836201a8e23399d0270d89ba336c98eabea5",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/production.js",
+      "originalSHA256": "d9fd6fde1ad676700b9f7a81cdab748337fad592b61af6cd70756f1b51319739",
+      "publishedSHA256": "d9fd6fde1ad676700b9f7a81cdab748337fad592b61af6cd70756f1b51319739",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/pump-fun.js",
+      "originalSHA256": "f501b1ba91b91d2b59849f5bbd089bebae7a030d4c45a0685deaaed9883b5e73",
+      "publishedSHA256": "f501b1ba91b91d2b59849f5bbd089bebae7a030d4c45a0685deaaed9883b5e73",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/pump-swap.js",
+      "originalSHA256": "a4e57458cbbbf3360d252997e65b899dab23e58744b9b9f7a6298cf5b85f7ee0",
+      "publishedSHA256": "a4e57458cbbbf3360d252997e65b899dab23e58744b9b9f7a6298cf5b85f7ee0",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/rpc-read-context.js",
+      "originalSHA256": "24540bd717effc59f99507db621257089010a8c87733117858a164690e9878ab",
+      "publishedSHA256": "24540bd717effc59f99507db621257089010a8c87733117858a164690e9878ab",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/sell-capacity.js",
+      "originalSHA256": "e66d4054c14cc1c39f4f836c97101179760625d1db1e9313877067b4c67423a0",
+      "publishedSHA256": "e66d4054c14cc1c39f4f836c97101179760625d1db1e9313877067b4c67423a0",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/solana-routes.js",
+      "originalSHA256": "88a11667aa004d72459ccfff0220042f27df268665da452f9b197e04ba7ad324",
+      "publishedSHA256": "88a11667aa004d72459ccfff0220042f27df268665da452f9b197e04ba7ad324",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/experimental/external-event-evidence.js",
+      "originalSHA256": "e56a666e93face4767c718071c652c9fca8d7304e023893e08d6a577122891ee",
+      "publishedSHA256": "e56a666e93face4767c718071c652c9fca8d7304e023893e08d6a577122891ee",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/experimental/non-sol-pump-swap.js",
+      "originalSHA256": "4e6300402e0f5cb34c81998fc01bf6816cd0e5a82f08ef4fe4f1a9e361372bbc",
+      "publishedSHA256": "4e6300402e0f5cb34c81998fc01bf6816cd0e5a82f08ef4fe4f1a9e361372bbc",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/experimental/pump-reserve-stage1.js",
+      "originalSHA256": "db9b614e4e18eb220bee3e74f16b3f3f7b93167b2171c3ef33ffc30879bf6137",
+      "publishedSHA256": "db9b614e4e18eb220bee3e74f16b3f3f7b93167b2171c3ef33ffc30879bf6137",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/protocols/dist/experimental/sequential-route.js",
+      "originalSHA256": "688ff7ca39ab0d88b4dc800d3f906e56d46c25865de099d8f171d5a1e5edb2a8",
+      "publishedSHA256": "688ff7ca39ab0d88b4dc800d3f906e56d46c25865de099d8f171d5a1e5edb2a8",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/shared/dist/browser.js",
+      "originalSHA256": "bc9e0d13db6fad1f46158489f86210c729759f9080ec666ef648c3905e4944cd",
+      "publishedSHA256": "bc9e0d13db6fad1f46158489f86210c729759f9080ec666ef648c3905e4944cd",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-api/runtime/packages/shared/dist/index.js",
+      "originalSHA256": "827c148a2159c5d098f9fe33185b555382ad63931193dda5f41f6af38a6a4445",
+      "publishedSHA256": "827c148a2159c5d098f9fe33185b555382ad63931193dda5f41f6af38a6a4445",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    },
+    {
+      "path": "reference/production-worker/worker.mjs",
+      "originalSHA256": "8bdd3457dbf9971a09eeb2722e21bcaa26600f6caea45d37483a9650bc48765b",
+      "publishedSHA256": "8bdd3457dbf9971a09eeb2722e21bcaa26600f6caea45d37483a9650bc48765b",
+      "privacyTransformed": false,
+      "lineEndingsNormalized": false
+    }
+  ]
+}

@@ -1,91 +1,59 @@
 # Paperfund
 
-Paperfund is a Solana paper-trading competition. Read [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) before changing product behavior.
+Paperfund is a Solana PAPER-trading competition with a Chrome extension, web dashboard, wallet-authenticated API, PostgreSQL ledger, competition worker and controlled real-SOL reward tooling. PAPER SOL and trading positions are simulated. Mainnet SOL rewards are real and require verified funding, custody, settlement and payout authorization.
 
-The current development baseline includes:
+This source update includes extension **0.2.2**, the current executable-quote trading composition, DURABLE_QUOTE_V2 settlement/cutoff capture, fee accounting, reward allocation, treasury controls and payout/recovery implementations. Historical experiments remain identified by `experimental`, `candidates` and diagnostic paths.
 
-- the Phase 0 repository and infrastructure foundation;
-- the Phase 1A–1F pure competition and reward-economics domain engine;
-- the corrected Phase 2 authoritative hourly PostgreSQL ledger;
-- the Phase 3 Pump.fun/PumpSwap authoritative execution and forced-settlement engine;
-- the Phase 4A wallet-authenticated competition API and automatic hourly lifecycle worker;
-- the Phase 4B React web trading application;
-- the Phase 4C authoritative BUY preflight, executable portfolio valuation, and browser smoke;
-- the Phase 5B Chromium MV3 trading overlay for Axiom, GMGN.ai, and Terminal.trade;
-- the Phase 5A authoritative creator-fee and reward-pool accounting system;
-- the Phase 6A production launch configuration, readiness checks, backup/restore smoke, and public
-  landing/rules surface;
-- the Phase 6B approved visual identity, Chrome Web Store assets, privacy surface, and audited
-  extension release packaging;
-- validated local PostgreSQL and Redis development infrastructure.
+## Current status
 
-See [Phase 2 ledger and schema](./docs/PHASE_2_LEDGER_AND_SCHEMA.md),
-[Phase 3 execution engine](./docs/PHASE_3_EXECUTION_ENGINE.md), and
-[V1 API](./docs/API.md), [web application](./docs/WEB_APP.md), and
-[multi-terminal extension](./docs/EXTENSION.md) for implementation details.
-Chrome Web Store listing copy, permissions/data disclosures, assets, and operator submission gates
-are maintained in [the store release guide](./docs/CHROME_WEB_STORE.md).
+The owner-approved October 27, 2026 context records public PAPER trading as active. The reward worker uses future-enrolled DURABLE_QUOTE_V2 evidence, retaining historical settlement REVIEW holds. Financial STOP is asserted; claims, signing, payouts and fee ingestion are disabled. Genuine hourly/full-day qualification and fresh verified funding/custody remain pending. Daily scoring and payout code do not establish live daily payouts.
 
-## Prerequisites
+Public-release clearance is incomplete. See [publication status](docs/publication/STATUS.md). Keep the repository private until history, confidentiality, third-party permissions and deployed-source provenance are cleared. The old RC1 snapshot is not the current extension.
 
-- Node.js 22 or newer
-- npm 10 or newer
-- Docker Desktop with Docker Compose (recommended for local PostgreSQL and Redis)
+## Components
 
-## Local setup
+| Path | Responsibility |
+| --- | --- |
+| `apps/extension` | MV3 0.2.2, Axiom/GMGN/Padre adapters, PAPER overlays, wallet auth and synchronized portfolio |
+| `apps/web` | Website, trading dashboard, accounts and leaderboards |
+| `apps/api/src` | API, auth, trading services, positions and P&L |
+| `apps/api/isolated/current-quotes` | Current executable-quote router/capture and public production composition |
+| `apps/api/isolated/verified-routes` | Verified routing and finalized provider evidence |
+| `apps/worker` | UTC lifecycle, accounting, durable cutoff collection and settlement composition |
+| `packages/core` | Integer rules, scoring, eligibility, ties, allocations and Reward Buffer |
+| `packages/db` | Ledger, migrations, settlement, fees, treasury, payout authorization and recovery |
+| `packages/execution`, `packages/protocols` | Quotes, tokens/routes, fees, simulated slippage and valuation |
+| `packages/shared`, `packages/config`, `packages/testing` | Contracts, configuration and test support |
+| `packages/payout-signer`, `scripts/operator` | Signer source, STOP, distribution, verification and recovery |
+
+See [architecture](docs/ARCHITECTURE.md), [development](docs/DEVELOPMENT.md), [configuration](docs/CONFIGURATION.md) and [rules](docs/RULES.md).
+
+## Local development
+
+Use a separate checkout, Node.js 22+, npm 10+ and Docker Desktop for local PostgreSQL/Redis. Production keys, treasury, user data and private RPC subscriptions are not needed.
 
 ```powershell
-npm install
+npm ci
 Copy-Item .env.example .env
 docker compose up -d
 npm run db:migrate
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. The API defaults to `http://127.0.0.1:3000`; the root `npm run dev` starts the API, lifecycle worker, and Vite web app together. Use `GET /health` for process health and `GET /ready` for PostgreSQL and Redis readiness.
+Web defaults to `http://127.0.0.1:5173`, API to `http://127.0.0.1:3000`. Authenticate with a disposable browser wallet. Default RPC is public Solana; availability and route support affect quotes. Keep signing and fee ingestion disabled. Baseline migrations do not silently install isolated current-quote schemas or production policies; see DEVELOPMENT.md.
 
-## Important commands
+`npm run build` compiles API, worker and TypeScript workspaces and builds the website. `npm run build:extension` creates a local extension. In `chrome://extensions`, enable Developer mode, choose Load unpacked and select `apps/extension/build`. Development identity differs from Web Store identity.
 
-| Command                            | Purpose                                           |
-| ---------------------------------- | ------------------------------------------------- |
-| `npm run dev`                      | Run API, worker, and web app in watch mode        |
-| `npm run build`                    | Compile workspaces and build the production web   |
-| `npm run typecheck`                | Type-check the monorepo                           |
-| `npm run lint`                     | Run ESLint                                        |
-| `npm run format`                   | Apply Prettier formatting                         |
-| `npm run format:check`             | Check formatting                                  |
-| `npm test`                         | Run Vitest tests                                  |
-| `npm run test:e2e`                 | Run deterministic Playwright trading smoke        |
-| `npm run build:extension`          | Build the unpacked Chromium extension             |
-| `npm run package:extension`        | Build, audit, and ZIP a clean store release       |
-| `npm run validate:extension:store` | Audit a built extension release                   |
-| `npm run dev:extension`            | Rebuild the extension in watch mode               |
-| `npm run test:extension`           | Run adapter, overlay, and fixture-harness tests   |
-| `npm run test:extension:headed`    | Run the loaded MV3 headed fixture acceptance      |
-| `npm run test:extension:live`      | Verify safe injection on live supported terminals |
-| `npm run db:generate`              | Generate a Drizzle migration from schema changes  |
-| `npm run db:migrate`               | Apply committed database migrations               |
-| `npm run db:check`                 | Check database connectivity                       |
-| `npm run db:backup`                | Create a timestamped PostgreSQL custom dump       |
-| `npm run db:restore-smoke`         | Prove a dump restores into an isolated database   |
-| `npm run ops:check`                | Check DB, Redis, RPC, and safe operational modes  |
-| `npm run start:api`                | Start the built API as an independent process     |
-| `npm run start:worker`             | Start the built worker as an independent process  |
-| `npm run payout:status -- <id>`    | Inspect or reconcile a persisted payout execution |
+Public-origin extension build verification:
 
-Unit tests and static validation do not require Docker. Infrastructure readiness and migrations require the local services and values from `.env`.
+```powershell
+$env:PAPERFUND_API_BASE_URL='https://api.paperfund.app'
+$env:PAPERFUND_APP_URL='https://trade.paperfund.app/'
+npm run build:release --workspace @paperfund/extension
+```
 
-Production-oriented Windows startup, HTTPS, supervision, shadow creator-fee rollout, payout
-reconciliation, backup/restore, RPC replacement, and incident procedures are documented in
-[the operations runbook](./docs/OPERATIONS.md). Use the
-[production launch checklist](./docs/LAUNCH_CHECKLIST.md) as the release gate. Start from
-`.env.production.example` and `compose.production.yml`; neither the template nor the compose file
-contains deployable secrets.
+This creates local output only. CI performs builds/tests without deployment or financial actions. Run `npm run test:extension` and `npm run test:publication` for focused offline checks. Integration suites need disposable infrastructure.
 
-The Playwright smoke also requires local PostgreSQL from `docker compose up -d` and a one-time `npx playwright install chromium`. It creates and drops its own database, uses recorded market fixtures and a test-only wallet, and makes no external RPC or wallet request.
+## License and branding
 
-## Multi-terminal extension
-
-Run `npm run build:extension`, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select `apps/extension/build`. Open a Solana token page on Axiom, GMGN, or Terminal and verify the shared Paperfund overlay. The same authenticated hourly account, Paper SOL, positions, slots, and history follow the user across supported tabs; each tab retains its own current mint. The checked-in manifest key gives development installs the stable extension ID `lcnpjpkojoadojibfbjfohpjepkfmdln`.
-
-The developer build defaults to the local API and web app. Release packaging requires the public build-time `PAPERFUND_API_BASE_URL` and `PAPERFUND_APP_URL`; run `npm run package:extension` to create the validated unpacked directory and `artifacts/paperfund-extension-0.2.0.zip`. Server-only values such as `SOLANA_RPC_URL`, `DATABASE_URL`, `REDIS_URL`, cookie/auth configuration, and private keys must never be passed to the browser build. See [multi-terminal extension](./docs/EXTENSION.md) for verified routes, exact permissions, fail-closed behavior, install, headed acceptance, recovery, and packaging procedures.
+Original code is licensed under [Apache-2.0](LICENSE). [Third-party material](THIRD_PARTY_NOTICES.md) retains its rights and notices. Name, logo and branding are separately reserved under [BRANDING.md](BRANDING.md). See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).

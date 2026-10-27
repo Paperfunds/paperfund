@@ -1,0 +1,12 @@
+import 'dotenv/config';
+import { SolanaRpcClient, decodePumpBondingCurve, pumpBondingCurveAddress, pumpGlobalAddress, pumpFeeConfigAddress } from '../packages/protocols/src/pump-fun.js';
+import { writeFileSync } from 'node:fs';
+const rpc = new SolanaRpcClient({ url: process.env['SOLANA_RPC_URL'] ?? 'https://api.mainnet-beta.solana.com', timeoutMs: 15000, commitment: 'confirmed' });
+const mint = process.argv[2]!;
+const curve = await pumpBondingCurveAddress(mint);
+const addresses = [curve, await pumpGlobalAddress(), await pumpFeeConfigAddress(), mint];
+const response = await rpc.getMultipleAccounts(addresses);
+const account = response.value[0];
+const decoded = account ? decodePumpBondingCurve(Buffer.from(account.data[0], 'base64')) : null;
+console.log(JSON.stringify({ mint, curve, slot: response.context.slot, owner: account?.owner, length: account ? Buffer.from(account.data[0], 'base64').length : null, decoded }, (_, value) => typeof value === 'bigint' ? value.toString() : value));
+if (process.argv[3]) writeFileSync(process.argv[3], JSON.stringify({ addresses, response }, null, 2));

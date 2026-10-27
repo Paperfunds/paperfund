@@ -1,0 +1,150 @@
+{
+  "note": "Historical unsigned positive-claim fixture. Offline tests only; expired, never authorize.",
+  "review": {
+    "schema": "paperfund-mainnet-claim-review-v1",
+    "preparedAt": "2026-10-20T00:07:33.378Z",
+    "expiresAt": "2026-10-20T00:08:33.378Z",
+    "network": "mainnet-beta",
+    "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+    "mint": "3JVd8Z3kEEXBaBoZo9rcWk4MHJPSUAf6zAjvAF5spump",
+    "wallet": "GHMGUyYpdaC4TfUTwHEWBeZHPYq6csJDP1iVuYCjyQyW",
+    "recipient": "GHMGUyYpdaC4TfUTwHEWBeZHPYq6csJDP1iVuYCjyQyW",
+    "vault": "3swpgMo1CEeBvkfZMniPceRk1Km398SqjabJ7y1TAAF5",
+    "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "instruction": "collect_creator_fee_v2",
+    "scope": "CREATOR_AGGREGATE_VAULT_NOT_TOKEN_SPECIFIC_RECEIVED_CAPITAL",
+    "finalizedObservation": {
+      "observedAt": "2026-10-20T00:07:32.653Z",
+      "network": "mainnet-beta",
+      "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "commitment": "finalized",
+      "slot": 459026035,
+      "vaultSlot": 459026036,
+      "mint": "3JVd8Z3kEEXBaBoZo9rcWk4MHJPSUAf6zAjvAF5spump",
+      "creator": "GHMGUyYpdaC4TfUTwHEWBeZHPYq6csJDP1iVuYCjyQyW",
+      "selectedTreasury": "GHMGUyYpdaC4TfUTwHEWBeZHPYq6csJDP1iVuYCjyQyW",
+      "authorityMatches": true,
+      "market": "ACTIVE_PUMP_CURVE",
+      "curve": "EXHcMtkiWkxZPBrRhCVuuz8LvJdZu1oykkcudemsT1en",
+      "sharingExists": false,
+      "canonicalPumpSwapExists": false,
+      "vault": "3swpgMo1CEeBvkfZMniPceRk1Km398SqjabJ7y1TAAF5",
+      "ammVault": "817c8FwqxH6HYDQ7sLhXZisUybtYkwrT39TkVkiCshSz",
+      "vaultLamports": "12060597",
+      "rentLamports": "650240",
+      "claimableBondingExcessLamports": "11410357",
+      "claimableAmmWsolLamports": "0",
+      "walletBalanceLamports": "3006484",
+      "creatorFeeBps": "30",
+      "protocolFeeBps": "95",
+      "scope": "CREATOR_AGGREGATE_VAULT_NOT_TOKEN_SPECIFIC_RECEIVED_CAPITAL",
+      "providerQualification": "UNQUALIFIED",
+      "claimReady": false
+    },
+    "expectedGrossLamports": "11410357",
+    "maximumFeeLamports": "5000",
+    "feeLamports": "5000",
+    "minimumNetLamports": "11405357",
+    "walletBalanceLamports": "3006484",
+    "feeFundingSufficient": true,
+    "profitable": true,
+    "priorityFeeLamports": "0",
+    "computeUnitLimit": 50000,
+    "blockhash": "Bw88vAadzYR3CxkivxfH4rsNhSHPWzU8WnSiUT9tZwdu",
+    "lastValidBlockHeight": 437061302,
+    "messageSha256": "9a5bda4f264a3798e5e2c98bfb1c2e4a0876922bd110a400a2146163443787e9",
+    "unsignedTransactionBase64": "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAcL4w+DQtpPnqUQTVWASweuvbLhrKSqn+kYL/9Tfh9c4AkqxGbbtquBNZIRzhiLZ7YaClUFPRsIcenL3qgrRnQufIFN6Qi19p6IyU+Diehkt66qsJogNWR+Y2kJEAlm3PDuhWyvGkySe7pS4ij0LxTuXlBhOoov+rDpLY5Egf5QY0oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFW4PaTZlrPRNsVaL8XW6pRicuX9dL/O2VdK7b9bRiwjJclj04kifG7PRApFI4NgwtaE5na/xCEBI572Nvp+Fms8TbrAfwcTog9I8i1hEq1mjf2at1XxemsO1PgWdNcZAMGRm/lIRcy/+ytunLDm+e8jOW7xfcSayxDmzpAAAAABpuIV/6rgYT7aH9jRhjANdrEOdwa6ztVmKDwAAAAAAEG3fbh12Whk9nL4UbO63msHLSF7V9bN5E6jPWFfv8AqaJyTV3SRR0NeOoOqzxJItIkIkw4zA0Jlsm4A79LJzckAggABQJQwwAABQoAAwECCQoGBAcFCM8RivIEIhM4",
+    "instructions": [
+      {
+        "program": "ComputeBudget111111111111111111111111111111",
+        "dataBase64": "AlDDAAA=",
+        "accounts": []
+      },
+      {
+        "program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+        "dataBase64": "zxGK8gQiEzg=",
+        "accounts": [
+          {
+            "address": "GHMGUyYpdaC4TfUTwHEWBeZHPYq6csJDP1iVuYCjyQyW",
+            "signer": false,
+            "writable": true
+          },
+          {
+            "address": "9yqLypsgnvjDrBhW4mr6DeZbwsTX3XVGp9y8WDiSVzAm",
+            "signer": false,
+            "writable": true
+          },
+          {
+            "address": "3swpgMo1CEeBvkfZMniPceRk1Km398SqjabJ7y1TAAF5",
+            "signer": false,
+            "writable": true
+          },
+          {
+            "address": "9hkVqoYXd876wZq5UtJZcKEf9LEpdWX6jb8Y8KGdvchB",
+            "signer": false,
+            "writable": true
+          },
+          {
+            "address": "So11111111111111111111111111111111111111112",
+            "signer": false,
+            "writable": false
+          },
+          {
+            "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "signer": false,
+            "writable": false
+          },
+          {
+            "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+            "signer": false,
+            "writable": false
+          },
+          {
+            "address": "11111111111111111111111111111111",
+            "signer": false,
+            "writable": false
+          },
+          {
+            "address": "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+            "signer": false,
+            "writable": false
+          },
+          {
+            "address": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+            "signer": false,
+            "writable": false
+          }
+        ]
+      }
+    ],
+    "simulation": {
+      "error": null,
+      "slot": 459026036,
+      "unitsConsumed": 19877,
+      "logs": [
+        "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+        "Program ComputeBudget111111111111111111111111111111 success",
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [1]",
+        "Program log: Instruction: CollectCreatorFeeV2",
+        "Program 11111111111111111111111111111111 invoke [2]",
+        "Program 11111111111111111111111111111111 success",
+        "Program data: egJ/AQ6/DK+9sNZqAAAAAOMPg0LaT56lEE1VgEsHrr2y4aykqp/pGC//U34fXOAJtRuuAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [2]",
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2170 of 32600 compute units",
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success",
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 19727 of 49850 compute units",
+        "Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success"
+      ],
+      "grossVerified": true,
+      "walletPostLamports": 14411841,
+      "vaultPostLamports": 650240,
+      "signatureVerification": false
+    },
+    "readyForApproval": true,
+    "authorization": "NONE",
+    "broadcast": "BLOCKED",
+    "signature": null,
+    "historicalObservationLamports": "5844557",
+    "reconciliation": "FINALIZED_SIGNATURE_AND_EXACT_MESSAGE_PLUS_VAULT_WALLET_DELTAS_REQUIRED_NO_AUTOMATIC_DATABASE_CREDIT"
+  }
+}

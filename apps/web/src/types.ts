@@ -13,6 +13,9 @@ export type {
 } from '@paperfund/shared/browser';
 
 export interface LeaderboardEntry {
+  equityLamports?: string;
+  slotsUsed?: number;
+  openPositions?: number;
   user_id: string;
   wallet_address: string;
   score: string;
@@ -21,6 +24,14 @@ export interface LeaderboardEntry {
   tieGroupSize: number;
   final_settled_balance_lamports?: string;
   completed_hourly_round_count?: number;
+}
+export interface LiveHourlyLeaderboard {
+  round: { id: string; starts_at: string; ends_at_exclusive: string; state: string };
+  phase: 'LIVE' | 'SETTLING' | 'FINALIZED';
+  status: 'AVAILABLE' | 'UNAVAILABLE';
+  reason: string | null;
+  serverTime: string;
+  entries: LeaderboardEntry[];
 }
 
 export interface RewardAllocation {

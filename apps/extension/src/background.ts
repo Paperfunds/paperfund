@@ -1,7 +1,11 @@
+import { ValuationTransport } from './valuation-transport.js';
 import { isExtensionApiRequest, type ApiOperation, type ExtensionApiResponse } from './messages.js';
+import { ReadTransport } from './read-transport.js';
 
 const TOKEN_KEY = 'paperfundSessionToken';
 const API_BASE = __PAPERFUND_API_BASE_URL__;
+const reads = new ReadTransport();
+const valuations = new ValuationTransport();
 
 interface Route {
   method: 'GET' | 'POST';
@@ -33,13 +37,24 @@ const routes: Record<ApiOperation, Route> = {
   CURRENT_ROUND: { method: 'GET', path: () => '/api/v1/rounds/current' },
   ENTER_ROUND: { method: 'POST', path: () => '/api/v1/rounds/current/enter', authenticated: true },
   ACCOUNT: { method: 'GET', path: () => '/api/v1/rounds/current/account', authenticated: true },
+  CHART_METADATA: {
+    method: 'GET',
+    authenticated: true,
+    path: (p) => '/api/v1/chart-metadata/' + encodeURIComponent(required(p, 'context')),
+  },
   MARKET: {
     method: 'GET',
+    authenticated: true,
     path: (p) => `/api/v1/markets/${encodeURIComponent(required(p, 'mint'))}`,
   },
   PREFLIGHT: {
     method: 'GET',
     path: (p) => `/api/v1/trades/buy-preflight?mint=${encodeURIComponent(required(p, 'mint'))}`,
+    authenticated: true,
+  },
+  VIEWED_POSITION: {
+    method: 'GET',
+    path: (p) => `/api/v1/positions/viewed?mint=${encodeURIComponent(required(p, 'mint'))}`,
     authenticated: true,
   },
   POSITIONS: { method: 'GET', path: () => '/api/v1/positions', authenticated: true },
@@ -57,7 +72,12 @@ const routes: Record<ApiOperation, Route> = {
     idempotent: true,
     authenticated: true,
   },
-  TRADES: { method: 'GET', path: () => '/api/v1/trades?limit=10', authenticated: true },
+  TRADES: {
+    method: 'GET',
+    path: (p) =>
+      `/api/v1/trades?limit=100${p['mint'] ? `&mint=${encodeURIComponent(p['mint'])}` : ''}${p['cursor'] ? `&cursor=${encodeURIComponent(p['cursor'])}` : ''}`,
+    authenticated: true,
+  },
   RESULTS: { method: 'GET', path: () => '/api/v1/results/hourly?limit=1', authenticated: true },
 };
 
@@ -73,7 +93,10 @@ async function sessionToken(): Promise<string | undefined> {
   return typeof token === 'string' ? token : undefined;
 }
 
-async function handle(message: unknown): Promise<ExtensionApiResponse> {
+async function handle(
+  message: unknown,
+  sender: chrome.runtime.MessageSender,
+): Promise<ExtensionApiResponse> {
   if (!isExtensionApiRequest(message))
     return {
       ok: false,
@@ -87,11 +110,35 @@ async function handle(message: unknown): Promise<ExtensionApiResponse> {
     if (token) headers['authorization'] = `Bearer ${token}`;
     if (route.body) headers['content-type'] = 'application/json';
     if (route.idempotent) headers['idempotency-key'] = required(payload, 'idempotencyKey');
-    const response = await fetch(`${API_BASE}${route.path(payload)}`, {
-      method: route.method,
-      headers,
-      ...(route.body ? { body: JSON.stringify(route.body(payload)) } : {}),
-    });
+    const url = `${API_BASE}${route.path(payload)}`;
+    const fetchRequest = () =>
+      fetch(url, {
+        method: route.method,
+        headers,
+        signal: AbortSignal.timeout(15_000),
+        ...(route.body ? { body: JSON.stringify(route.body(payload)) } : {}),
+      });
+    if (route.method === 'POST') {
+      reads.invalidate();
+      valuations.invalidate();
+    }
+    const response = ['VIEWED_POSITION', 'MARKET', 'PREFLIGHT', 'POSITIONS'].includes(
+      message.operation,
+    )
+      ? await valuations.read(
+          `${token ?? ''}:${url}`,
+          `${sender.tab?.id}:${message.requestId ?? crypto.randomUUID()}`,
+          (signal) => fetch(url, { method: 'GET', headers, signal }),
+          message.operation === 'MARKET'
+            ? 10000
+            : message.operation === 'VIEWED_POSITION'
+              ? 3500
+              : 15000,
+        )
+      : route.method === 'GET'
+        ? await reads.read(`${token ?? ''}:${url}`, fetchRequest, 0)
+        : await fetchRequest();
+    if (route.method === 'POST') reads.invalidate();
     const data = response.status === 204 ? undefined : await response.json().catch(() => null);
     if (!response.ok) {
       const error = data as { error?: { code?: string; message?: string } } | null;
@@ -102,6 +149,15 @@ async function handle(message: unknown): Promise<ExtensionApiResponse> {
           code: error?.error?.code ?? 'HTTP_ERROR',
           message: error?.error?.message ?? 'The request failed.',
           status: response.status,
+          ...(response.headers.get('retry-after')
+            ? {
+                retryAfterMs: Math.max(
+                  0,
+                  Number(response.headers.get('retry-after')) * 1000 ||
+                    Date.parse(response.headers.get('retry-after')!) - Date.now(),
+                ),
+              }
+            : {}),
         },
       };
     }
@@ -125,8 +181,17 @@ async function handle(message: unknown): Promise<ExtensionApiResponse> {
   }
 }
 
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
+  const cancel = message as { kind?: string; requestId?: string };
+  if (
+    cancel?.kind === 'PAPERFUND_CANCEL_VIEWED_V1' &&
+    typeof cancel.requestId === 'string' &&
+    /^[a-zA-Z0-9-]{1,80}$/.test(cancel.requestId)
+  ) {
+    valuations.cancel(`${sender.tab?.id}:${cancel.requestId}`);
+    return false;
+  }
   if (!isExtensionApiRequest(message)) return false;
-  void handle(message).then(sendResponse);
+  void handle(message, sender).then(sendResponse);
   return true;
 });

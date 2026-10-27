@@ -7,6 +7,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./private/payout-security": {
+      "types": "./dist/payout-security.d.ts",
+      "default": "./dist/payout-security.js"
+    },
+    "./private/payout-treasury": {
+      "types": "./dist/payout-treasury.d.ts",
+      "default": "./dist/payout-treasury.js"
+    },
+    "./private/payout-approval": {
+      "types": "./dist/payout-approval.d.ts",
+      "default": "./dist/payout-approval.js"
+    },
+    "./private/legacy-settlement": {
+      "types": "./dist/legacy-settlement.d.ts",
+      "default": "./dist/legacy-settlement.js"
     }
   },
   "scripts": {
@@ -28,5 +44,6 @@
   "devDependencies": {
     "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.11"
-  }
+  },
+  "license": "Apache-2.0"
 }

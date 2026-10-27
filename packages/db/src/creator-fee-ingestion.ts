@@ -1,3 +1,4 @@
+import { safeErrorMessage } from '@paperfund/core';
 import { createHash } from 'node:crypto';
 
 import { PUMP_AMM_PROGRAM_ID, PUMP_PROGRAM_ID, WRAPPED_SOL_MINT } from '@paperfund/protocols';
@@ -19,6 +20,10 @@ const PUMP_SELL = Buffer.from([51, 230, 133, 164, 1, 127, 131, 173]);
 const PUMP_BUY_V2 = Buffer.from([184, 23, 238, 97, 103, 197, 211, 61]);
 const PUMP_BUY_EXACT_QUOTE_IN_V2 = Buffer.from([194, 171, 28, 70, 104, 77, 91, 47]);
 const PUMP_SELL_V2 = Buffer.from([93, 246, 130, 60, 231, 233, 64, 178]);
+// Official pump-public-docs IDL pin: 7616681ea557975f9f623ac211080f22a93060781eaf4765b0a488d980997207.
+const PUMP_BUY_V3 = Buffer.from([7, 5, 29, 196, 245, 23, 101, 80]);
+const PUMP_BUY_EXACT_QUOTE_IN_V3 = Buffer.from([225, 247, 80, 30, 213, 179, 132, 136]);
+const PUMP_SELL_V3 = Buffer.from([28, 146, 222, 119, 38, 196, 105, 213]);
 const PUMP_AMM_BUY_EVENT = Buffer.from([103, 244, 82, 31, 44, 245, 119, 119]);
 const PUMP_AMM_SELL_EVENT = Buffer.from([62, 47, 55, 10, 165, 3, 220, 42]);
 const PUMP_AMM_BUY_EXACT_QUOTE_IN = Buffer.from([198, 46, 21, 82, 180, 217, 232, 112]);
@@ -166,6 +171,8 @@ interface DecodedEvent {
   readonly protocolEventTimestamp: bigint;
   readonly instructionName: string;
   readonly pool?: string;
+  readonly user?: string;
+  readonly quoteMint?: string;
   readonly holderRewardsBps: bigint;
   readonly holderRewardsLamports: bigint;
   readonly cashbackLamports: bigint;
@@ -177,7 +184,7 @@ function decodePumpEvent(data: Buffer): DecodedEvent {
   value.u64();
   value.u64();
   value.u8();
-  value.publicKey();
+  const user = value.publicKey();
   const timestamp = value.i64();
   value.u64();
   value.u64();
@@ -216,6 +223,8 @@ function decodePumpEvent(data: Buffer): DecodedEvent {
   }
   return {
     sourceProgram: PUMP_PROGRAM_ID,
+    user,
+    quoteMint,
     tokenMint,
     creatorWallet,
     creatorFeeLamports,
@@ -314,6 +323,18 @@ function bindEventToInstruction(
         discriminatorIs(instruction.data, PUMP_BUY_EXACT_SOL_IN) ||
         isSell ||
         isV2;
+      const isV3 = discriminatorIs(instruction.data, PUMP_BUY_V3) || discriminatorIs(instruction.data, PUMP_BUY_EXACT_QUOTE_IN_V3) || discriminatorIs(instruction.data, PUMP_SELL_V3);
+      if (isV3) {
+        const curve = programAddress([Buffer.from('bonding-curve'), event.tokenMint], PUMP_PROGRAM_ID);
+        const quote = keys[instruction.accounts[2]!];
+        const quoteProgram = keys[instruction.accounts[4]!];
+        const associatedQuote = quote && quoteProgram ? programAddress([curve, quoteProgram, quote], ASSOCIATED_TOKEN_PROGRAM_ID) : '';
+        if (keys[instruction.accounts[1]!] === event.tokenMint && quote === WRAPPED_SOL_MINT &&
+            (event.quoteMint === WRAPPED_SOL_MINT || event.quoteMint === NATIVE_SOL_QUOTE) &&
+            keys[instruction.accounts[5]!] === curve && keys[instruction.accounts[7]!] === associatedQuote &&
+            keys[instruction.accounts[8]!] === event.user) return event;
+        continue;
+      }
       const creatorVaultIndex = isSell ? 8 : 9;
       const expectedCreatorVault = programAddress(
         [Buffer.from('creator-vault'), event.creatorWallet],
@@ -516,7 +537,7 @@ export class SolanaJsonRpcClient implements ReadOnlySolanaRpc {
             method,
             attempt,
             maxAttempts: attempts,
-            message: error instanceof Error ? error.message : 'Unknown RPC failure',
+            message: safeErrorMessage(error, [this.url], 'Unknown RPC failure'),
           });
           await new Promise((resolve) => setTimeout(resolve, Math.min(2_000, 125 * 2 ** attempt)));
         }
@@ -526,7 +547,7 @@ export class SolanaJsonRpcClient implements ReadOnlySolanaRpc {
     }
     throw new CreatorFeeIngestionError(
       'RPC_UNAVAILABLE',
-      lastError instanceof Error ? lastError.message : 'Solana RPC request failed.',
+      safeErrorMessage(lastError, [this.url], 'Solana RPC request failed.'),
     );
   }
 
@@ -1352,7 +1373,11 @@ export async function recordCreatorFeeIngestionFailure(
 ) {
   const category =
     error instanceof CreatorFeeIngestionError ? error.code : 'CREATOR_FEE_INGESTION_FAILED';
-  const detail = error instanceof Error ? error.message : 'Unknown creator-fee ingestion failure';
+  const detail = safeErrorMessage(
+    error,
+    [process.env['SOLANA_RPC_URL']],
+    'Unknown creator-fee ingestion failure',
+  );
   await database.pool.query(
     `insert into creator_fee_ingestion_checkpoints
       (source_id,network,token_mint,creator_wallet,last_error_category,last_error_detail,

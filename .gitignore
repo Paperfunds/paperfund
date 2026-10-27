@@ -26,3 +26,28 @@ Thumbs.db
 .DS_Store
 
 *.tsbuildinfo
+
+# Private runtime, custody and historical release/evidence copies
+/releases/
+/docs/operator-candidate/
+/docs/reward-accounting-*/
+/docs/reward-distribution-*/
+/docs/linked-pair-*/
+/docs/*-candidate/
+/docs/patches/
+*.key
+*.pem
+*.p12
+*.pfx
+*.keypair.json
+*.dpapi
+*.vault
+*.dump
+*.backup
+*.sql.gz
+*.sqlite*
+*.har
+*.cookies.json
+*.session.json
+*.bundle.cjs
+*-result.log

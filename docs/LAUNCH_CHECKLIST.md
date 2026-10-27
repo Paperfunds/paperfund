@@ -42,7 +42,7 @@ and result for every checked item.
 - [ ] Secure cookies are enabled and login/logout work from the public web app.
 - [ ] Landing and rules pages accurately state 10 Paper SOL per hour, 20% max buy, five slots,
       forced settlement, top-10/top-25 reward curves, tie handling, and simulated/no-value status.
-- [ ] Axiom, GMGN.ai, and Terminal.trade production builds show the shared overlay only on supported
+- [ ] Axiom, GMGN.ai, and Terminal / Padre production builds show the shared overlay only on supported
       Solana token routes; multi-tab mint isolation and logout remain correct.
 
 ## Process and observability
@@ -58,6 +58,12 @@ and result for every checked item.
       fee events, payout attempts, or changed totals.
 
 ## Financial safety
+
+- [ ] Approve/version/test conservative BUY-cap equity treatment for illiquid holdings; current
+      canonical full-exit valuation still blocks new BUYs when any holding cannot fully exit.
+- [ ] Approve/version/test terminating forced-settlement behavior for residual illiquid tokens;
+      current fail-closed behavior can remain SETTLING. No write-off policy is implied by partial
+      SELL preflight or the live leaderboard. See `PHASE_6C_CONTINUATION.md`.
 
 - [ ] Creator-fee ingestion starts disabled or in shadow mode. Official mint and creator-wallet
       identities are independently verified before enabling it. Shadow evidence must be reviewed

@@ -6,6 +6,7 @@ import {
   FinancialServiceError,
   initializeCompetitionAccount,
   settleHourlyRound,
+  type SettlementFailure,
 } from './financial-service.js';
 
 export const DEFAULT_MAX_UNIQUE_TOKENS = 5;
@@ -219,9 +220,11 @@ export interface LifecycleEvent {
     | 'ROUND_SETTLING'
     | 'ROUND_FINALIZED'
     | 'SETTLEMENT_RETRY'
+    | 'SETTLEMENT_OPERATIONAL_ERROR'
     | 'DAILY_FINALIZED';
   readonly roundId: string;
   readonly failures?: number;
+  readonly failureDetails?: readonly SettlementFailure[];
 }
 
 export async function runHourlyLifecycleTick(
@@ -262,8 +265,15 @@ export async function runHourlyLifecycleTick(
       roundId: id,
       failures: result.failures.length,
     });
-    if (result.failures.length > 0) {
-      events.push({ type: 'SETTLEMENT_RETRY', roundId: id, failures: result.failures.length });
+    for (const disposition of ['RETRY', 'OPERATIONAL_ERROR'] as const) {
+      const details = result.failures.filter((f) => f.disposition === disposition);
+      if (details.length > 0)
+        events.push({
+          type: disposition === 'RETRY' ? 'SETTLEMENT_RETRY' : 'SETTLEMENT_OPERATIONAL_ERROR',
+          roundId: id,
+          failures: details.length,
+          failureDetails: details,
+        });
     }
   }
   await database.pool.query(
@@ -274,6 +284,9 @@ export async function runHourlyLifecycleTick(
   const finalizedDays = await database.pool.query<{ id: string }>(
     `update daily_competitions d set state = 'FINALIZED', finalized_at = $1
      where d.state = 'FINALIZING'
+       and not exists (select 1 from legacy_source_reviews h join hourly_rounds r on r.id=h.hourly_round_id where r.starts_at>=d.starts_at and r.starts_at<d.ends_at_exclusive)
+       and (select count(*) from hourly_rounds r
+            where r.starts_at >= d.starts_at and r.starts_at < d.ends_at_exclusive) = 24
        and not exists (
          select 1 from hourly_rounds r
          where r.starts_at >= d.starts_at and r.starts_at < d.ends_at_exclusive

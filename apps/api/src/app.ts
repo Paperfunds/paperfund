@@ -1,3 +1,10 @@
+import {
+  safeApiDiagnostic,
+  safeApiErrorMessage,
+  safeApiLoggerOptions,
+} from './safe-diagnostics.js';
+import { withGenericActor } from '@paperfund/protocols';
+import type { GenericCapability, GenericMode } from '@paperfund/db';
 import { randomUUID } from 'node:crypto';
 
 import fastify, { type FastifyRequest } from 'fastify';
@@ -18,6 +25,8 @@ import type { RedisService } from './redis.js';
 
 type ApiConfig = Pick<
   AppConfig,
+  | 'BETA_INVITE_ONLY'
+  | 'BETA_WALLET_ALLOWLIST'
   | 'LOG_LEVEL'
   | 'COOKIE_SECURE'
   | 'COOKIE_SAME_SITE'
@@ -26,6 +35,7 @@ type ApiConfig = Pick<
   | 'API_RATE_LIMIT_WINDOW_SECONDS'
   | 'API_RATE_LIMIT_AUTH_MAX'
   | 'API_RATE_LIMIT_TRADE_MAX'
+  | 'API_RATE_LIMIT_VALUATION_MAX'
 >;
 
 export interface AppDependencies {
@@ -34,6 +44,7 @@ export interface AppDependencies {
   redis: Pick<RedisService, 'healthCheck'> & Partial<RedisService>;
   auth?: AuthService;
   competition?: CompetitionService;
+  genericCapability?: GenericCapability;
   logger?: boolean;
 }
 
@@ -62,7 +73,13 @@ function cookieValue(request: FastifyRequest, name: string): string | undefined 
   const cookies = request.headers.cookie?.split(';') ?? [];
   for (const cookie of cookies) {
     const [key, ...value] = cookie.trim().split('=');
-    if (key === name) return decodeURIComponent(value.join('='));
+    if (key === name) {
+      try {
+        return decodeURIComponent(value.join('='));
+      } catch {
+        throw new ApiError('INVALID_REQUEST', 'Session cookie is invalid.');
+      }
+    }
   }
   return undefined;
 }
@@ -109,10 +126,13 @@ function pagination(query: unknown) {
 
 const statusByCode: Record<string, number> = {
   UNAUTHENTICATED: 401,
+  PAPER_BUY_DISABLED: 403,
   INVALID_REQUEST: 400,
   INVALID_FINANCIAL_INPUT: 400,
   INVALID_SELL_QUANTITY: 400,
   ROUND_NOT_OPEN: 409,
+  SETTLEMENT_REVIEW: 409,
+  PAYOUT_SETTLEMENT_REVIEW: 409,
   OUTSIDE_ROUND_WINDOW: 409,
   INSUFFICIENT_PAPER_SOL: 409,
   INSUFFICIENT_BALANCE: 409,
@@ -124,8 +144,11 @@ const statusByCode: Record<string, number> = {
   MARKET_ACCOUNT_NOT_FOUND: 422,
   INVALID_MARKET_STATE: 422,
   INVALID_EXECUTION_RESULT: 503,
+  INSUFFICIENT_EXECUTABLE_LIQUIDITY: 409,
+  ZERO_EXECUTABLE_OUTPUT: 409,
   RPC_TIMEOUT: 503,
   RPC_ERROR: 503,
+  RPC_UNAVAILABLE: 503,
   MARKET_MIGRATED: 409,
   MIGRATION_DESTINATION_UNAVAILABLE: 503,
   UNSUPPORTED_MIGRATED_PROTOCOL: 422,
@@ -145,7 +168,10 @@ const statusByCode: Record<string, number> = {
 
 export function buildApp(dependencies: AppDependencies) {
   const app = fastify({
-    logger: dependencies.logger ?? { level: dependencies.config.LOG_LEVEL },
+    logger:
+      dependencies.logger === false ? false : safeApiLoggerOptions(dependencies.config.LOG_LEVEL),
+    // Only the local Cloudflare Tunnel may supply the forwarding chain.
+    trustProxy: ['127.0.0.1', '::1'],
     genReqId: () => randomUUID(),
   });
   const fullConfig = dependencies.config as Partial<ApiConfig>;
@@ -156,13 +182,36 @@ export function buildApp(dependencies: AppDependencies) {
       .filter(Boolean),
   );
 
+  const betaWallets = new Set(fullConfig.BETA_WALLET_ALLOWLIST ?? []);
+  if ([...betaWallets].some((wallet) => !isSolanaPublicKey(wallet)))
+    throw new Error('Invalid public wallet in beta allowlist.');
+  function requireBetaInvite(wallet: string) {
+    if (fullConfig.BETA_INVITE_ONLY && !betaWallets.has(wallet))
+      throw new ApiError(
+        'BETA_INVITE_REQUIRED',
+        'This private beta requires an invited wallet.',
+        403,
+      );
+  }
+
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
     reply.header('x-content-type-options', 'nosniff');
     reply.header('x-frame-options', 'DENY');
     reply.header('referrer-policy', 'no-referrer');
     reply.header('content-security-policy', "default-src 'none'; frame-ancestors 'none'");
+    // Authenticated responses and extension bearer tokens must never enter shared caches.
+    reply.header('cache-control', 'no-store');
+    reply.header('vary', 'Origin');
     const origin = request.headers.origin;
+    if (
+      !['GET', 'HEAD', 'OPTIONS'].includes(request.method) &&
+      ((origin && !allowedOrigins.has(origin)) ||
+        (!origin &&
+          request.headers['sec-fetch-site'] === 'cross-site' &&
+          !request.headers.authorization?.startsWith('Bearer ')))
+    )
+      throw new ApiError('ORIGIN_NOT_ALLOWED', 'Request origin is not allowed.', 403);
     if (origin && allowedOrigins.has(origin)) {
       reply.header('access-control-allow-origin', origin);
       reply.header('access-control-allow-credentials', 'true');
@@ -206,13 +255,15 @@ export function buildApp(dependencies: AppDependencies) {
     else request.log.warn({ code }, 'API request rejected');
     return reply.code(status).send({
       error: {
-        code,
+        code: safeApiDiagnostic(code, error),
         message: domainError
-          ? error.message
+          ? safeApiErrorMessage(error)
           : invalidFrameworkRequest
             ? 'Request is invalid.'
             : 'An internal error occurred.',
-        ...(error instanceof ApiError && error.details ? { details: error.details } : {}),
+        ...(error instanceof ApiError && error.details
+          ? { details: safeApiDiagnostic(error.details, error) }
+          : {}),
         requestId: request.id,
       },
     });
@@ -240,9 +291,65 @@ export function buildApp(dependencies: AppDependencies) {
   async function user(request: FastifyRequest): Promise<AuthenticatedUser> {
     const authenticated = await auth.authenticate(sessionToken(request));
     if (!authenticated) throw new ApiError('UNAUTHENTICATED', 'Authentication is required.', 401);
+    requireBetaInvite(authenticated.walletAddress);
     return authenticated;
   }
 
+  const scoped = <T>(owner: AuthenticatedUser, intent: 'READ' | 'BUY' | 'SELL', work: () => T): T =>
+    withGenericActor(
+      {
+        userId: owner.id,
+        intent,
+        isolateCaptures: dependencies.genericCapability?.options.armed === true,
+      },
+      work,
+    );
+  app.get('/api/v1/capabilities/generic-pumpswap', async (request, reply) => {
+    const owner = await user(request);
+    reply.header('cache-control', 'no-store');
+    if (!dependencies.genericCapability)
+      return {
+        userId: owner.id,
+        armed: false,
+        entitled: false,
+        mode: 'HARD_STOP',
+        entriesEnabled: false,
+      };
+    return dependencies.genericCapability.status(owner.id);
+  });
+  app.post('/api/v1/capabilities/generic-pumpswap/control', async (request, reply) => {
+    const owner = await user(request);
+    reply.header('cache-control', 'no-store');
+    const body = request.body as Record<string, unknown>;
+    if (
+      !body ||
+      Object.keys(body).length !== 1 ||
+      !['ENTRY', 'EXIT_ONLY', 'HARD_STOP'].includes(String(body['mode']))
+    )
+      throw new ApiError('INVALID_REQUEST', 'Only an exact generic control mode is accepted.');
+    if (!dependencies.genericCapability)
+      throw new ApiError(
+        'GENERIC_CAPABILITY_NOT_CONFIGURED',
+        'Generic control is not configured.',
+        503,
+      );
+    try {
+      const result = await dependencies.genericCapability.control(
+        owner.id,
+        body['mode'] as GenericMode,
+      );
+      request.log.info({ event: 'generic_mode_changed', actorUserId: owner.id, mode: result.mode });
+      return result;
+    } catch (error) {
+      if (error instanceof ExecutionEngineError)
+        throw new ApiError(
+          error.message,
+          error.message,
+          error.message === 'GENERIC_OPERATOR_ENTITLEMENT_REQUIRED' ? 403 : 409,
+        );
+      throw error;
+    }
+  });
   function rateLimit(scope: 'auth' | 'trade') {
     return async (request: FastifyRequest) => {
       if (!dependencies.redis.incrementWindow) return;
@@ -263,6 +370,7 @@ export function buildApp(dependencies: AppDependencies) {
     const walletAddress = stringField(request.body, 'walletAddress', 64);
     if (!isSolanaPublicKey(walletAddress))
       throw new ApiError('INVALID_REQUEST', 'walletAddress is not a Solana public key.');
+    requireBetaInvite(walletAddress);
     return reply.send(exactJson(await auth.createChallenge(walletAddress)));
   });
 
@@ -275,6 +383,7 @@ export function buildApp(dependencies: AppDependencies) {
       if (transport !== undefined && transport !== 'extension') {
         throw new ApiError('INVALID_REQUEST', 'transport is invalid.');
       }
+      requireBetaInvite(stringField(request.body, 'walletAddress', 64));
       const result = await auth.verifyChallenge({
         walletAddress: stringField(request.body, 'walletAddress', 64),
         challengeId: stringField(request.body, 'challengeId', 64),
@@ -298,10 +407,7 @@ export function buildApp(dependencies: AppDependencies) {
       );
     } catch (error) {
       if (error instanceof ApiError) throw error;
-      throw new ApiError(
-        'INVALID_REQUEST',
-        error instanceof Error ? error.message : 'Authentication failed.',
-      );
+      throw new ApiError('INVALID_REQUEST', safeApiErrorMessage(error));
     }
   });
 
@@ -345,6 +451,7 @@ export function buildApp(dependencies: AppDependencies) {
         tokenQuantityBaseUnits: position.remaining_base_units,
         costBasisPaperSolLamports: position.cost_basis_lamports,
         realizedPnlLamports: position.realized_pnl_lamports,
+        ...(position.updated_at ? { updatedAt: position.updated_at } : {}),
         valuation: {
           status: 'UNAVAILABLE',
           reason: 'VALUATION_NOT_REQUESTED',
@@ -358,11 +465,13 @@ export function buildApp(dependencies: AppDependencies) {
     const authenticated = await user(request);
     const mint = stringField(request.body, 'mint', 64);
     if (!isSolanaPublicKey(mint)) throw new ApiError('INVALID_REQUEST', 'mint is invalid.');
-    const result = await competition.buy(authenticated.id, {
-      mint,
-      paperSol: stringField(request.body, 'paperSol', 32),
-      idempotencyKey: idempotencyKey(request),
-    });
+    const result = await scoped(authenticated, 'BUY', () =>
+      competition.buy(authenticated.id, {
+        mint,
+        paperSol: stringField(request.body, 'paperSol', 32),
+        idempotencyKey: idempotencyKey(request),
+      }),
+    );
     request.log.info(
       {
         userId: authenticated.id,
@@ -392,12 +501,30 @@ export function buildApp(dependencies: AppDependencies) {
     });
   });
 
-  app.get('/api/v1/trades/buy-preflight', async (request) => {
+  app.get('/api/v1/trades/buy-preflight', async (request, reply) => {
     const mint = (request.query as { mint?: unknown }).mint;
     if (typeof mint !== 'string' || !isSolanaPublicKey(mint)) {
       throw new ApiError('INVALID_REQUEST', 'mint is invalid.');
     }
-    return exactJson(await competition.buyPreflight((await user(request)).id, mint));
+    const controller = new AbortController();
+    const close = () => {
+      if (!reply.raw.writableFinished) controller.abort();
+    };
+    reply.raw.on('close', close);
+    try {
+      const owner = await user(request);
+      return exactJson(
+        await scoped(owner, 'READ', () =>
+          competition.buyPreflight(
+            owner.id,
+            mint,
+            AbortSignal.any([controller.signal, AbortSignal.timeout(14000)]),
+          ),
+        ),
+      );
+    } finally {
+      reply.raw.removeListener('close', close);
+    }
   });
 
   app.post('/api/v1/trades/sell', { preHandler: rateLimit('trade') }, async (request) => {
@@ -407,11 +534,13 @@ export function buildApp(dependencies: AppDependencies) {
     const quantity = stringField(request.body, 'quantity', 80);
     if (quantity !== 'ALL' && !/^[1-9][0-9]*$/.test(quantity))
       throw new ApiError('INVALID_REQUEST', 'quantity must be positive base units or ALL.');
-    const result = await competition.sell(authenticated.id, {
-      mint,
-      quantity,
-      idempotencyKey: idempotencyKey(request),
-    });
+    const result = await scoped(authenticated, 'SELL', () =>
+      competition.sell(authenticated.id, {
+        mint,
+        quantity,
+        idempotencyKey: idempotencyKey(request),
+      }),
+    );
     request.log.info(
       {
         userId: authenticated.id,
@@ -443,11 +572,88 @@ export function buildApp(dependencies: AppDependencies) {
     });
   });
 
-  app.get('/api/v1/trades', async (request) =>
-    exactJson(await competition.trades((await user(request)).id, pagination(request.query))),
-  );
-  app.get('/api/v1/positions', async (request) => {
-    const result = await competition.getPositions((await user(request)).id);
+  app.get('/api/v1/trades', async (request) => {
+    const mint = (request.query as { mint?: unknown }).mint;
+    if (mint !== undefined && (typeof mint !== 'string' || !isSolanaPublicKey(mint)))
+      throw new ApiError('INVALID_REQUEST', 'mint is invalid.');
+    return exactJson(
+      await competition.trades((await user(request)).id, pagination(request.query), mint),
+    );
+  });
+  app.get('/api/v1/positions/viewed', async (request, reply) => {
+    const mint = (request.query as { mint?: unknown }).mint;
+    if (typeof mint !== 'string' || !isSolanaPublicKey(mint))
+      throw new ApiError('INVALID_REQUEST', 'mint is invalid.');
+    const controller = new AbortController();
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(3000)]);
+    const disconnected = () => {
+      if (!reply.raw.writableFinished) controller.abort();
+    };
+    reply.raw.on('close', disconnected);
+    const wait = <T>(task: Promise<T>) =>
+      new Promise<T>((resolve, reject) => {
+        const abort = () =>
+          reject(
+            new ApiError('ADVISORY_DEADLINE_EXCEEDED', 'Live valuation deadline exceeded.', 503),
+          );
+        if (signal.aborted) {
+          void task.catch(() => {});
+          abort();
+          return;
+        }
+        signal.addEventListener('abort', abort, { once: true });
+        void task.then(
+          (value) => {
+            signal.removeEventListener('abort', abort);
+            resolve(value);
+          },
+          (error) => {
+            signal.removeEventListener('abort', abort);
+            reject(error);
+          },
+        );
+      });
+    try {
+      const owner = await wait(user(request));
+      reply.header('cache-control', 'no-store');
+      if (dependencies.redis.incrementWindow) {
+        const count = await wait(
+          dependencies.redis.incrementWindow(`rate:valuation:${owner.id}`, 60),
+        );
+        if (count > (fullConfig.API_RATE_LIMIT_VALUATION_MAX ?? 240)) {
+          reply.header('retry-after', '60');
+          throw new ApiError('RATE_LIMITED', 'Advisory refresh rate exceeded.', 429);
+        }
+      }
+      signal.throwIfAborted();
+      return exactJson({
+        ...(await wait(
+          scoped(owner, 'READ', () => competition.viewedPosition(owner.id, mint, signal)),
+        )),
+        requestId: request.id,
+      });
+    } finally {
+      reply.raw.removeListener('close', disconnected);
+    }
+  });
+  app.get('/api/v1/positions', async (request, reply) => {
+    const controller = new AbortController();
+    const close = () => {
+      if (!reply.raw.writableFinished) controller.abort();
+    };
+    reply.raw.on('close', close);
+    let result;
+    try {
+      const owner = await user(request);
+      result = await scoped(owner, 'READ', () =>
+        competition.getPositions(
+          owner.id,
+          AbortSignal.any([controller.signal, AbortSignal.timeout(14000)]),
+        ),
+      );
+    } finally {
+      reply.raw.removeListener('close', close);
+    }
     if (!result)
       throw new ApiError(
         'ROUND_ACCOUNT_NOT_FOUND',
@@ -473,7 +679,9 @@ export function buildApp(dependencies: AppDependencies) {
         tokenQuantityBaseUnits: position.remaining_base_units,
         costBasisPaperSolLamports: position.cost_basis_lamports,
         realizedPnlLamports: position.realized_pnl_lamports,
+        ...(position.updated_at ? { updatedAt: position.updated_at } : {}),
         valuation: position.valuation,
+        sellPreflight: position.sellPreflight,
       })),
     });
   });
@@ -483,6 +691,14 @@ export function buildApp(dependencies: AppDependencies) {
   app.get('/api/v1/leaderboards/daily', async () =>
     exactJson(await competition.dailyLeaderboard()),
   );
+  app.get('/api/v1/leaderboards/hourly/live', async (request) => {
+    const roundId = (request.query as { roundId?: unknown }).roundId;
+    if (roundId !== undefined && (typeof roundId !== 'string' || roundId.length > 128))
+      throw new ApiError('INVALID_REQUEST', 'roundId is invalid.');
+    return exactJson(
+      await competition.liveHourlyLeaderboard(typeof roundId === 'string' ? roundId : undefined),
+    );
+  });
   app.get('/api/v1/leaderboards/hourly', async (request) => {
     const roundId = (request.query as { roundId?: unknown }).roundId;
     if (roundId !== undefined && (typeof roundId !== 'string' || roundId.length > 128))
@@ -534,10 +750,62 @@ export function buildApp(dependencies: AppDependencies) {
     exactJson(await competition.userRewardAllocations((await user(request)).id)),
   );
 
-  app.get('/api/v1/markets/:mint', async (request) => {
+  app.get('/api/v1/chart-metadata/:context', async (request) => {
+    await user(request);
+    const context = (request.params as { context: string }).context;
+    if (!isSolanaPublicKey(context)) throw new ApiError('INVALID_REQUEST', 'context is invalid.');
+    try {
+      return exactJson(await competition.chartMetadata(context));
+    } catch (error) {
+      const reason = safeApiErrorMessage(error);
+      if (
+        [
+          'CHART_TOKEN_METADATA_MISSING',
+          'INVALID_TOKEN_DECIMALS',
+          'AUTHORITATIVE_SUPPLY_UNAVAILABLE',
+        ].includes(reason)
+      )
+        throw new ApiError(reason, reason, 503);
+      throw error;
+    }
+  });
+
+  app.get('/api/v1/markets/:mint', async (request, reply) => {
     const mint = (request.params as { mint: string }).mint;
     if (!isSolanaPublicKey(mint)) throw new ApiError('INVALID_REQUEST', 'mint is invalid.');
-    return exactJson(await competition.marketSupport(mint));
+    const controller = new AbortController();
+    const close = () => {
+      if (!reply.raw.writableFinished) controller.abort();
+    };
+    reply.raw.on('close', close);
+    let result;
+    try {
+      const owner = await auth.authenticate(sessionToken(request));
+      result = owner
+        ? await scoped(owner, 'READ', () => competition.marketSupport(mint, controller.signal))
+        : await competition.marketSupport(mint, controller.signal);
+    } finally {
+      reply.raw.removeListener('close', close);
+    }
+    controller.signal.throwIfAborted();
+    request.log[result.supported ? 'info' : 'warn']({
+      event: 'market_resolution',
+      requestedContext: mint,
+      resolvedMint: result.mint,
+      supported: result.supported,
+      ...('diagnostics' in result
+        ? { diagnostics: result.diagnostics, reason: result.reason }
+        : {}),
+    });
+    return exactJson(
+      'diagnostics' in result
+        ? {
+            ...result,
+            diagnostics: safeApiDiagnostic(result.diagnostics),
+            reason: safeApiDiagnostic(result.reason, result.diagnostics),
+          }
+        : result,
+    );
   });
 
   return app;

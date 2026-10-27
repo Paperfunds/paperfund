@@ -8,7 +8,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDatabase, runHourlyLifecycleTick, type DatabaseService } from '@paperfund/db';
 import { ExecutionRouter, type MarketState, type MarketStateSource } from '@paperfund/execution';
-import { PumpFunProtocolAdapter } from '@paperfund/protocols';
+import {
+  PUMP_SWAP_PROTOCOL_ID,
+  PumpFunProtocolAdapter,
+  pumpBondingCurveAddress,
+} from '@paperfund/protocols';
 
 import {
   RECORDED_PUMP_FIXTURES,
@@ -102,6 +106,47 @@ describe('Phase 4A complete backend vertical slice', () => {
       await adminPool.query(`drop database if exists "${databaseName}" with (force)`);
       await adminPool.end();
     }
+  });
+
+  it('registers migrated PumpSwap metadata without an untyped PostgreSQL parameter', async () => {
+    const mint = RECORDED_PUMP_FIXTURES.early.mint;
+    const originMarketId = await pumpBondingCurveAddress(mint);
+    const poolMarketId = 'fixture-canonical-pumpswap-pool';
+    const router = {
+      async resolvePositionRoute(identity: MarketState['identity']) {
+        const route = {
+          originIdentity: identity,
+          executionIdentity: {
+            protocolId: PUMP_SWAP_PROTOCOL_ID,
+            marketId: poolMarketId,
+            tokenMint: identity.tokenMint,
+          },
+          migrated: true,
+        };
+        return {
+          route,
+          adapter: {
+            async loadMarketState() {
+              return { normalizedState: { tokenDecimals: '6' } };
+            },
+          },
+        };
+      },
+    } as unknown as ExecutionRouter;
+    const competition = new CompetitionService(database, router);
+
+    await expect(competition.marketSupport(mint)).resolves.toMatchObject({
+      supported: true,
+      executionProtocol: PUMP_SWAP_PROTOCOL_ID,
+      status: 'MIGRATED_POOL',
+      marketId: poolMarketId,
+      originMarketId,
+    });
+    const saved = await database.pool.query<{ migrated_from: string }>(
+      `select metadata->>'migrationResolvedFromMarketId' migrated_from from markets where id = $1`,
+      [poolMarketId],
+    );
+    expect(saved.rows[0]?.migrated_from).toBe(originMarketId);
   });
 
   it('authenticates, trades, force-settles, ranks, and resets into the next hour', async () => {

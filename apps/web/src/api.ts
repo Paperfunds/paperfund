@@ -3,6 +3,7 @@ import type {
   BuyPreflight,
   HourlyResult,
   LeaderboardEntry,
+  LiveHourlyLeaderboard,
   MarketSupport,
   Page,
   PositionValuationResponse,
@@ -109,12 +110,20 @@ export const api = {
   trades: (cursor?: string) => request<Page<Trade>>(`/api/v1/trades${query(cursor)}`),
   results: (cursor?: string) =>
     request<Page<HourlyResult>>(`/api/v1/results/hourly${query(cursor)}`),
+  hourlyRewardPool: (roundId: string) =>
+    request<unknown>(`/api/v1/rewards/hourly/${encodeURIComponent(roundId)}`),
+  hourlyRewards: () => request<unknown>('/api/v1/rewards/hourly/current'),
+  dailyRewards: () => request<unknown>('/api/v1/rewards/daily/current'),
   rewardAllocations: () => request<RewardAllocation[]>('/api/v1/rewards/me'),
   hourly: () =>
     request<{
       round: { id: string; starts_at: string; ends_at_exclusive: string; state: string };
       entries: LeaderboardEntry[];
     } | null>('/api/v1/leaderboards/hourly'),
+  liveHourly: (roundId?: string) =>
+    request<LiveHourlyLeaderboard | null>(
+      `/api/v1/leaderboards/hourly/live${roundId ? `?roundId=${encodeURIComponent(roundId)}` : ''}`,
+    ),
   daily: () =>
     request<{
       dailyCompetition: { id: string; starts_at: string; ends_at_exclusive: string; state: string };
@@ -141,6 +150,11 @@ export interface SellResult {
 }
 
 const friendlyErrors: Record<string, string> = {
+  INSUFFICIENT_EXECUTABLE_LIQUIDITY:
+    'Insufficient executable liquidity for this quantity. Check the current max executable exit.',
+  ZERO_EXECUTABLE_OUTPUT: 'This quantity currently produces no positive SOL after fees.',
+  POSITION_VALUATION_FAILED:
+    'BUY paused: an open position cannot be fully valued. Partial SELL may still be available.',
   MAX_BUY_RATIO_EXCEEDED: 'Buy exceeds the 20% per-order limit.',
   INSUFFICIENT_PAPER_SOL: 'Not enough Paper SOL.',
   TOKEN_SLOT_LIMIT_REACHED: 'You have used all token slots for this round.',

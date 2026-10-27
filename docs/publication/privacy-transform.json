@@ -1,0 +1,8 @@
+{
+  "policy": "Historical PAPER user identifiers replaced consistently with synthetic identifiers in publication copy; live source untouched.",
+  "files": [
+    "packages/db/src/financial-service.ts",
+    "packages/db/test/fixtures/pump-dust-resolution.json"
+  ],
+  "uniqueIdentifiers": 1
+}

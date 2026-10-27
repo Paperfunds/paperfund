@@ -1,9 +1,42 @@
-import { createHash } from 'node:crypto';
+import {
+  withPayoutTreasury,
+  reservePayoutTreasury,
+  assertPayoutTreasuryEffect,
+  validatePayoutTreasuryReadOnly,
+  assertTreasuryEnvironment,
+  assertTreasuryPreparedFees,
+  recordTreasurySettlement,
+} from './payout-treasury.js';
+import {
+  withPayoutAuthorization,
+  authorizedApprover,
+  assertPayoutStep,
+  invokeAuthorizedPayoutEffect,
+  assertPayoutEnvironment,
+  persistApprovalAuthorization,
+  assertApprovalAuthorization,
+  type OperatorRequest,
+} from './payout-security.js';
+import {
+  withPayoutOperation,
+  payoutPlanForExecution,
+  recordPayoutEvent,
+  requireSerializedExecution,
+} from './payout-coordination.js';
+import {
+  APPROVAL_SNAPSHOT_VERSION,
+  approvalSnapshotHash,
+  captureApprovalSnapshot,
+  assertApprovalBinding,
+  assertExecutionBinding,
+  assertObservedExecutionBinding,
+  transactionDatabase,
+  verifiedPayoutReplay,
+} from './payout-approval.js';
 
 import { buildPayoutBatches, PAYOUT_INTENT_VERSION, type PayoutNetwork } from '@paperfund/core';
 import {
   Connection,
-  Keypair,
   PublicKey,
   SystemInstruction,
   SystemProgram,
@@ -55,6 +88,7 @@ export interface PayoutRpc {
     readonly error: unknown;
     readonly slot: bigint;
     readonly transfers: readonly ChainTransfer[];
+    readonly feeLamports?: bigint;
   } | null>;
 }
 
@@ -72,39 +106,6 @@ export class DisabledPayoutSigner implements PayoutSigner {
   readonly publicKey = '';
   async signTransaction(): Promise<never> {
     throw new PayoutPlanError('PAYOUT_SIGNER_DISABLED', 'Payout signer is disabled.');
-  }
-}
-
-export class LocalKeypairPayoutSigner implements PayoutSigner {
-  readonly type = 'LOCAL_KEYPAIR';
-  readonly publicKey: string;
-  private constructor(private readonly keypair: Keypair) {
-    this.publicKey = keypair.publicKey.toBase58();
-  }
-  static fromJsonSecret(secret: string) {
-    let bytes: unknown;
-    try {
-      bytes = JSON.parse(secret);
-    } catch {
-      throw new PayoutPlanError('PAYOUT_SIGNER_SECRET_INVALID', 'Signer secret is not valid JSON.');
-    }
-    if (
-      !Array.isArray(bytes) ||
-      bytes.length !== 64 ||
-      bytes.some((value) => !Number.isInteger(value) || value < 0 || value > 255)
-    )
-      throw new PayoutPlanError('PAYOUT_SIGNER_SECRET_INVALID', 'Signer secret must be 64 bytes.');
-    return new LocalKeypairPayoutSigner(Keypair.fromSecretKey(Uint8Array.from(bytes as number[])));
-  }
-  async signTransaction(unsignedTransaction: Uint8Array) {
-    const transaction = Transaction.from(unsignedTransaction);
-    transaction.sign(this.keypair);
-    if (!transaction.signature)
-      throw new PayoutPlanError('PAYOUT_SIGNING_FAILED', 'Signer did not produce a signature.');
-    return {
-      signedTransaction: transaction.serialize(),
-      signature: bs58.encode(transaction.signature),
-    };
   }
 }
 
@@ -131,7 +132,13 @@ export class SolanaPayoutRpc implements PayoutRpc {
       );
   }
   async getBalance(address: string) {
-    return BigInt(await this.connection.getBalance(new PublicKey(address), 'confirmed'));
+    const balance = await this.connection.getBalance(new PublicKey(address), 'confirmed');
+    if (!Number.isSafeInteger(balance) || balance < 0)
+      throw new PayoutPlanError(
+        'PAYOUT_RPC_AMOUNT_UNSAFE',
+        'Exact treasury amount is unavailable.',
+      );
+    return BigInt(balance);
   }
   async prepareTransaction(
     treasury: string,
@@ -152,7 +159,7 @@ export class SolanaPayoutRpc implements PayoutRpc {
         }),
       );
     const fee = await this.connection.getFeeForMessage(transaction.compileMessage(), 'confirmed');
-    if (fee.value === null)
+    if (fee.value === null || !Number.isSafeInteger(fee.value) || fee.value < 0)
       throw new PayoutPlanError(
         'PAYOUT_FEE_UNAVAILABLE',
         'RPC could not estimate transaction fee.',
@@ -168,7 +175,10 @@ export class SolanaPayoutRpc implements PayoutRpc {
     };
   }
   async sendSignedTransaction(transaction: Uint8Array) {
-    return this.connection.sendRawTransaction(transaction, { skipPreflight: false, maxRetries: 0 });
+    return this.connection.sendRawTransaction(transaction, {
+      skipPreflight: false,
+      maxRetries: 0,
+    });
   }
   async getBlockHeight() {
     return BigInt(await this.connection.getBlockHeight('confirmed'));
@@ -204,6 +214,11 @@ export class SolanaPayoutRpc implements PayoutRpc {
           destination: string;
           lamports: number;
         };
+        if (!Number.isSafeInteger(info.lamports) || info.lamports < 0)
+          throw new PayoutPlanError(
+            'PAYOUT_RPC_AMOUNT_UNSAFE',
+            'Exact finalized transfer amount is unavailable.',
+          );
         transfers.push({
           source: info.source,
           destination: info.destination,
@@ -211,7 +226,14 @@ export class SolanaPayoutRpc implements PayoutRpc {
         });
       }
     }
-    return { error: transaction.meta?.err ?? null, slot: BigInt(transaction.slot), transfers };
+    return {
+      error: transaction.meta?.err ?? null,
+      slot: BigInt(transaction.slot),
+      transfers,
+      ...(Number.isSafeInteger(transaction.meta?.fee)
+        ? { feeLamports: BigInt(transaction.meta!.fee) }
+        : {}),
+    };
   }
 }
 
@@ -262,49 +284,22 @@ function assertPreparedTransactionMatchesIntent(
   }
 }
 
-function snapshotHash(audit: NonNullable<Awaited<ReturnType<typeof getPayoutPlanAudit>>>) {
-  return createHash('sha256')
-    .update(
-      JSON.stringify({
-        id: audit.id,
-        competitionType: audit.competitionType,
-        sourceId: audit.hourlyRoundId ?? audit.dailyCompetitionId,
-        prizePoolLamports: audit.prizePoolLamports.toString(),
-        curveVersion: audit.curveVersion,
-        tiePolicyVersion: audit.tiePolicyVersion,
-        allocations: audit.allocations.map((row) => [
-          row.userId,
-          row.walletAddress,
-          row.allocatedLamports.toString(),
-        ]),
-      }),
-    )
-    .digest('hex');
-}
-
-export async function approvePayoutPlan(
+async function approvePayoutPlanAuthorized(
   database: DatabaseService,
-  input: { readonly planId: string; readonly approverIdentifier: string; readonly now: Date },
+  input: {
+    readonly planId: string;
+    readonly approverIdentifier: string;
+    readonly authority?: OperatorRequest;
+    readonly now: Date;
+  },
 ) {
   if (!input.approverIdentifier.trim())
     throw new PayoutPlanError('PAYOUT_APPROVER_REQUIRED', 'Approver identifier is required.');
-  const priorApproval = (
-    await database.pool.query('select * from payout_plan_approvals where payout_plan_id=$1', [
-      input.planId,
-    ])
-  ).rows[0];
-  if (priorApproval) return priorApproval;
-  const validation = await validatePayoutPlan(database, input.planId);
-  if (!validation.valid)
-    throw new PayoutPlanError('PAYOUT_VALIDATION_FAILED', 'Payout plan no longer validates.');
-  const audit = await getPayoutPlanAudit(database, input.planId);
-  if (!audit) throw new PayoutPlanError('PAYOUT_PLAN_NOT_FOUND', 'Payout plan not found.');
-  const hash = snapshotHash(audit);
-  const approvalId = `approval:${input.planId}`;
   const client = await database.pool.connect();
   try {
-    await client.query('begin');
+    await client.query('begin isolation level repeatable read');
     await client.query('select pg_advisory_xact_lock(hashtext($1))', [input.planId]);
+    const scoped = transactionDatabase(database, client);
     const plan = (
       await client.query<{ state: string }>(
         'select state from payout_plans where id=$1 for update',
@@ -312,37 +307,191 @@ export async function approvePayoutPlan(
       )
     ).rows[0];
     if (!plan) throw new PayoutPlanError('PAYOUT_PLAN_NOT_FOUND', 'Payout plan not found.');
-    if (plan.state === 'APPROVED') {
-      const existing = (
-        await client.query('select * from payout_plan_approvals where payout_plan_id=$1', [
-          input.planId,
-        ])
-      ).rows[0];
+    const prior = (
+      await client.query('select * from payout_plan_approvals where payout_plan_id=$1', [
+        input.planId,
+      ])
+    ).rows[0];
+    if (prior) {
+      authorizedApprover(String(prior.plan_snapshot_hash));
+      if (!(await verifiedPayoutReplay(database, input.planId)))
+        await reservePayoutTreasury(scoped, input.planId, String(prior.plan_snapshot_hash));
       await client.query('commit');
-      return existing;
+      if (await verifiedPayoutReplay(database, input.planId)) return prior;
+      await assertApprovalBinding(database, input.planId);
+      return prior;
     }
     if (plan.state !== 'VALIDATED')
       throw new PayoutPlanError(
         'PAYOUT_PLAN_NOT_VALIDATED',
         'Only validated plans can be approved.',
       );
+    const validation = await validatePayoutPlan(scoped, input.planId);
+    if (!validation.valid)
+      throw new PayoutPlanError('PAYOUT_VALIDATION_FAILED', 'Payout plan no longer validates.');
+    const audit = await getPayoutPlanAudit(scoped, input.planId);
+    if (!audit) throw new PayoutPlanError('PAYOUT_PLAN_NOT_FOUND', 'Payout plan not found.');
+    const snapshot = await captureApprovalSnapshot(scoped, audit);
+    const hash = approvalSnapshotHash(snapshot);
+    await reservePayoutTreasury(scoped, input.planId, hash);
+    const approvalId = 'approval:' + input.planId;
     await client.query(
       `insert into payout_plan_approvals
        (id,payout_plan_id,approval_method,approver_identifier,plan_snapshot_hash,approved_at)
        values ($1,$2,'OPERATOR_CLI',$3,$4,$5)`,
-      [approvalId, input.planId, input.approverIdentifier.trim(), hash, input.now],
+      [approvalId, input.planId, authorizedApprover(hash), hash, input.now],
     );
-    await client.query(`update payout_plans set state='APPROVED',approved_at=$2 where id=$1`, [
+    await client.query(
+      'insert into payout_approval_snapshots (approval_id,snapshot_version,snapshot) values ($1,$2,$3)',
+      [
+        approvalId,
+        APPROVAL_SNAPSHOT_VERSION,
+        JSON.stringify(snapshot, (_key, value: unknown) =>
+          typeof value === 'bigint' ? value.toString() : value,
+        ),
+      ],
+    );
+    await client.query("update payout_plans set state='APPROVED',approved_at=$2 where id=$1", [
       input.planId,
       input.now,
     ]);
+    await persistApprovalAuthorization(client, approvalId);
     await client.query('commit');
-    return { id: approvalId, payoutPlanId: input.planId, planSnapshotHash: hash };
+    return {
+      id: approvalId,
+      payoutPlanId: input.planId,
+      planSnapshotHash: hash,
+    };
   } catch (error) {
     await client.query('rollback');
     throw error;
   } finally {
     client.release();
+  }
+}
+
+async function guardExecution(database: DatabaseService, executionId: string) {
+  await requireSerializedExecution(database, executionId);
+  const binding = await assertExecutionBinding(database, executionId);
+  assertPayoutEnvironment(binding.execution.network, binding.execution.treasury_address);
+  await assertApprovalAuthorization(database, binding.execution.payout_plan_id);
+  assertTreasuryEnvironment(binding.execution.network, binding.execution.treasury_address);
+  await assertPayoutTreasuryEffect();
+  const batches = await validatePersistedTransactions(database, executionId, binding);
+  for (const batch of batches) await assertTreasuryPreparedFees(BigInt(batch.fee_lamports));
+}
+
+// Pure recorded-evidence validation: remains usable while STOP/funding/permissions forbid effects.
+export async function validatePayoutObservation(database: DatabaseService, executionId: string) {
+  await requireSerializedExecution(database, executionId);
+  const binding = await assertObservedExecutionBinding(database, executionId);
+  await validatePersistedTransactions(database, executionId, binding);
+  return binding;
+}
+
+async function validatePersistedTransactions(
+  database: DatabaseService,
+  executionId: string,
+  binding: Awaited<ReturnType<typeof assertExecutionBinding>>,
+) {
+  const missing = (
+    await database.pool.query<{ id: string }>(
+      `select b.id from payout_batches b left join payout_signed_transactions h on h.payout_batch_id=b.id
+     where b.payout_execution_id=$1 and ((b.signed_transaction_base64 is null and h.payout_batch_id is not null) or
+     (b.signed_transaction_base64 is not null and (h.payout_batch_id is null or h.transaction_signature<>b.transaction_signature or h.intent_hash<>b.intent_hash
+      or h.signed_transaction_base64<>b.signed_transaction_base64 or h.unsigned_transaction_base64<>b.unsigned_transaction_base64
+      or h.recent_blockhash<>b.recent_blockhash or h.last_valid_block_height<>b.last_valid_block_height)))`,
+      [executionId],
+    )
+  ).rows;
+  if (missing.length)
+    throw new PayoutPlanError(
+      'PAYOUT_SIGNING_EVIDENCE_MISMATCH',
+      'Persisted signed evidence is missing or contradictory.',
+    );
+  const batches = (
+    await database.pool.query<{
+      id: string;
+      state: string;
+      unsigned_transaction_base64: string;
+      recent_blockhash: string;
+      signed_transaction_base64: string | null;
+      transaction_signature: string | null;
+      fee_lamports: string;
+    }>('select * from payout_batches where payout_execution_id=$1 order by batch_index', [
+      executionId,
+    ])
+  ).rows;
+  for (const batch of batches) {
+    const recipients = (
+      await database.pool.query<{
+        destination_address: string;
+        lamports: string;
+      }>(
+        'select destination_address,lamports::text from payout_batch_allocations where payout_batch_id=$1 order by ordinal',
+        [batch.id],
+      )
+    ).rows.map((row) => ({
+      destination: row.destination_address,
+      lamports: BigInt(row.lamports),
+    }));
+    const unsigned = Buffer.from(batch.unsigned_transaction_base64, 'base64');
+    assertPreparedTransactionMatchesIntent(
+      unsigned,
+      binding.execution.treasury_address,
+      recipients,
+    );
+    if (Transaction.from(unsigned).recentBlockhash !== batch.recent_blockhash)
+      throw new PayoutPlanError(
+        'PAYOUT_TRANSACTION_INTENT_MISMATCH',
+        'Recorded blockhash differs from the persisted transaction.',
+      );
+    if (
+      batch.state !== 'PREPARED' &&
+      (!batch.signed_transaction_base64 || !batch.transaction_signature)
+    )
+      throw new PayoutPlanError(
+        'PAYOUT_TRANSACTION_INTENT_MISMATCH',
+        'Payment state lacks persisted signed evidence.',
+      );
+    if (
+      batch.state === 'PREPARED' &&
+      (batch.signed_transaction_base64 || batch.transaction_signature)
+    )
+      throw new PayoutPlanError(
+        'PAYOUT_TRANSACTION_INTENT_MISMATCH',
+        'Prepared state contradicts signed evidence.',
+      );
+    if (batch.signed_transaction_base64) {
+      const signed = Buffer.from(batch.signed_transaction_base64, 'base64');
+      assertSignedTransactionMatches(unsigned, signed, batch.transaction_signature ?? '');
+    } else if (batch.transaction_signature)
+      throw new PayoutPlanError(
+        'PAYOUT_TRANSACTION_INTENT_MISMATCH',
+        'Signature exists without signed bytes.',
+      );
+  }
+  return batches;
+}
+
+function assertSignedTransactionMatches(
+  unsigned: Uint8Array,
+  signed: Uint8Array,
+  signature: string,
+) {
+  try {
+    const transaction = Transaction.from(signed);
+    if (
+      !transaction.serializeMessage().equals(Transaction.from(unsigned).serializeMessage()) ||
+      !transaction.signature ||
+      bs58.encode(transaction.signature) !== signature
+    )
+      throw new Error();
+  } catch {
+    throw new PayoutPlanError(
+      'PAYOUT_TRANSACTION_INTENT_MISMATCH',
+      'Signed bytes or signature differ from the approved prepared transaction.',
+    );
   }
 }
 
@@ -364,7 +513,7 @@ function assertExecutionConfig(config: PayoutExecutionConfig, signer?: PayoutSig
     );
 }
 
-export async function dryRunPayoutExecution(
+async function dryRunPayoutExecutionLocked(
   database: DatabaseService,
   input: {
     readonly planId: string;
@@ -373,17 +522,20 @@ export async function dryRunPayoutExecution(
   },
 ) {
   assertExecutionConfig(input.config);
+  assertTreasuryEnvironment(input.config.network, input.config.treasuryAddress);
+  await validatePayoutTreasuryReadOnly();
   await input.rpc.assertNetwork(input.config.network);
   const audit = await getPayoutPlanAudit(database, input.planId);
   if (!audit) throw new PayoutPlanError('PAYOUT_PLAN_NOT_FOUND', 'Payout plan not found.');
   if (audit.state !== 'APPROVED')
     throw new PayoutPlanError('PAYOUT_PLAN_NOT_APPROVED', 'Payout plan must be approved.');
-  const recipients = audit.allocations
-    .filter((row) => row.allocatedLamports > 0n)
+  const binding = await assertApprovalBinding(database, input.planId);
+  const recipients = binding.allocations
+    .filter((row) => BigInt(row.lamports) > 0n)
     .map((row) => ({
-      allocationId: `${audit.id}:user:${row.userId}`,
-      destination: row.walletAddress,
-      lamports: row.allocatedLamports,
+      allocationId: row.allocationId,
+      destination: row.destination,
+      lamports: BigInt(row.lamports),
     }));
   for (const recipient of recipients) new PublicKey(recipient.destination);
   const intents = buildPayoutBatches({
@@ -395,15 +547,20 @@ export async function dryRunPayoutExecution(
   });
   const batches = [];
   for (const intent of intents) {
+    await assertApprovalBinding(database, input.planId);
+    await validatePayoutTreasuryReadOnly();
     const prepared = await input.rpc.prepareTransaction(
       input.config.treasuryAddress,
       intent.recipients,
     );
+    await assertTreasuryPreparedFees(prepared.feeLamports);
+    await validatePayoutTreasuryReadOnly();
     assertPreparedTransactionMatchesIntent(
       prepared.unsignedTransaction,
       input.config.treasuryAddress,
       intent.recipients,
     );
+    await assertApprovalBinding(database, input.planId);
     batches.push({ ...intent, ...prepared });
   }
   const totalPayoutLamports = batches.reduce((sum, batch) => sum + batch.totalLamports, 0n);
@@ -432,13 +589,14 @@ export async function dryRunPayoutExecution(
   };
 }
 
-export async function executeApprovedPayoutPlan(
+async function executeApprovedPayoutPlanLocked(
   database: DatabaseService,
   input: {
     readonly planId: string;
     readonly config: PayoutExecutionConfig;
     readonly rpc: PayoutRpc;
     readonly signer: PayoutSigner;
+    readonly authority?: OperatorRequest;
     readonly now: Date;
   },
 ) {
@@ -447,11 +605,16 @@ export async function executeApprovedPayoutPlan(
   if (input.signer.type === 'DISABLED')
     throw new PayoutPlanError('PAYOUT_SIGNER_DISABLED', 'Payout signer is disabled.');
   assertExecutionConfig(input.config, input.signer);
+  const verified = await verifiedPayoutReplay(database, input.planId);
+  if (verified) return verified;
   const existingExecution = (
-    await database.pool.query<{ id: string; network: string; treasury_address: string }>(
-      'select id,network,treasury_address from payout_executions where payout_plan_id=$1',
-      [input.planId],
-    )
+    await database.pool.query<{
+      id: string;
+      network: string;
+      treasury_address: string;
+    }>('select id,network,treasury_address from payout_executions where payout_plan_id=$1', [
+      input.planId,
+    ])
   ).rows[0];
   if (existingExecution) {
     if (
@@ -462,16 +625,15 @@ export async function executeApprovedPayoutPlan(
         'PAYOUT_EXECUTION_CONFIG_MISMATCH',
         'Persisted execution environment does not match current configuration.',
       );
-    await input.rpc.assertNetwork(input.config.network);
-    await signPreparedBatches(database, existingExecution.id, input.signer, input.now);
-    await broadcastSignedBatches(database, existingExecution.id, input.rpc, input.now);
-    return reconcilePayoutExecution(database, {
+    return retryPayoutExecutionLocked(database, {
+      ...input,
       executionId: existingExecution.id,
-      rpc: input.rpc,
-      now: input.now,
     });
   }
-  const dryRun = await dryRunPayoutExecution(database, input);
+  await assertApprovalBinding(database, input.planId);
+  await assertApprovalAuthorization(database, input.planId);
+  const dryRun = await dryRunPayoutExecutionLocked(database, input);
+  await assertApprovalBinding(database, input.planId);
   if (!dryRun.sufficientBalance)
     throw new PayoutPlanError(
       'PAYOUT_TREASURY_INSUFFICIENT',
@@ -481,6 +643,7 @@ export async function executeApprovedPayoutPlan(
   const client = await database.pool.connect();
   try {
     await client.query('begin');
+    await assertPayoutTreasuryEffect();
     await client.query('select pg_advisory_xact_lock(hashtext($1))', [executionId]);
     const existing = (
       await client.query<{ id: string }>(
@@ -491,8 +654,8 @@ export async function executeApprovedPayoutPlan(
     if (!existing) {
       await client.query(
         `insert into payout_executions
-         (id,payout_plan_id,network,treasury_address,signer_type,state,total_payout_lamports,estimated_fee_lamports,prepared_at)
-         values ($1,$2,$3,$4,$5,'PREPARED',$6,$7,$8)`,
+         (id,payout_plan_id,network,treasury_address,signer_type,state,total_payout_lamports,estimated_fee_lamports,prepared_at,safety_version)
+         values ($1,$2,$3,$4,$5,'PREPARED',$6,$7,$8,'payout-serialized-v1')`,
         [
           executionId,
           input.planId,
@@ -548,7 +711,11 @@ export async function executeApprovedPayoutPlan(
   }
   await signPreparedBatches(database, executionId, input.signer, input.now);
   await broadcastSignedBatches(database, executionId, input.rpc, input.now);
-  return reconcilePayoutExecution(database, { executionId, rpc: input.rpc, now: input.now });
+  return reconcilePayoutExecutionLocked(database, {
+    executionId,
+    rpc: input.rpc,
+    now: input.now,
+  });
 }
 
 async function signPreparedBatches(
@@ -557,6 +724,7 @@ async function signPreparedBatches(
   signer: PayoutSigner,
   now: Date,
 ) {
+  await guardExecution(database, executionId);
   const batches = await database.pool.query<{
     id: string;
     unsigned_transaction_base64: string;
@@ -570,7 +738,10 @@ async function signPreparedBatches(
   for (const batch of batches.rows) {
     const unsigned = Buffer.from(batch.unsigned_transaction_base64, 'base64');
     const recipients = (
-      await database.pool.query<{ destination_address: string; lamports: string }>(
+      await database.pool.query<{
+        destination_address: string;
+        lamports: string;
+      }>(
         `select destination_address,lamports::text from payout_batch_allocations
          where payout_batch_id=$1 order by ordinal`,
         [batch.id],
@@ -580,7 +751,12 @@ async function signPreparedBatches(
       lamports: BigInt(row.lamports),
     }));
     assertPreparedTransactionMatchesIntent(unsigned, batch.treasury_address, recipients);
-    const signed = await signer.signTransaction(unsigned);
+    await guardExecution(database, executionId);
+    const signed = await invokeAuthorizedPayoutEffect('SIGN', batch.id, () =>
+      signer.signTransaction(unsigned),
+    );
+    assertSignedTransactionMatches(unsigned, signed.signedTransaction, signed.signature);
+    await guardExecution(database, executionId);
     await database.pool.query(
       `update payout_batches set state='SIGNED',signed_transaction_base64=$2,transaction_signature=$3,signed_at=$4,updated_at=$4 where id=$1 and state='PREPARED'`,
       [batch.id, Buffer.from(signed.signedTransaction).toString('base64'), signed.signature, now],
@@ -599,297 +775,522 @@ async function signPreparedBatches(
   );
 }
 
+interface ObservedBatch {
+  id: string;
+  state: string;
+  transaction_signature: string | null;
+  last_valid_block_height: string;
+  signed_transaction_base64: string | null;
+}
+
+async function observeBatch(
+  database: DatabaseService,
+  batch: ObservedBatch,
+  state: string,
+  now: Date,
+  code: string | null = null,
+  slot: bigint | null = null,
+) {
+  const result = await database.pool.query(
+    `update payout_batches set state=$2,failure_code=$3,failure_detail=$3,updated_at=$4,
+      verified_at=case when $2='VERIFIED' then $4 else verified_at end,
+      confirmation_slot=case when $2='VERIFIED' then $5 else confirmation_slot end
+     where id=$1 and state=$6 and transaction_signature is not distinct from $7 and state<>'VERIFIED'`,
+    [
+      batch.id,
+      state,
+      code,
+      now,
+      slot?.toString() ?? null,
+      batch.state,
+      batch.transaction_signature,
+    ],
+  );
+  if (result.rowCount !== 1)
+    throw new PayoutPlanError(
+      'PAYOUT_OBSERVATION_CONFLICT',
+      'Expected batch transition was not applied.',
+    );
+  return result;
+}
+
+async function holdBatch(
+  database: DatabaseService,
+  executionId: string,
+  batch: ObservedBatch,
+  now: Date,
+  reason: string,
+) {
+  await observeBatch(database, batch, 'RECONCILIATION_REQUIRED', now, reason);
+  await recordPayoutEvent(database, {
+    executionId,
+    batchId: batch.id,
+    ...(batch.transaction_signature ? { signature: batch.transaction_signature } : {}),
+    event: 'REVIEW_HOLD',
+    detail: { reason },
+  });
+}
+
 async function broadcastSignedBatches(
   database: DatabaseService,
   executionId: string,
   rpc: PayoutRpc,
   now: Date,
 ) {
-  const batches = await database.pool.query<{
-    id: string;
-    signed_transaction_base64: string;
-    transaction_signature: string;
-  }>(
-    `select id,signed_transaction_base64,transaction_signature from payout_batches where payout_execution_id=$1 and state in ('SIGNED','FAILED_RETRYABLE') order by batch_index`,
-    [executionId],
-  );
-  for (const batch of batches.rows) {
-    const known = await rpc.getSignatureStatus(batch.transaction_signature);
-    let outcome = known ? 'ALREADY_PROCESSED' : 'ACCEPTED';
-    let detail: string | null = null;
-    if (!known) {
-      try {
-        const returnedSignature = await rpc.sendSignedTransaction(
-          Buffer.from(batch.signed_transaction_base64, 'base64'),
-        );
-        if (returnedSignature !== batch.transaction_signature)
-          throw new Error('RPC returned a signature different from the signed transaction.');
-      } catch (error) {
-        outcome = 'UNCERTAIN';
-        detail = error instanceof Error ? error.message.slice(0, 500) : 'Unknown RPC response';
-      }
+  await guardExecution(database, executionId);
+  const batches = (
+    await database.pool.query<ObservedBatch>(
+      `select * from payout_batches where payout_execution_id=$1 and state in ('SIGNED','BROADCAST','FAILED_RETRYABLE') order by batch_index`,
+      [executionId],
+    )
+  ).rows;
+  for (const batch of batches) {
+    await guardExecution(database, executionId);
+    let known: Awaited<ReturnType<PayoutRpc['getSignatureStatus']>>;
+    try {
+      known = await rpc.getSignatureStatus(batch.transaction_signature!);
+    } catch {
+      await holdBatch(database, executionId, batch, now, 'SIGNATURE_OBSERVATION_UNAVAILABLE');
+      break;
     }
-    const attempt = await database.pool.query<{ count: string }>(
-      'select count(*)::text count from payout_broadcast_attempts where payout_batch_id=$1',
-      [batch.id],
-    );
-    const attemptNumber = Number(attempt.rows[0]!.count) + 1;
-    await database.pool.query(
-      `insert into payout_broadcast_attempts (id,payout_batch_id,attempt_number,transaction_signature,outcome,rpc_detail,attempted_at)
-       values ($1,$2,$3,$4,$5,$6,$7)`,
-      [
-        `${batch.id}:attempt:${attemptNumber}`,
-        batch.id,
-        attemptNumber,
-        batch.transaction_signature,
-        outcome,
-        detail,
-        now,
-      ],
-    );
-    await database.pool.query(
-      `update payout_batches set state='BROADCAST',broadcast_at=coalesce(broadcast_at,$2),last_broadcast_at=$2,updated_at=$2 where id=$1`,
-      [batch.id, now],
-    );
+    await guardExecution(database, executionId);
+    if (known) continue; // confirmation is evidence to reconcile, never reason to re-sign.
+    let height: bigint;
+    try {
+      height = await rpc.getBlockHeight();
+    } catch {
+      await holdBatch(database, executionId, batch, now, 'EXPIRY_OBSERVATION_UNAVAILABLE');
+      break;
+    }
+    if (height > BigInt(batch.last_valid_block_height)) {
+      await holdBatch(database, executionId, batch, now, 'EXPIRED_SIGNATURE_HISTORY_UNCERTAIN');
+      break;
+    }
+    await guardExecution(database, executionId);
+    // This immutable attempt is committed BEFORE the external send. Outcome at this instant is uncertain.
+    const attempt = (
+      await database.pool.query<{ attempt_number: number }>(
+        `insert into payout_broadcast_attempts (id,payout_batch_id,attempt_number,transaction_signature,outcome,rpc_detail,attempted_at)
+       select $1||':attempt:'||n,$1,n,$2,'UNCERTAIN','DURABLE_BEFORE_RPC_SEND',$3
+       from (select coalesce(max(attempt_number),0)+1 n from payout_broadcast_attempts where payout_batch_id=$1) next
+       returning attempt_number`,
+        [batch.id, batch.transaction_signature, now],
+      )
+    ).rows[0]!;
+    await recordPayoutEvent(database, {
+      executionId,
+      batchId: batch.id,
+      signature: batch.transaction_signature!,
+      event: 'SEND_STARTED',
+      detail: { attemptNumber: attempt.attempt_number },
+    });
+    const signedBytes = Buffer.from(batch.signed_transaction_base64!, 'base64');
+    const accepted = await invokeAuthorizedPayoutEffect('BROADCAST', batch.id, () => {
+      // Only RPC failures are uncertain sends; authorization rejection propagates unchanged.
+      try {
+        return rpc.sendSignedTransaction(signedBytes).then(
+          (returned) => returned === batch.transaction_signature,
+          () => false,
+        );
+      } catch {
+        // A provider can also throw synchronously after accepting the artifact.
+        return Promise.resolve(false);
+      }
+    });
+    await recordPayoutEvent(database, {
+      executionId,
+      batchId: batch.id,
+      signature: batch.transaction_signature!,
+      event: accepted ? 'SEND_RETURNED' : 'SEND_UNCERTAIN',
+      detail: { attemptNumber: attempt.attempt_number },
+    });
+    if (!accepted) {
+      await holdBatch(database, executionId, batch, now, 'RPC_SEND_UNCERTAIN');
+      break;
+    }
+    await observeBatch(database, batch, 'BROADCAST', now);
   }
-  await database.pool.query(
-    `update payout_executions set state='BROADCAST',broadcast_at=coalesce(broadcast_at,$2),last_broadcast_at=$2,updated_at=$2 where id=$1 and state in ('SIGNED','FAILED_RETRYABLE')`,
-    [executionId, now],
-  );
-  await database.pool.query(
-    `update payout_plans set state='BROADCAST',broadcast_at=coalesce(broadcast_at,$2) where id=(select payout_plan_id from payout_executions where id=$1) and state='SIGNED'`,
-    [executionId, now],
-  );
 }
 
-export async function reconcilePayoutExecution(
+async function aggregateExecution(
+  database: DatabaseService,
+  executionId: string,
+  now: Date,
+  transactionOpen = false,
+) {
+  const rows = (
+    await database.pool.query<{ state: string }>(
+      'select state from payout_batches where payout_execution_id=$1 order by batch_index',
+      [executionId],
+    )
+  ).rows;
+  const states = rows.map((row) => row.state);
+  let state = 'BROADCAST';
+  if (!states.length) state = 'RECONCILIATION_REQUIRED';
+  else if (states.every((value) => value === 'VERIFIED')) state = 'VERIFIED';
+  else if (states.includes('RECONCILIATION_REQUIRED')) state = 'RECONCILIATION_REQUIRED';
+  else if (states.includes('FAILED_FINAL')) state = 'FAILED_FINAL';
+  else if (states.every((value) => value === 'PREPARED')) state = 'PREPARED';
+  else if (states.every((value) => value === 'SIGNED')) state = 'SIGNED';
+  else if (states.includes('FAILED_RETRYABLE')) state = 'FAILED_RETRYABLE';
+  const client = await database.pool.connect();
+  try {
+    if (!transactionOpen) await client.query('begin');
+    const row = (
+      await client.query<{ state: string; payout_plan_id: string }>(
+        'select state,payout_plan_id from payout_executions where id=$1 for update',
+        [executionId],
+      )
+    ).rows[0];
+    if (!row)
+      throw new PayoutPlanError('PAYOUT_EXECUTION_NOT_FOUND', 'Payout execution not found.');
+    if (row.state !== 'VERIFIED' && row.state !== state)
+      await client.query(
+        `update payout_executions set state=$2,verified_at=case when $2='VERIFIED' then $3 else verified_at end,updated_at=$3 where id=$1 and state=$4 and state<>'VERIFIED'`,
+        [executionId, state, now, row.state],
+      );
+    const plan = (
+      await client.query<{ state: string }>(
+        'select state from payout_plans where id=$1 for update',
+        [row.payout_plan_id],
+      )
+    ).rows[0]!;
+    let current = plan.state;
+    const desired = state === 'PREPARED' ? 'APPROVED' : state;
+    // Recover interrupted application state progress using only already-persisted signed/chain evidence.
+    if (current === 'APPROVED' && ['SIGNED', 'BROADCAST', 'VERIFIED'].includes(desired)) {
+      await client.query(
+        `update payout_plans set state='SIGNED',signed_at=coalesce(signed_at,$2) where id=$1 and state='APPROVED'`,
+        [row.payout_plan_id, now],
+      );
+      current = 'SIGNED';
+    }
+    if (current === 'SIGNED' && desired === 'VERIFIED') {
+      await client.query(
+        `update payout_plans set state='BROADCAST',broadcast_at=coalesce(broadcast_at,$2) where id=$1 and state='SIGNED'`,
+        [row.payout_plan_id, now],
+      );
+      current = 'BROADCAST';
+    }
+    if (current !== desired && current !== 'VERIFIED')
+      await client.query(
+        `update payout_plans set state=$2,verified_at=case when $2='VERIFIED' then $3 else verified_at end where id=$1 and state=$4 and state<>'VERIFIED'`,
+        [row.payout_plan_id, desired, now, current],
+      );
+    if (!transactionOpen) await client.query('commit');
+  } catch (error) {
+    if (!transactionOpen) await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+  return { executionId, state, batchStates: states };
+}
+
+async function reconcilePayoutExecutionLocked(
   database: DatabaseService,
   input: { readonly executionId: string; readonly rpc: PayoutRpc; readonly now: Date },
 ) {
-  const integrity = (
-    await database.pool.query<{
-      plan_total: string;
-      execution_total: string;
-      batch_total: string;
-      expected_allocation_count: string;
-      mapped_allocation_count: string;
-    }>(
-      `select p.total_allocated_lamports::text plan_total,
-              e.total_payout_lamports::text execution_total,
-              coalesce((select sum(b.total_lamports) from payout_batches b where b.payout_execution_id=e.id),0)::text batch_total,
-              (select count(*) from payout_allocations a where a.payout_plan_id=p.id and a.allocated_lamports>0)::text expected_allocation_count,
-              (select count(*) from payout_batch_allocations ba join payout_batches b on b.id=ba.payout_batch_id where b.payout_execution_id=e.id)::text mapped_allocation_count
-       from payout_executions e join payout_plans p on p.id=e.payout_plan_id where e.id=$1`,
+  const planId = await payoutPlanForExecution(database, input.executionId);
+  const verified = await verifiedPayoutReplay(database, planId);
+  if (verified) return verified;
+  await database.pool.query('begin');
+  try {
+    await database.pool.query('select id from payout_executions where id=$1 for update', [
+      input.executionId,
+    ]);
+    await database.pool.query(
+      'select id from payout_batches where payout_execution_id=$1 order by batch_index for update',
       [input.executionId],
+    );
+    const binding = await validatePayoutObservation(database, input.executionId);
+    await input.rpc.assertNetwork(binding.execution.network);
+    const integrity = (
+      await database.pool.query<{
+        plan_total: string;
+        execution_total: string;
+        batch_total: string;
+        expected_count: string;
+        mapped_count: string;
+      }>(
+        `select p.total_allocated_lamports::text plan_total,e.total_payout_lamports::text execution_total,
+      (select coalesce(sum(total_lamports),0)::text from payout_batches where payout_execution_id=e.id) batch_total,
+      (select count(*)::text from payout_allocations where payout_plan_id=p.id and allocated_lamports>0) expected_count,
+      (select count(*)::text from payout_batch_allocations ba join payout_batches b on b.id=ba.payout_batch_id where b.payout_execution_id=e.id) mapped_count
+     from payout_executions e join payout_plans p on p.id=e.payout_plan_id where e.id=$1`,
+        [input.executionId],
+      )
+    ).rows[0]!;
+    if (
+      integrity.plan_total !== integrity.execution_total ||
+      integrity.plan_total !== integrity.batch_total ||
+      integrity.expected_count !== integrity.mapped_count
     )
-  ).rows[0];
-  if (!integrity)
-    throw new PayoutPlanError('PAYOUT_EXECUTION_NOT_FOUND', 'Payout execution not found.');
-  if (
-    integrity.plan_total !== integrity.execution_total ||
-    integrity.plan_total !== integrity.batch_total ||
-    integrity.expected_allocation_count !== integrity.mapped_allocation_count
-  ) {
-    await database.pool.query(
-      `update payout_executions set state='RECONCILIATION_REQUIRED',failure_code='PERSISTED_INTENT_MISMATCH',
-       failure_detail='Execution totals or allocation mapping do not match approved plan.',updated_at=$2 where id=$1`,
-      [input.executionId, input.now],
-    );
-    await database.pool.query(
-      `update payout_plans set state='RECONCILIATION_REQUIRED'
-       where id=(select payout_plan_id from payout_executions where id=$1) and state <> 'VERIFIED'`,
-      [input.executionId],
-    );
-    return {
-      executionId: input.executionId,
-      state: 'RECONCILIATION_REQUIRED',
-      batchStates: [] as string[],
-    };
-  }
-  const batches = await database.pool.query<{
-    id: string;
-    state: string;
-    transaction_signature: string;
-    last_valid_block_height: string;
-  }>(
-    `select id,state,transaction_signature,last_valid_block_height::text from payout_batches where payout_execution_id=$1 order by batch_index`,
-    [input.executionId],
-  );
-  for (const batch of batches.rows) {
-    if (batch.state === 'VERIFIED') continue;
-    const status = await input.rpc.getSignatureStatus(batch.transaction_signature);
-    if (status?.error) {
-      await markBatchFailure(
-        database,
-        batch.id,
-        'FAILED_FINAL',
-        'ON_CHAIN_TRANSACTION_ERROR',
-        JSON.stringify(status.error),
-        input.now,
+      throw new PayoutPlanError(
+        'PAYOUT_APPROVED_INTENT_MISMATCH',
+        'Persisted payout mapping requires independent review.',
       );
-      continue;
-    }
-    if (status?.confirmationStatus === 'finalized') {
-      const chain = await input.rpc.getFinalizedTransfers(batch.transaction_signature);
-      const expected = await database.pool.query<{ destination_address: string; lamports: string }>(
-        `select destination_address,lamports::text from payout_batch_allocations where payout_batch_id=$1 order by ordinal`,
-        [batch.id],
-      );
-      const execution = await database.pool.query<{ treasury_address: string }>(
-        `select e.treasury_address from payout_executions e join payout_batches b on b.payout_execution_id=e.id where b.id=$1`,
-        [batch.id],
-      );
-      const actual =
-        chain?.transfers.filter((row) => row.source === execution.rows[0]!.treasury_address) ?? [];
-      const matches =
-        chain &&
-        !chain.error &&
-        JSON.stringify(actual.map((row) => [row.destination, row.lamports.toString()])) ===
-          JSON.stringify(expected.rows.map((row) => [row.destination_address, row.lamports]));
-      if (!matches) {
-        await markBatchFailure(
+    const batches = (
+      await database.pool.query<ObservedBatch>(
+        'select * from payout_batches where payout_execution_id=$1 order by batch_index',
+        [input.executionId],
+      )
+    ).rows;
+    for (const batch of batches) {
+      if (
+        batch.state === 'VERIFIED' ||
+        batch.state === 'FAILED_FINAL' ||
+        !batch.transaction_signature
+      )
+        continue;
+      let status: Awaited<ReturnType<PayoutRpc['getSignatureStatus']>>;
+      try {
+        status = await input.rpc.getSignatureStatus(batch.transaction_signature);
+      } catch {
+        await holdBatch(
           database,
-          batch.id,
-          'RECONCILIATION_REQUIRED',
-          'ON_CHAIN_INTENT_MISMATCH',
-          'Finalized transaction did not match persisted payout intent.',
+          input.executionId,
+          batch,
           input.now,
+          'SIGNATURE_OBSERVATION_UNAVAILABLE',
         );
-      } else {
-        await database.pool.query(
-          `update payout_batches set state='VERIFIED',verified_at=$2,confirmation_slot=$3,updated_at=$2,failure_code=null,failure_detail=null where id=$1`,
-          [batch.id, input.now, chain.slot.toString()],
-        );
+        continue;
       }
-      continue;
+      if (status?.confirmationStatus === 'finalized') {
+        if (status.error) {
+          const failed = await input.rpc.getFinalizedTransfers(batch.transaction_signature);
+          if (!failed || failed.slot !== status.slot || !failed.error)
+            throw new PayoutPlanError(
+              'PAYOUT_TREASURY_SETTLEMENT_REVIEW_REQUIRED',
+              'Finalized failure fee evidence is required.',
+            );
+          await recordTreasurySettlement(
+            database,
+            batch.id,
+            batch.transaction_signature,
+            0n,
+            failed.feeLamports,
+            failed.slot,
+          );
+          await observeBatch(
+            database,
+            batch,
+            'FAILED_FINAL',
+            input.now,
+            'FINALIZED_TRANSACTION_ERROR',
+          );
+          continue;
+        }
+        let chain: Awaited<ReturnType<PayoutRpc['getFinalizedTransfers']>>;
+        try {
+          chain = await input.rpc.getFinalizedTransfers(batch.transaction_signature);
+        } catch {
+          await holdBatch(
+            database,
+            input.executionId,
+            batch,
+            input.now,
+            'FINALIZED_TRANSACTION_UNAVAILABLE',
+          );
+          continue;
+        }
+        const expected = (
+          await database.pool.query<{ destination_address: string; lamports: string }>(
+            'select destination_address,lamports::text from payout_batch_allocations where payout_batch_id=$1 order by ordinal',
+            [batch.id],
+          )
+        ).rows;
+        const treasury = (
+          await database.pool.query<{ treasury_address: string }>(
+            'select treasury_address from payout_executions where id=$1',
+            [input.executionId],
+          )
+        ).rows[0]!.treasury_address;
+        const actual = chain?.transfers.filter((row) => row.source === treasury) ?? [];
+        const matches =
+          chain &&
+          !chain.error &&
+          JSON.stringify(actual.map((row) => [row.destination, row.lamports.toString()])) ===
+            JSON.stringify(expected.map((row) => [row.destination_address, row.lamports]));
+        if (!matches)
+          await holdBatch(
+            database,
+            input.executionId,
+            batch,
+            input.now,
+            'ON_CHAIN_INTENT_MISMATCH',
+          );
+        else {
+          if (chain!.slot !== status.slot)
+            throw new PayoutPlanError(
+              'PAYOUT_TREASURY_SETTLEMENT_REVIEW_REQUIRED',
+              'Finalized slots disagree.',
+            );
+          await recordTreasurySettlement(
+            database,
+            batch.id,
+            batch.transaction_signature,
+            expected.reduce((n, r) => n + BigInt(r.lamports), 0n),
+            chain!.feeLamports,
+            chain!.slot,
+          );
+          await observeBatch(database, batch, 'VERIFIED', input.now, null, chain!.slot);
+        }
+        continue;
+      }
+      if (!status) {
+        let height: bigint;
+        try {
+          height = await input.rpc.getBlockHeight();
+        } catch {
+          await holdBatch(
+            database,
+            input.executionId,
+            batch,
+            input.now,
+            'EXPIRY_OBSERVATION_UNAVAILABLE',
+          );
+          continue;
+        }
+        if (height > BigInt(batch.last_valid_block_height))
+          await holdBatch(
+            database,
+            input.executionId,
+            batch,
+            input.now,
+            'EXPIRED_SIGNATURE_HISTORY_UNCERTAIN',
+          );
+      }
     }
-    const height = await input.rpc.getBlockHeight();
-    if (!status && height > BigInt(batch.last_valid_block_height))
-      await markBatchFailure(
-        database,
-        batch.id,
-        'FAILED_RETRYABLE',
-        'BLOCKHASH_EXPIRED',
-        'Transaction was not found after its blockhash expired; a new signing cycle is required.',
-        input.now,
-      );
+    const result = await aggregateExecution(database, input.executionId, input.now, true);
+    await database.pool.query('commit');
+    return result;
+  } catch (error) {
+    await database.pool.query('rollback');
+    throw error;
   }
-  const states = (
-    await database.pool.query<{ state: string }>(
-      'select state from payout_batches where payout_execution_id=$1',
-      [input.executionId],
-    )
-  ).rows.map((row) => row.state);
-  let state = 'BROADCAST';
-  if (states.every((value) => value === 'VERIFIED')) state = 'VERIFIED';
-  else if (states.includes('RECONCILIATION_REQUIRED')) state = 'RECONCILIATION_REQUIRED';
-  else if (states.includes('FAILED_FINAL')) state = 'FAILED_FINAL';
-  else if (states.includes('FAILED_RETRYABLE')) state = 'FAILED_RETRYABLE';
-  else if (states.includes('VERIFIED')) state = 'PARTIAL_VERIFIED';
-  await database.pool.query(
-    `update payout_executions set state=$2,verified_at=case when $2='VERIFIED' then $3 else verified_at end,updated_at=$3 where id=$1`,
-    [input.executionId, state, input.now],
-  );
-  const planState = state === 'PARTIAL_VERIFIED' ? 'BROADCAST' : state;
-  await database.pool.query(
-    `update payout_plans set state=$2,verified_at=case when $2='VERIFIED' then $3 else verified_at end where id=(select payout_plan_id from payout_executions where id=$1) and state <> 'VERIFIED'`,
-    [input.executionId, planState, input.now],
-  );
-  return { executionId: input.executionId, state, batchStates: states };
 }
 
-export async function retryPayoutExecution(
+async function retryPayoutExecutionLocked(
   database: DatabaseService,
   input: {
     readonly executionId: string;
     readonly config: PayoutExecutionConfig;
     readonly rpc: PayoutRpc;
     readonly signer: PayoutSigner;
+    readonly authority?: OperatorRequest;
     readonly now: Date;
   },
 ) {
   if (!input.config.enabled)
     throw new PayoutPlanError('PAYOUT_EXECUTION_DISABLED', 'Live payout execution is disabled.');
   assertExecutionConfig(input.config, input.signer);
+  const planId = await payoutPlanForExecution(database, input.executionId);
+  const verified = await verifiedPayoutReplay(database, planId);
+  if (verified) return verified;
+  await assertPayoutStep('RETRY');
   await input.rpc.assertNetwork(input.config.network);
-  await reconcilePayoutExecution(database, input);
-  const execution = (
-    await database.pool.query<{ network: string; treasury_address: string }>(
-      'select network,treasury_address from payout_executions where id=$1',
+  await requireSerializedExecution(database, input.executionId);
+  const row = (
+    await database.pool.query<{ state: string; network: string; treasury_address: string }>(
+      'select * from payout_executions where id=$1',
       [input.executionId],
     )
-  ).rows[0];
-  if (!execution)
-    throw new PayoutPlanError('PAYOUT_EXECUTION_NOT_FOUND', 'Payout execution not found.');
-  if (
-    execution.network !== input.config.network ||
-    execution.treasury_address !== input.config.treasuryAddress
-  )
+  ).rows[0]!;
+  if (row.network !== input.config.network || row.treasury_address !== input.config.treasuryAddress)
     throw new PayoutPlanError(
       'PAYOUT_EXECUTION_CONFIG_MISMATCH',
-      'Persisted execution environment does not match current configuration.',
+      'Execution environment differs from its persisted authority.',
     );
-  const batches = await database.pool.query<{
-    id: string;
-    state: string;
-    transaction_signature: string;
-  }>(
-    `select id,state,transaction_signature from payout_batches
-     where payout_execution_id=$1 and state='FAILED_RETRYABLE' order by batch_index`,
-    [input.executionId],
-  );
-  for (const batch of batches.rows) {
-    if (await input.rpc.getSignatureStatus(batch.transaction_signature))
-      throw new PayoutPlanError(
-        'PAYOUT_RETRY_RECONCILIATION_REQUIRED',
-        'Original signature became visible; reconcile before retrying.',
-      );
-    const recipients = (
-      await database.pool.query<{ destination_address: string; lamports: string }>(
-        `select destination_address,lamports::text from payout_batch_allocations
-         where payout_batch_id=$1 order by ordinal`,
-        [batch.id],
+  // A held execution can only observe its existing signatures, never prepare or sign a replacement.
+  if (row.state === 'RECONCILIATION_REQUIRED')
+    return reconcilePayoutExecutionLocked(database, input);
+  // Existing signature observation remains available even when funding/caps now forbid new effects.
+  const result = await reconcilePayoutExecutionLocked(database, input);
+  if (['VERIFIED', 'RECONCILIATION_REQUIRED', 'FAILED_FINAL'].includes(result.state)) return result;
+  if (
+    input.config.network === 'mainnet-beta' &&
+    input.config.mainnetMaxPlanLamports !== undefined
+  ) {
+    const total = (
+      await database.pool.query<{ total_payout_lamports: string }>(
+        'select total_payout_lamports::text from payout_executions where id=$1',
+        [input.executionId],
       )
-    ).rows.map((row) => ({
-      destination: row.destination_address,
-      lamports: BigInt(row.lamports),
-    }));
-    const prepared = await input.rpc.prepareTransaction(input.config.treasuryAddress, recipients);
-    assertPreparedTransactionMatchesIntent(
-      prepared.unsignedTransaction,
-      input.config.treasuryAddress,
-      recipients,
-    );
-    await database.pool.query(
-      `update payout_batches set state='PREPARED',fee_lamports=$2,recent_blockhash=$3,
-       last_valid_block_height=$4,unsigned_transaction_base64=$5,signed_transaction_base64=null,
-       transaction_signature=null,signed_at=null,broadcast_at=null,failure_code=null,failure_detail=null,updated_at=$6
-       where id=$1 and state='FAILED_RETRYABLE'`,
-      [
-        batch.id,
-        prepared.feeLamports.toString(),
-        prepared.recentBlockhash,
-        prepared.lastValidBlockHeight.toString(),
-        Buffer.from(prepared.unsignedTransaction).toString('base64'),
-        input.now,
-      ],
-    );
+    ).rows[0]!;
+    if (BigInt(total.total_payout_lamports) > input.config.mainnetMaxPlanLamports)
+      throw new PayoutPlanError(
+        'PAYOUT_MAINNET_CAP_EXCEEDED',
+        'Persisted plan exceeds the configured mainnet payout safety cap.',
+      );
   }
+  await guardExecution(database, input.executionId);
   await signPreparedBatches(database, input.executionId, input.signer, input.now);
   await broadcastSignedBatches(database, input.executionId, input.rpc, input.now);
-  return reconcilePayoutExecution(database, input);
+  return reconcilePayoutExecutionLocked(database, input);
 }
 
-async function markBatchFailure(
+export async function executeApprovedPayoutPlan(
   database: DatabaseService,
-  id: string,
-  state: string,
-  code: string,
-  detail: string,
-  now: Date,
+  input: Parameters<typeof executeApprovedPayoutPlanLocked>[1],
 ) {
-  await database.pool.query(
-    `update payout_batches set state=$2,failure_code=$3,failure_detail=$4,updated_at=$5 where id=$1`,
-    [id, state, code, detail.slice(0, 1000), now],
+  const verified = await verifiedPayoutReplay(database, input.planId);
+  if (verified) return verified;
+  return withPayoutAuthorization(database, input.authority, 'EXECUTE', input.planId, () => {
+    assertPayoutEnvironment(input.config.network, input.config.treasuryAddress);
+    return withPayoutTreasury(database, input.planId, (treasury) =>
+      withPayoutOperation(treasury, input.planId, (scoped) =>
+        executeApprovedPayoutPlanLocked(scoped, input),
+      ),
+    );
+  });
+}
+export async function retryPayoutExecution(
+  database: DatabaseService,
+  input: Parameters<typeof retryPayoutExecutionLocked>[1],
+) {
+  const planId = await payoutPlanForExecution(database, input.executionId);
+  const verified = await verifiedPayoutReplay(database, planId);
+  if (verified) return verified;
+  return withPayoutAuthorization(database, input.authority, 'RETRY', planId, () => {
+    assertPayoutEnvironment(input.config.network, input.config.treasuryAddress);
+    return withPayoutTreasury(database, planId, (treasury) =>
+      withPayoutOperation(treasury, planId, (scoped) => retryPayoutExecutionLocked(scoped, input)),
+    );
+  });
+}
+export async function reconcilePayoutExecution(
+  database: DatabaseService,
+  input: Parameters<typeof reconcilePayoutExecutionLocked>[1],
+) {
+  const planId = await payoutPlanForExecution(database, input.executionId);
+  const verified = await verifiedPayoutReplay(database, planId);
+  if (verified) return verified;
+  return withPayoutTreasury(database, planId, (treasury) =>
+    withPayoutOperation(treasury, planId, (scoped) =>
+      reconcilePayoutExecutionLocked(scoped, input),
+    ),
+  );
+}
+
+export async function approvePayoutPlan(
+  database: DatabaseService,
+  input: Parameters<typeof approvePayoutPlanAuthorized>[1],
+) {
+  return withPayoutAuthorization(database, input.authority, 'APPROVE', input.planId, () =>
+    withPayoutTreasury(database, input.planId, (scoped) =>
+      approvePayoutPlanAuthorized(scoped, input),
+    ),
+  );
+}
+
+export async function dryRunPayoutExecution(
+  database: DatabaseService,
+  input: Parameters<typeof dryRunPayoutExecutionLocked>[1],
+) {
+  return withPayoutTreasury(database, input.planId, (treasury) =>
+    withPayoutOperation(treasury, input.planId, (scoped) =>
+      dryRunPayoutExecutionLocked(scoped, input),
+    ),
   );
 }

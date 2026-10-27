@@ -1,0 +1,17 @@
+{
+  "api": {
+    "script": "apps\\api\\dist\\main.js",
+    "sha256": "REVIEWED_BUILD_SHA256",
+    "environmentFile": "C:\\ProgramData\\Paperfund\\api.json"
+  },
+  "worker": {
+    "script": "apps\\worker\\dist\\index.js",
+    "sha256": "REVIEWED_BUILD_SHA256",
+    "environmentFile": "C:\\ProgramData\\Paperfund\\worker.json"
+  },
+  "web": {
+    "script": "scripts\\serve-web.mjs",
+    "sha256": "REVIEWED_BUILD_SHA256",
+    "environmentFile": "C:\\ProgramData\\Paperfund\\web.json"
+  }
+}

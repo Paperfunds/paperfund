@@ -24,6 +24,8 @@ import {
 } from '@paperfund/execution';
 
 export * from './pump-fun.js';
+export * from './solana-routes.js';
+export * from './chart-supply.js';
 
 export const REFERENCE_PROTOCOL_ID: ProtocolId = identifier('REFERENCE_TEST_ONLY', 'ProtocolId');
 export const REFERENCE_ADAPTER_VERSION = 'reference-constant-price-v1';
@@ -267,3 +269,20 @@ export function tokenAmount(value: bigint): TokenBaseUnits {
 }
 export * from './pump-swap.js';
 export * from './production.js';
+export * from './cutoff-capture.js';
+
+export {
+  advisoryReadContext,
+  withAdvisoryRead,
+  rpcProviderIdentity,
+  type AdvisoryReadContext,
+} from './rpc-read-context.js';
+
+export {
+  genericActor,
+  withGenericActor,
+  withGenericSystemRead,
+  withGenericAccount,
+  type GenericActor,
+  type GenericPermission,
+} from './generic-access-context.js';

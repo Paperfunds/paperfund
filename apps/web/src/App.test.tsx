@@ -66,6 +66,7 @@ function mockApi(
     preflightUnavailable?: boolean;
     valuationAvailable?: boolean;
     migrated?: boolean;
+    liveUnavailable?: boolean;
   } = {},
 ) {
   let entered = options.entered ?? false;
@@ -172,6 +173,44 @@ function mockApi(
         feeLamports: '1000000',
         executedAt: now.toISOString(),
       });
+    if (url.includes('/leaderboards/hourly/live'))
+      return response({
+        round: {
+          id: round.id,
+          starts_at: round.startsAt,
+          ends_at_exclusive: round.endsAtExclusive,
+          state: 'OPEN',
+        },
+        phase: 'LIVE',
+        status: options.liveUnavailable ? 'UNAVAILABLE' : 'AVAILABLE',
+        reason: options.liveUnavailable ? 'POSITION_VALUATION_UNAVAILABLE' : null,
+        entries: options.liveUnavailable
+          ? []
+          : [
+              {
+                user_id: 'user-1',
+                wallet_address: account.positions[0]!.mint,
+                score: '100000000',
+                equityLamports: '10100000000',
+                rank: 1,
+                tied: true,
+                tieGroupSize: 2,
+                slotsUsed: 1,
+                openPositions: 1,
+              },
+              {
+                user_id: 'user-2',
+                wallet_address: 'other-wallet',
+                score: '100000000',
+                equityLamports: '10100000000',
+                rank: 1,
+                tied: true,
+                tieGroupSize: 2,
+                slotsUsed: 2,
+                openPositions: 1,
+              },
+            ],
+      });
     if (url.endsWith('/leaderboards/hourly'))
       return response({
         round: { ...round, state: 'FINALIZED' },
@@ -226,7 +265,52 @@ function renderApp(path = '/trade') {
   );
 }
 
+it('explains a missing browser wallet before connection succeeds', async () => {
+  mockApi();
+  Object.defineProperty(window, 'solana', {
+    configurable: true,
+    value: undefined,
+  });
+  Object.defineProperty(window, 'phantom', {
+    configurable: true,
+    value: undefined,
+  });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={['/trade']}>
+        <App />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Connect Wallet' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('No compatible Solana wallet');
+  client.clear();
+});
+
 describe('Paperfund web app', () => {
+  it('labels live standings provisional, displays own equity and slots, and does not promise payouts', async () => {
+    mockApi({ authenticated: true });
+    renderApp('/hourly');
+    const board = screen.getByRole('region', {
+      name: 'Live hourly leaderboard',
+    });
+    expect(await within(board).findByText('YOU')).toBeVisible();
+    expect(within(board).getByText('LIVE / PROVISIONAL')).toBeVisible();
+    expect(within(board).getAllByText('1 (tie ×2)')).toHaveLength(2);
+    expect(within(board).getByText(/Provisional scores never allocate rewards/)).toBeVisible();
+    expect(within(board).getByText('Slots used')).toBeVisible();
+  });
+
+  it('hides provisional ranks when any account cannot be valued', async () => {
+    mockApi({ liveUnavailable: true });
+    renderApp('/hourly');
+    const board = screen.getByRole('region', { name: 'Live hourly leaderboard' });
+    expect(await within(board).findByText('Live ranking temporarily unavailable')).toBeVisible();
+    expect(within(board).queryByRole('table')).not.toBeInTheDocument();
+  });
   it('uses the approved brand mark and publishes privacy disclosures', async () => {
     mockApi();
     const { unmount } = renderApp('/');
@@ -245,7 +329,7 @@ describe('Paperfund web app', () => {
     mockApi();
     renderApp('/');
     expect(await screen.findByText('Prove your edge.')).toBeInTheDocument();
-    expect(screen.getByText(/Axiom, GMGN.ai, and Terminal.trade/)).toBeInTheDocument();
+    expect(screen.getByText(/Axiom, GMGN.ai, and Terminal \/ Padre/)).toBeInTheDocument();
 
     renderApp('/rules');
     expect(await screen.findByText('Fresh hourly account')).toBeInTheDocument();

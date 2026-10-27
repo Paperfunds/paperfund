@@ -1,0 +1,1 @@
+import {build} from 'esbuild';await build({entryPoints:['scripts/operator/developer-transfer-runtime.mjs'],bundle:true,platform:'node',format:'cjs',target:'node22',define:{'import.meta.url':JSON.stringify('file:///C:/PaperfundSigner/library.mjs')},outfile:'scripts/operator/developer-transfer.bundle.cjs'});

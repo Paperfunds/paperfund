@@ -1,6 +1,8 @@
+import { browserPublicUrl } from './browser-config-security.mjs';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateExtensionScripts } from './extension-script-validation.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const extensionPackage = JSON.parse(
@@ -10,16 +12,17 @@ const target = resolve(process.argv[2] ?? join(root, 'apps', 'extension', 'build
 const expectedTerminals = [
   'https://axiom.trade/*',
   'https://gmgn.ai/*',
-  'https://www.theterminal.trade/*',
+  'https://trade.padre.gg/*',
 ];
 
 if (!existsSync(target)) throw new Error(`Extension artifact does not exist: ${target}`);
 const manifestPath = join(target, 'manifest.json');
 if (!existsSync(manifestPath)) throw new Error('manifest.json must be at the artifact root.');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+validateExtensionScripts(target);
 const apiUrl = process.env['PAPERFUND_API_BASE_URL'];
 if (!apiUrl) throw new Error('PAPERFUND_API_BASE_URL is required for release validation.');
-const expectedApiPermission = `${new URL(apiUrl).origin}/*`;
+const expectedApiPermission = `${browserPublicUrl('PAPERFUND_API_BASE_URL', apiUrl).origin}/*`;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -83,7 +86,8 @@ const forbiddenPaths = [
   /(^|[\\/])\.env/i,
   /fixture/i,
 ];
-const secretMarkers = /SOLANA_RPC_URL|DATABASE_URL|REDIS_URL|PRIVATE_KEY|SEED_PHRASE|COOKIE_SECRET/;
+const secretMarkers =
+  /SOLANA_RPC_URL|HELIUS_API_KEY|helius-rpc\.com|[?&]api[-_]key=|DATABASE_URL|REDIS_URL|PRIVATE_KEY|SEED_PHRASE|COOKIE_SECRET/i;
 const remoteCode =
   /<script[^>]+src=["']https?:|import\s*\(\s*["']https?:|\beval\s*\(|\bnew\s+Function\s*\(/i;
 const files = filesUnder(target);

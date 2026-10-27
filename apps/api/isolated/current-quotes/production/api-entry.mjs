@@ -1,0 +1,21 @@
+import fs from'node:fs';import path from'node:path';import{createHash}from'node:crypto';
+import * as h from'./current-quote-runtime.mjs';
+import{parseApplicationEnvironment}from'./packages/config/dist/index.js';
+import{genericActor}from'./packages/protocols/dist/index.js';
+import{createRedis}from'./redis.mjs';
+import{composeProduction,validateProfile}from'./policy.mjs';
+import{installDrain}from'./drain.mjs';
+const[profileFile,profileHash]=process.argv.slice(2),raw=fs.readFileSync(profileFile);
+if(createHash('sha256').update(raw).digest('hex')!==profileHash)throw Error('PRODUCTION_PROFILE_PIN');
+const profile=validateProfile(JSON.parse(raw)),config=parseApplicationEnvironment(process.env);
+if(config.API_HOST!=='127.0.0.1'||config.API_PORT!==3000||!config.PRIVATE_BETA_NON_PAYING||config.PAYOUT_SIGNER_TYPE!=='DISABLED'||config.PAYOUT_EXECUTION_ENABLED||!config.BETA_INVITE_ONLY)throw Error('PRODUCTION_PAPER_SAFETY_CONFIG');
+if(!path.isAbsolute(profile.archiveDirectory)||!path.isAbsolute(profile.controlDirectory))throw Error('PRODUCTION_EVIDENCE_PATHS');
+const base=h.createDatabase(config.DATABASE_URL),cap=new h.GenericCapability(base,{...h.genericCapabilityOptions(config),entries:profile.grants.length>0,normalUserAccess:profile.grants.length>0});
+const baseline=h.createProductionExecutionRouter({rpcUrl:config.SOLANA_RPC_URL,rpcTimeoutMs:config.SOLANA_RPC_TIMEOUT_MS,commitment:'finalized',genericPumpSwapEnabled:config.GENERIC_PUMPSWAP_ENABLED,genericPumpSwapBuysEnabled:false,genericAccessResolver:(mint,quote,settlement)=>cap.resolve(mint,quote,settlement),nonSolPumpSwapEnabled:config.NON_SOL_PUMPSWAP_ENABLED,nonSolPumpSwapRoutes:config.NON_SOL_PUMPSWAP_ALLOWED_ROUTES});
+const rpc=new h.FinalizedRpc(config.SOLANA_RPC_URL,config.SOLANA_RPC_TIMEOUT_MS),archive=new h.FinalizedBankArchive(profile.archiveDirectory,true);
+const scoped=composeProduction(h,{database:base,baseline,profile,capability:cap,actor:genericActor,snapshots:async mint=>Promise.all(profile.routes.filter(r=>r.mint===mint).map(r=>h.captureCurrentPumpRoute(rpc,archive,r)))});
+const redis=createRedis(config.REDIS_URL),auth=new h.AuthService(scoped.database,redis,config.AUTH_CHALLENGE_TTL_SECONDS,config.AUTH_SESSION_TTL_SECONDS),competition=new h.CompetitionService(scoped.database,scoped.router,()=>new Date(),{allocationMode:config.REWARD_ALLOCATION_MODE,baselineWindow:config.REWARD_BASELINE_WINDOW,lambdaBps:BigInt(config.REWARD_LAMBDA_BPS),configurationVersion:'phase-5a-v1'},undefined,{maxConcurrent:config.ADVISORY_MAX_CONCURRENT,backgroundConcurrent:config.ADVISORY_BACKGROUND_CONCURRENT},config.GENERIC_PUMPSWAP_ENABLED),app=h.buildApp({config,database:scoped.database,redis,auth,competition,genericCapability:cap});
+app.addHook('preHandler',async(req,reply)=>{if(req.method!=='POST'||req.url.split('?')[0]!=='/api/v1/trades/buy')return;try{const user=await auth.authenticate(req.headers.authorization?.match(/^Bearer (\S+)$/)?.[1]);scoped.admission.request(user,req.body?.mint,req.body?.paperSol)}catch{return reply.code(403).send({error:{code:'PAPER_BUY_DISABLED',message:'No applicable bounded PAPER trading authorization.',requestId:req.id}})}});
+let closing,detach=()=>{};const close=()=>closing??=(async()=>{await app.close();await redis.close();await base.close();detach()})();
+detach=installDrain(profile.controlDirectory,'api',close);process.once('SIGTERM',()=>void close());process.once('SIGINT',()=>void close());
+try{await app.listen({host:config.API_HOST,port:config.API_PORT});console.log(JSON.stringify({event:'SCOPED_CURRENT_QUOTE_API_READY',pid:process.pid,nonPaying:true,scopedGrantCount:profile.grants.length,unscopedBuys:'DENIED'}));}catch(e){await close();throw e;}

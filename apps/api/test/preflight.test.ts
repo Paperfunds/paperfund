@@ -1,4 +1,4 @@
-import { identifier, paperSolBaseUnits, utcInstant } from '@paperfund/core';
+import { identifier, paperSolBaseUnits, tokenBaseUnits, utcInstant } from '@paperfund/core';
 import {
   ExecutionEngineError,
   ExecutionRouter,
@@ -93,6 +93,7 @@ function service(options: {
   targetExisting?: boolean;
   unavailable?: boolean;
   migrated?: boolean;
+  illiquid?: boolean;
 }) {
   const positions = options.positions ?? [];
   const query = async (sql: string) => {
@@ -120,6 +121,15 @@ function service(options: {
     throw new Error(`Unexpected SQL: ${sql}`);
   };
   const origin = adapter(originProtocol, 1n);
+  if (options.illiquid) {
+    const value = origin.valuePositionForExit;
+    origin.maxExecutableSellQuantity = async () => tokenBaseUnits(100n);
+    origin.valuePositionForExit = async (request, state) => {
+      if (request.tokenQuantity > 100n)
+        throw new ExecutionEngineError('INSUFFICIENT_EXECUTABLE_LIQUIDITY', 'reserve shortfall');
+      return value(request, state);
+    };
+  }
   if (options.unavailable) {
     origin.loadMarketState = async () => {
       throw new ExecutionEngineError('MARKET_STATE_UNAVAILABLE', 'fixture unavailable');
@@ -142,6 +152,25 @@ function service(options: {
 }
 
 describe('authoritative BUY preflight', () => {
+  it('uses conservative executable equity for an illiquid holding without blocking an unrelated BUY', async () => {
+    const target = service({
+      cash: 9_030_000_000n,
+      positions: [position('illiquid', 1_004_000_000n)],
+      illiquid: true,
+    });
+    const preflight = await target.buyPreflight('user:one', 'mint:other');
+    expect(preflight).toMatchObject({
+      marketSupported: true,
+      blockingReason: null,
+      equityValuationStatus: 'PARTIAL_LIQUIDITY',
+      unavailablePositions: [{ id: 'illiquid', reason: 'LIQUIDITY_LIMITED' }],
+    });
+    const positions = await target.getPositions('user:one');
+    expect(positions?.positions[0]?.sellPreflight).toMatchObject({
+      status: 'LIQUIDITY_LIMITED',
+      maxExecutableQuantityBaseUnits: 100n,
+    });
+  });
   it('uses exact cash as equity when no positions are open', async () => {
     const result = await service({ cash: 10_000_000_000n }).buyPreflight('user:one', 'mint:target');
     expect(result).toMatchObject({

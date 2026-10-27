@@ -1,0 +1,1609 @@
+{
+  "source": "Unchanged compiled deployed protocol baseline; no package build/reload",
+  "rows": [
+    {
+      "amount": "1000000",
+      "buy": {
+        "id": "prebond-parity",
+        "orderId": "prebond-parity",
+        "quote": {
+          "orderId": "prebond-parity",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocolId": "SOLANA_ROUTE",
+          "adapterVersion": "solana-composed-route-v1",
+          "marketStateRecordedAt": "2026-10-01T19:04:21.430Z",
+          "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+          "normalizationVersion": "solana-route-accounts-v1",
+          "requestedInput": {
+            "asset": "PAPER_SOL",
+            "amount": "1000000"
+          },
+          "simulatedOutput": {
+            "asset": "TOKEN",
+            "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "amount": "16546250583"
+          },
+          "fees": [
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "PAPER_SOL",
+                "amount": "1601"
+              }
+            },
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "477"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "151"
+              }
+            }
+          ]
+        },
+        "actualInput": {
+          "asset": "PAPER_SOL",
+          "amount": "1000000"
+        },
+        "actualOutput": {
+          "asset": "TOKEN",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "amount": "16546250583"
+        },
+        "executedAt": "2026-10-01T19:04:21.430Z",
+        "executionDetails": {
+          "hops": [
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "1000000",
+              "outputBeforeTransfer": "50833",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "1601",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4162381944162440550",
+              "tickCurrentIndex": -29778,
+              "endTick": -29778,
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 9,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "1000000",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "A_TO_B",
+              "outputAfterTransfer": "50833",
+              "stateSlot": "452376128"
+            },
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "50833",
+              "outputBeforeTransfer": "16546250583",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "1",
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "inputDecimals": 8,
+              "outputDecimals": 6,
+              "inputAfterTransfer": "50833",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "B_TO_A",
+              "outputAfterTransfer": "16546250583",
+              "stateSlot": "452376128"
+            }
+          ],
+          "canonicalRoute": {
+            "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "protocol": "SOLANA_ROUTE",
+            "direction": "BUY",
+            "hops": [
+              {
+                "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                "input": "1000000",
+                "outputBeforeTransfer": "50833",
+                "tradeFeeRate": 1600,
+                "protocolShareRate": 1300,
+                "totalTradeFee": "1601",
+                "sqrtPrice": "4162382069574388526",
+                "endSqrtPrice": "4162381944162440550",
+                "tickCurrentIndex": -29778,
+                "endTick": -29778,
+                "inputMint": "So11111111111111111111111111111111111111112",
+                "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "inputDecimals": 9,
+                "outputDecimals": 8,
+                "inputAfterTransfer": "1000000",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "50833",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              },
+              {
+                "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                "input": "50833",
+                "outputBeforeTransfer": "16546250583",
+                "virtualBase": "814638608769478",
+                "virtualQuote": "2471695072",
+                "realBase": "534738608769478",
+                "realQuote": "595145150",
+                "unusedQuoteInput": "1",
+                "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                "inputDecimals": 8,
+                "outputDecimals": 6,
+                "inputAfterTransfer": "50833",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "16546250583",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              }
+            ],
+            "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+            "routeHash": "f3cc3801b755d70700d15d705685443d584486bf4ca65e662cac15d6fa6e4afa",
+            "inputAsset": "PAPER_SOL",
+            "outputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "observedAt": "2026-10-01T19:04:21.430Z",
+            "chainSlot": "452376128",
+            "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+            "orderId": "prebond-parity",
+            "executionId": "prebond-parity",
+            "requestedInput": "1000000",
+            "input": "1000000",
+            "output": "16546250583",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "1601"
+                  },
+                  "asset": "PAPER_SOL"
+                },
+                "category": "AMM_TRADE_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "477"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "151"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              }
+            ]
+          },
+          "immediateReverse": {
+            "status": "AVAILABLE",
+            "executableValue": "972074",
+            "executableQuantity": "16546250583",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "477"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "151"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "80"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "AMM_TRADE_FEE"
+              }
+            ],
+            "route": {
+              "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "protocol": "SOLANA_ROUTE",
+              "direction": "SELL",
+              "hops": [
+                {
+                  "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                  "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                  "input": "16546250583",
+                  "outputBeforeTransfer": "49573",
+                  "virtualBase": "814638608769478",
+                  "virtualQuote": "2471695072",
+                  "realBase": "534738608769478",
+                  "realQuote": "595145150",
+                  "unusedQuoteInput": "0",
+                  "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                  "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "inputDecimals": 6,
+                  "outputDecimals": 8,
+                  "inputAfterTransfer": "16546250583",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "49573",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                },
+                {
+                  "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                  "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                  "input": "49573",
+                  "outputBeforeTransfer": "972074",
+                  "tradeFeeRate": 1600,
+                  "protocolShareRate": 1300,
+                  "totalTradeFee": "80",
+                  "sqrtPrice": "4162382069574388526",
+                  "endSqrtPrice": "4162382191679580127",
+                  "tickCurrentIndex": -29778,
+                  "endTick": -29778,
+                  "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "outputMint": "So11111111111111111111111111111111111111112",
+                  "inputDecimals": 8,
+                  "outputDecimals": 9,
+                  "inputAfterTransfer": "49573",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "972074",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                }
+              ],
+              "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+              "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+              "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputAsset": "PAPER_SOL",
+              "observedAt": "2026-10-01T19:04:21.430Z",
+              "chainSlot": "452376128",
+              "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+            }
+          }
+        }
+      },
+      "value": {
+        "identity": {
+          "protocolId": "SOLANA_ROUTE",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3"
+        },
+        "tokenQuantity": "16546250583",
+        "paperSolValue": "972074",
+        "route": {
+          "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocol": "SOLANA_ROUTE",
+          "direction": "SELL",
+          "hops": [
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "16546250583",
+              "outputBeforeTransfer": "49573",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "0",
+              "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 6,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "16546250583",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "49573",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            },
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "49573",
+              "outputBeforeTransfer": "972074",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "80",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4162382191679580127",
+              "tickCurrentIndex": -29778,
+              "endTick": -29778,
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "inputDecimals": 8,
+              "outputDecimals": 9,
+              "inputAfterTransfer": "49573",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "972074",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            }
+          ],
+          "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+          "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+          "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "outputAsset": "PAPER_SOL",
+          "observedAt": "2026-10-01T19:04:21.430Z",
+          "chainSlot": "452376128",
+          "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+        },
+        "feeBreakdown": {
+          "fees": [
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "477"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "151"
+              }
+            },
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "80"
+              }
+            }
+          ],
+          "totalPaperSolFees": "0"
+        },
+        "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+        "adapterVersion": "solana-composed-route-v1"
+      }
+    },
+    {
+      "amount": "100000000",
+      "buy": {
+        "id": "prebond-parity",
+        "orderId": "prebond-parity",
+        "quote": {
+          "orderId": "prebond-parity",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocolId": "SOLANA_ROUTE",
+          "adapterVersion": "solana-composed-route-v1",
+          "marketStateRecordedAt": "2026-10-01T19:04:21.430Z",
+          "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+          "normalizationVersion": "solana-route-accounts-v1",
+          "requestedInput": {
+            "asset": "PAPER_SOL",
+            "amount": "100000000"
+          },
+          "simulatedOutput": {
+            "asset": "TOKEN",
+            "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "amount": "1651356800035"
+          },
+          "fees": [
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "PAPER_SOL",
+                "amount": "160100"
+              }
+            },
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "47696"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "15062"
+              }
+            }
+          ]
+        },
+        "actualInput": {
+          "asset": "PAPER_SOL",
+          "amount": "100000000"
+        },
+        "actualOutput": {
+          "asset": "TOKEN",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "amount": "1651356800035"
+        },
+        "executedAt": "2026-10-01T19:04:21.430Z",
+        "executionDetails": {
+          "hops": [
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "100000000",
+              "outputBeforeTransfer": "5083317",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "160100",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4162369528416999364",
+              "tickCurrentIndex": -29778,
+              "endTick": -29778,
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 9,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "100000000",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "A_TO_B",
+              "outputAfterTransfer": "5083317",
+              "stateSlot": "452376128"
+            },
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "5083317",
+              "outputBeforeTransfer": "1651356800035",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "0",
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "inputDecimals": 8,
+              "outputDecimals": 6,
+              "inputAfterTransfer": "5083317",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "B_TO_A",
+              "outputAfterTransfer": "1651356800035",
+              "stateSlot": "452376128"
+            }
+          ],
+          "canonicalRoute": {
+            "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "protocol": "SOLANA_ROUTE",
+            "direction": "BUY",
+            "hops": [
+              {
+                "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                "input": "100000000",
+                "outputBeforeTransfer": "5083317",
+                "tradeFeeRate": 1600,
+                "protocolShareRate": 1300,
+                "totalTradeFee": "160100",
+                "sqrtPrice": "4162382069574388526",
+                "endSqrtPrice": "4162369528416999364",
+                "tickCurrentIndex": -29778,
+                "endTick": -29778,
+                "inputMint": "So11111111111111111111111111111111111111112",
+                "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "inputDecimals": 9,
+                "outputDecimals": 8,
+                "inputAfterTransfer": "100000000",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "5083317",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              },
+              {
+                "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                "input": "5083317",
+                "outputBeforeTransfer": "1651356800035",
+                "virtualBase": "814638608769478",
+                "virtualQuote": "2471695072",
+                "realBase": "534738608769478",
+                "realQuote": "595145150",
+                "unusedQuoteInput": "0",
+                "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                "inputDecimals": 8,
+                "outputDecimals": 6,
+                "inputAfterTransfer": "5083317",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "1651356800035",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              }
+            ],
+            "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+            "routeHash": "f3cc3801b755d70700d15d705685443d584486bf4ca65e662cac15d6fa6e4afa",
+            "inputAsset": "PAPER_SOL",
+            "outputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "observedAt": "2026-10-01T19:04:21.430Z",
+            "chainSlot": "452376128",
+            "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+            "orderId": "prebond-parity",
+            "executionId": "prebond-parity",
+            "requestedInput": "100000000",
+            "input": "100000000",
+            "output": "1651356800035",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "160100"
+                  },
+                  "asset": "PAPER_SOL"
+                },
+                "category": "AMM_TRADE_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "47696"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "15062"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              }
+            ]
+          },
+          "immediateReverse": {
+            "status": "AVAILABLE",
+            "executableValue": "96824814",
+            "executableQuantity": "1651356800035",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "47503"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "15001"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "7906"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "AMM_TRADE_FEE"
+              }
+            ],
+            "route": {
+              "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "protocol": "SOLANA_ROUTE",
+              "direction": "SELL",
+              "hops": [
+                {
+                  "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                  "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                  "input": "1651356800035",
+                  "outputBeforeTransfer": "4937741",
+                  "virtualBase": "814638608769478",
+                  "virtualQuote": "2471695072",
+                  "realBase": "534738608769478",
+                  "realQuote": "595145150",
+                  "unusedQuoteInput": "0",
+                  "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                  "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "inputDecimals": 6,
+                  "outputDecimals": 8,
+                  "inputAfterTransfer": "1651356800035",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "4937741",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                },
+                {
+                  "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                  "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                  "input": "4937741",
+                  "outputBeforeTransfer": "96824814",
+                  "tradeFeeRate": 1600,
+                  "protocolShareRate": 1300,
+                  "totalTradeFee": "7906",
+                  "sqrtPrice": "4162382069574388526",
+                  "endSqrtPrice": "4162394232071049455",
+                  "tickCurrentIndex": -29778,
+                  "endTick": -29778,
+                  "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "outputMint": "So11111111111111111111111111111111111111112",
+                  "inputDecimals": 8,
+                  "outputDecimals": 9,
+                  "inputAfterTransfer": "4937741",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "96824814",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                }
+              ],
+              "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+              "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+              "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputAsset": "PAPER_SOL",
+              "observedAt": "2026-10-01T19:04:21.430Z",
+              "chainSlot": "452376128",
+              "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+            }
+          }
+        }
+      },
+      "value": {
+        "identity": {
+          "protocolId": "SOLANA_ROUTE",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3"
+        },
+        "tokenQuantity": "1651356800035",
+        "paperSolValue": "96824814",
+        "route": {
+          "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocol": "SOLANA_ROUTE",
+          "direction": "SELL",
+          "hops": [
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "1651356800035",
+              "outputBeforeTransfer": "4937741",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "0",
+              "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 6,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "1651356800035",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "4937741",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            },
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "4937741",
+              "outputBeforeTransfer": "96824814",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "7906",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4162394232071049455",
+              "tickCurrentIndex": -29778,
+              "endTick": -29778,
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "inputDecimals": 8,
+              "outputDecimals": 9,
+              "inputAfterTransfer": "4937741",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "96824814",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            }
+          ],
+          "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+          "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+          "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "outputAsset": "PAPER_SOL",
+          "observedAt": "2026-10-01T19:04:21.430Z",
+          "chainSlot": "452376128",
+          "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+        },
+        "feeBreakdown": {
+          "fees": [
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "47503"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "15001"
+              }
+            },
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "7906"
+              }
+            }
+          ],
+          "totalPaperSolFees": "0"
+        },
+        "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+        "adapterVersion": "solana-composed-route-v1"
+      }
+    },
+    {
+      "amount": "1000000000",
+      "buy": {
+        "id": "prebond-parity",
+        "orderId": "prebond-parity",
+        "quote": {
+          "orderId": "prebond-parity",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocolId": "SOLANA_ROUTE",
+          "adapterVersion": "solana-composed-route-v1",
+          "marketStateRecordedAt": "2026-10-01T19:04:21.430Z",
+          "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+          "normalizationVersion": "solana-route-accounts-v1",
+          "requestedInput": {
+            "asset": "PAPER_SOL",
+            "amount": "1000000000"
+          },
+          "simulatedOutput": {
+            "asset": "TOKEN",
+            "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "amount": "16217267686076"
+          },
+          "fees": [
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "PAPER_SOL",
+                "amount": "1601000"
+              }
+            },
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "476941"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "150613"
+              }
+            }
+          ]
+        },
+        "actualInput": {
+          "asset": "PAPER_SOL",
+          "amount": "1000000000"
+        },
+        "actualOutput": {
+          "asset": "TOKEN",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "amount": "16217267686076"
+        },
+        "executedAt": "2026-10-01T19:04:21.430Z",
+        "executionDetails": {
+          "hops": [
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "1000000000",
+              "outputBeforeTransfer": "50831800",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "1601000",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4162256661401163277",
+              "tickCurrentIndex": -29778,
+              "endTick": -29779,
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 9,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "1000000000",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "A_TO_B",
+              "outputAfterTransfer": "50831800",
+              "stateSlot": "452376128"
+            },
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "50831800",
+              "outputBeforeTransfer": "16217267686076",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "1",
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "inputDecimals": 8,
+              "outputDecimals": 6,
+              "inputAfterTransfer": "50831800",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "B_TO_A",
+              "outputAfterTransfer": "16217267686076",
+              "stateSlot": "452376128"
+            }
+          ],
+          "canonicalRoute": {
+            "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "protocol": "SOLANA_ROUTE",
+            "direction": "BUY",
+            "hops": [
+              {
+                "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                "input": "1000000000",
+                "outputBeforeTransfer": "50831800",
+                "tradeFeeRate": 1600,
+                "protocolShareRate": 1300,
+                "totalTradeFee": "1601000",
+                "sqrtPrice": "4162382069574388526",
+                "endSqrtPrice": "4162256661401163277",
+                "tickCurrentIndex": -29778,
+                "endTick": -29779,
+                "inputMint": "So11111111111111111111111111111111111111112",
+                "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "inputDecimals": 9,
+                "outputDecimals": 8,
+                "inputAfterTransfer": "1000000000",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "50831800",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              },
+              {
+                "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                "input": "50831800",
+                "outputBeforeTransfer": "16217267686076",
+                "virtualBase": "814638608769478",
+                "virtualQuote": "2471695072",
+                "realBase": "534738608769478",
+                "realQuote": "595145150",
+                "unusedQuoteInput": "1",
+                "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                "inputDecimals": 8,
+                "outputDecimals": 6,
+                "inputAfterTransfer": "50831800",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "16217267686076",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              }
+            ],
+            "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+            "routeHash": "f3cc3801b755d70700d15d705685443d584486bf4ca65e662cac15d6fa6e4afa",
+            "inputAsset": "PAPER_SOL",
+            "outputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "observedAt": "2026-10-01T19:04:21.430Z",
+            "chainSlot": "452376128",
+            "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+            "orderId": "prebond-parity",
+            "executionId": "prebond-parity",
+            "requestedInput": "1000000000",
+            "input": "1000000000",
+            "output": "16217267686076",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "1601000"
+                  },
+                  "asset": "PAPER_SOL"
+                },
+                "category": "AMM_TRADE_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "476941"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "150613"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              }
+            ]
+          },
+          "immediateReverse": {
+            "status": "AVAILABLE",
+            "executableValue": "934181840",
+            "executableQuantity": "16217267686076",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "458322"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "144734"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "76274"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "AMM_TRADE_FEE"
+              }
+            ],
+            "route": {
+              "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "protocol": "SOLANA_ROUTE",
+              "direction": "SELL",
+              "hops": [
+                {
+                  "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                  "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                  "input": "16217267686076",
+                  "outputBeforeTransfer": "47641340",
+                  "virtualBase": "814638608769478",
+                  "virtualQuote": "2471695072",
+                  "realBase": "534738608769478",
+                  "realQuote": "595145150",
+                  "unusedQuoteInput": "0",
+                  "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                  "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "inputDecimals": 6,
+                  "outputDecimals": 8,
+                  "inputAfterTransfer": "16217267686076",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "47641340",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                },
+                {
+                  "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                  "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                  "input": "47641340",
+                  "outputBeforeTransfer": "934181840",
+                  "tradeFeeRate": 1600,
+                  "protocolShareRate": 1300,
+                  "totalTradeFee": "76274",
+                  "sqrtPrice": "4162382069574388526",
+                  "endSqrtPrice": "4162499418320624841",
+                  "tickCurrentIndex": -29778,
+                  "endTick": -29777,
+                  "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "outputMint": "So11111111111111111111111111111111111111112",
+                  "inputDecimals": 8,
+                  "outputDecimals": 9,
+                  "inputAfterTransfer": "47641340",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "934181840",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                }
+              ],
+              "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+              "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+              "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputAsset": "PAPER_SOL",
+              "observedAt": "2026-10-01T19:04:21.430Z",
+              "chainSlot": "452376128",
+              "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+            }
+          }
+        }
+      },
+      "value": {
+        "identity": {
+          "protocolId": "SOLANA_ROUTE",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3"
+        },
+        "tokenQuantity": "16217267686076",
+        "paperSolValue": "934181840",
+        "route": {
+          "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocol": "SOLANA_ROUTE",
+          "direction": "SELL",
+          "hops": [
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "16217267686076",
+              "outputBeforeTransfer": "47641340",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "0",
+              "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 6,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "16217267686076",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "47641340",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            },
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "47641340",
+              "outputBeforeTransfer": "934181840",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "76274",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4162499418320624841",
+              "tickCurrentIndex": -29778,
+              "endTick": -29777,
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "inputDecimals": 8,
+              "outputDecimals": 9,
+              "inputAfterTransfer": "47641340",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "934181840",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            }
+          ],
+          "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+          "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+          "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "outputAsset": "PAPER_SOL",
+          "observedAt": "2026-10-01T19:04:21.430Z",
+          "chainSlot": "452376128",
+          "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+        },
+        "feeBreakdown": {
+          "fees": [
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "458322"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "144734"
+              }
+            },
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "76274"
+              }
+            }
+          ],
+          "totalPaperSolFees": "0"
+        },
+        "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+        "adapterVersion": "solana-composed-route-v1"
+      }
+    },
+    {
+      "amount": "10000000000",
+      "buy": {
+        "id": "prebond-parity",
+        "orderId": "prebond-parity",
+        "quote": {
+          "orderId": "prebond-parity",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocolId": "SOLANA_ROUTE",
+          "adapterVersion": "solana-composed-route-v1",
+          "marketStateRecordedAt": "2026-10-01T19:04:21.430Z",
+          "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+          "normalizationVersion": "solana-route-accounts-v1",
+          "requestedInput": {
+            "asset": "PAPER_SOL",
+            "amount": "10000000000"
+          },
+          "simulatedOutput": {
+            "asset": "TOKEN",
+            "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "amount": "137500709828063"
+          },
+          "fees": [
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "PAPER_SOL",
+                "amount": "16010000"
+              }
+            },
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "4768111"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "1505720"
+              }
+            }
+          ]
+        },
+        "actualInput": {
+          "asset": "PAPER_SOL",
+          "amount": "10000000000"
+        },
+        "actualOutput": {
+          "asset": "TOKEN",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "amount": "137500709828063"
+        },
+        "executedAt": "2026-10-01T19:04:21.430Z",
+        "executionDetails": {
+          "hops": [
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "10000000000",
+              "outputBeforeTransfer": "508180204",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "16010000",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4161128327807367150",
+              "tickCurrentIndex": -29778,
+              "endTick": -29784,
+              "inputMint": "So11111111111111111111111111111111111111112",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 9,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "10000000000",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "A_TO_B",
+              "outputAfterTransfer": "508180204",
+              "stateSlot": "452376128"
+            },
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "508180204",
+              "outputBeforeTransfer": "137500709828063",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "0",
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "inputDecimals": 8,
+              "outputDecimals": 6,
+              "inputAfterTransfer": "508180204",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "B_TO_A",
+              "outputAfterTransfer": "137500709828063",
+              "stateSlot": "452376128"
+            }
+          ],
+          "canonicalRoute": {
+            "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "protocol": "SOLANA_ROUTE",
+            "direction": "BUY",
+            "hops": [
+              {
+                "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                "input": "10000000000",
+                "outputBeforeTransfer": "508180204",
+                "tradeFeeRate": 1600,
+                "protocolShareRate": 1300,
+                "totalTradeFee": "16010000",
+                "sqrtPrice": "4162382069574388526",
+                "endSqrtPrice": "4161128327807367150",
+                "tickCurrentIndex": -29778,
+                "endTick": -29784,
+                "inputMint": "So11111111111111111111111111111111111111112",
+                "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "inputDecimals": 9,
+                "outputDecimals": 8,
+                "inputAfterTransfer": "10000000000",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "508180204",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              },
+              {
+                "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                "input": "508180204",
+                "outputBeforeTransfer": "137500709828063",
+                "virtualBase": "814638608769478",
+                "virtualQuote": "2471695072",
+                "realBase": "534738608769478",
+                "realQuote": "595145150",
+                "unusedQuoteInput": "0",
+                "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "outputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                "inputDecimals": 8,
+                "outputDecimals": 6,
+                "inputAfterTransfer": "508180204",
+                "inputTransferFee": "0",
+                "outputTransferFee": "0",
+                "direction": "BUY",
+                "outputAfterTransfer": "137500709828063",
+                "stateSlot": "452376128",
+                "chainSlot": "452376128"
+              }
+            ],
+            "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+            "routeHash": "f3cc3801b755d70700d15d705685443d584486bf4ca65e662cac15d6fa6e4afa",
+            "inputAsset": "PAPER_SOL",
+            "outputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+            "observedAt": "2026-10-01T19:04:21.430Z",
+            "chainSlot": "452376128",
+            "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+            "orderId": "prebond-parity",
+            "executionId": "prebond-parity",
+            "requestedInput": "10000000000",
+            "input": "10000000000",
+            "output": "137500709828063",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "16010000"
+                  },
+                  "asset": "PAPER_SOL"
+                },
+                "category": "AMM_TRADE_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "4768111"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "1505720"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              }
+            ]
+          },
+          "immediateReverse": {
+            "status": "AVAILABLE",
+            "executableValue": "6909984877",
+            "executableQuantity": "137500709828063",
+            "fees": [
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "3390963"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "PROTOCOL_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "1070831"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "CREATOR_FEE"
+              },
+              {
+                "amount": {
+                  "amount": {
+                    "$bigint": "587385"
+                  },
+                  "asset": "TOKEN",
+                  "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+                },
+                "category": "AMM_TRADE_FEE"
+              }
+            ],
+            "route": {
+              "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "protocol": "SOLANA_ROUTE",
+              "direction": "SELL",
+              "hops": [
+                {
+                  "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+                  "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+                  "input": "137500709828063",
+                  "outputBeforeTransfer": "352481586",
+                  "virtualBase": "814638608769478",
+                  "virtualQuote": "2471695072",
+                  "realBase": "534738608769478",
+                  "realQuote": "595145150",
+                  "unusedQuoteInput": "0",
+                  "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+                  "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "inputDecimals": 6,
+                  "outputDecimals": 8,
+                  "inputAfterTransfer": "137500709828063",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "352481586",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                },
+                {
+                  "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+                  "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+                  "input": "352481586",
+                  "outputBeforeTransfer": "6909984877",
+                  "tradeFeeRate": 1600,
+                  "protocolShareRate": 1300,
+                  "totalTradeFee": "587385",
+                  "sqrtPrice": "4162382069574388526",
+                  "endSqrtPrice": "4163250234946579854",
+                  "tickCurrentIndex": -29778,
+                  "endTick": -29774,
+                  "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                  "outputMint": "So11111111111111111111111111111111111111112",
+                  "inputDecimals": 8,
+                  "outputDecimals": 9,
+                  "inputAfterTransfer": "352481586",
+                  "inputTransferFee": "0",
+                  "outputTransferFee": "0",
+                  "direction": "SELL",
+                  "outputAfterTransfer": "6909984877",
+                  "stateSlot": "452376128",
+                  "chainSlot": "452376128"
+                }
+              ],
+              "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+              "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+              "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputAsset": "PAPER_SOL",
+              "observedAt": "2026-10-01T19:04:21.430Z",
+              "chainSlot": "452376128",
+              "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+            }
+          }
+        }
+      },
+      "value": {
+        "identity": {
+          "protocolId": "SOLANA_ROUTE",
+          "marketId": "solana-route:BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "tokenMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3"
+        },
+        "tokenQuantity": "137500709828063",
+        "paperSolValue": "6909984877",
+        "route": {
+          "mint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "protocol": "SOLANA_ROUTE",
+          "direction": "SELL",
+          "hops": [
+            {
+              "pool": "CQxky5L5PuvJesqj4dWinHTaYf7q4vU2NyWdBezrmMjA",
+              "programId": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+              "input": "137500709828063",
+              "outputBeforeTransfer": "352481586",
+              "virtualBase": "814638608769478",
+              "virtualQuote": "2471695072",
+              "realBase": "534738608769478",
+              "realQuote": "595145150",
+              "unusedQuoteInput": "0",
+              "inputMint": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+              "outputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "inputDecimals": 6,
+              "outputDecimals": 8,
+              "inputAfterTransfer": "137500709828063",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "352481586",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            },
+            {
+              "pool": "8Vy5Rjb9vg5nLb8L1r4Di8p9py5BTkp8UJSMHG8AD2zs",
+              "programId": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+              "input": "352481586",
+              "outputBeforeTransfer": "6909984877",
+              "tradeFeeRate": 1600,
+              "protocolShareRate": 1300,
+              "totalTradeFee": "587385",
+              "sqrtPrice": "4162382069574388526",
+              "endSqrtPrice": "4163250234946579854",
+              "tickCurrentIndex": -29778,
+              "endTick": -29774,
+              "inputMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+              "outputMint": "So11111111111111111111111111111111111111112",
+              "inputDecimals": 8,
+              "outputDecimals": 9,
+              "inputAfterTransfer": "352481586",
+              "inputTransferFee": "0",
+              "outputTransferFee": "0",
+              "direction": "SELL",
+              "outputAfterTransfer": "6909984877",
+              "stateSlot": "452376128",
+              "chainSlot": "452376128"
+            }
+          ],
+          "topologyHash": "b4fe71d40614cbf1b68bfd1e0852a9b3b2c9031cabe87bb5a67c0a633a3a17ca",
+          "routeHash": "e9bae82229799a2c42d4e325d232b83b07401ae6c5b10364ce709f61bf413ed3",
+          "inputAsset": "BsCrE8ZBoqwzv1Yix8uV6S7MmvmH6R7B5Nv3Su8CtmN3",
+          "outputAsset": "PAPER_SOL",
+          "observedAt": "2026-10-01T19:04:21.430Z",
+          "chainSlot": "452376128",
+          "stateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c"
+        },
+        "feeBreakdown": {
+          "fees": [
+            {
+              "category": "PROTOCOL_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "3390963"
+              }
+            },
+            {
+              "category": "CREATOR_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "1070831"
+              }
+            },
+            {
+              "category": "AMM_TRADE_FEE",
+              "amount": {
+                "asset": "TOKEN",
+                "tokenMint": "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh",
+                "amount": "587385"
+              }
+            }
+          ],
+          "totalPaperSolFees": "0"
+        },
+        "marketStateFingerprint": "0622935551d9877293e56a05dee84d16db2ae7cfe42c8e68a772f313aa22938c",
+        "adapterVersion": "solana-composed-route-v1"
+      }
+    }
+  ]
+}

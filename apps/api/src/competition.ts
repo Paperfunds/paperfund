@@ -1,3 +1,10 @@
+import { safeApiErrorMessage } from './safe-diagnostics.js';
+import { withGenericSystemRead } from '@paperfund/protocols';
+import { withAdvisoryRead } from '@paperfund/protocols';
+import type { QueryConfig } from 'pg';
+import { createHash } from 'node:crypto';
+import { AdvisoryValuations } from './advisory-valuations.js';
+import type { HistoricalChartFx } from '@paperfund/shared/browser';
 import { randomUUID } from 'node:crypto';
 
 import {
@@ -8,11 +15,11 @@ import {
   identifier,
   paperSolBaseUnits,
   paperSolFromSolString,
-  tokenBaseUnits,
 } from '@paperfund/core';
 import {
   enterCurrentRound,
   executePaperBuy,
+  assertPaperBuyAdmission,
   executePaperSell,
   executePaperSellAll,
   FinancialServiceError,
@@ -32,15 +39,21 @@ import {
 } from '@paperfund/db';
 import {
   ExecutionEngineError,
-  valuePortfolioPositions,
+  executionRouteRecord,
   type ExecutionRouter,
   type MarketIdentity,
+  type MarketState,
 } from '@paperfund/execution';
 import {
   PUMP_FUN_PROTOCOL_ID,
   WRAPPED_SOL_MINT,
   pumpBondingCurveAddress,
+  chartMintSupply,
 } from '@paperfund/protocols';
+import type { exitPreflight } from './exit-preflight.js';
+import { buildLiveStandings } from './live-leaderboard.js';
+import { historicalFillFx, saveCapturedFillFx, type HistoricalFxProvider } from './chart-fx.js';
+import { CoinbaseExecutionFxProvider } from './chart-fx-live.js';
 
 export interface PageOptions {
   readonly limit: number;
@@ -56,6 +69,7 @@ type PositionRow = {
   remaining_base_units: string;
   cost_basis_lamports: string;
   realized_pnl_lamports: string;
+  updated_at?: Date;
 };
 
 export type PositionValuation =
@@ -124,12 +138,102 @@ function rankRows<Row extends { score: string; user_id: string }>(rows: Row[]) {
 }
 
 export class CompetitionService {
+  readonly advisory: AdvisoryValuations;
+  private advisorySqlActive = 0;
+  private advisoryViews = 0;
+  private metadataReads = 0;
+  private liveCache:
+    | {
+        key: string;
+        expires: number;
+        pending: Promise<Awaited<ReturnType<typeof buildLiveStandings>>>;
+      }
+    | undefined;
+
+  async liveHourlyLeaderboard(roundId?: string) {
+    const round = (
+      await this.database.pool.query<{
+        id: string;
+        starts_at: Date;
+        ends_at_exclusive: Date;
+        state: string;
+      }>(
+        roundId
+          ? 'select id, starts_at, ends_at_exclusive, state from hourly_rounds where id = $1'
+          : 'select id, starts_at, ends_at_exclusive, state from hourly_rounds where starts_at <= $1 order by starts_at desc limit 1',
+        [roundId ?? this.now()],
+      )
+    ).rows[0];
+    if (!round) return null;
+    const serverTime = this.now();
+    if (round.state === 'FINALIZED') {
+      const final = await this.hourlyLeaderboard(round.id);
+      return {
+        round,
+        phase: 'FINALIZED' as const,
+        status: 'AVAILABLE' as const,
+        serverTime,
+        entries: final!.entries,
+        reason: null,
+      };
+    }
+    if (round.state !== 'OPEN' || serverTime >= round.ends_at_exclusive) {
+      return {
+        round,
+        phase: 'SETTLING' as const,
+        status: 'AVAILABLE' as const,
+        serverTime,
+        entries: [],
+        reason: null,
+      };
+    }
+    const key = round.id;
+    if (!this.liveCache || this.liveCache.key !== key || this.liveCache.expires <= Date.now()) {
+      const pending = withGenericSystemRead(
+        () => buildLiveStandings(this.database, this.advisory.router(), key),
+        this.genericArmed,
+      );
+      const cache = { key, expires: Number.POSITIVE_INFINITY, pending };
+      this.liveCache = cache;
+      void pending.then(
+        () => {
+          cache.expires = Date.now() + 2000;
+        },
+        () => {
+          cache.expires = 0;
+        },
+      );
+    }
+    const result = await this.liveCache.pending;
+    const fresh = (
+      await this.database.pool.query<{ state: string }>(
+        'select state from hourly_rounds where id = $1',
+        [key],
+      )
+    ).rows[0];
+    if (fresh?.state !== 'OPEN' || this.now() >= round.ends_at_exclusive) {
+      return {
+        round: { ...round, state: fresh?.state ?? round.state },
+        phase: 'SETTLING' as const,
+        status: 'AVAILABLE' as const,
+        serverTime: this.now(),
+        entries: [],
+        reason: null,
+      };
+    }
+    return { round, phase: 'LIVE' as const, ...result, serverTime };
+  }
   constructor(
     readonly database: DatabaseService,
     readonly router: ExecutionRouter,
     readonly now: () => Date = () => new Date(),
     readonly rewardConfig: RewardAccountingConfig = defaultRewardAccountingConfig,
-  ) {}
+    readonly chartFx: HistoricalFxProvider = new CoinbaseExecutionFxProvider(),
+    readonly advisoryLimits = { maxConcurrent: 4, backgroundConcurrent: 2 },
+    readonly genericArmed = false,
+  ) {
+    this.advisory = new AdvisoryValuations(router, () => this.now().getTime(), advisoryLimits);
+  }
 
   getCurrentRound() {
     return getCurrentRound(this.database, this.now());
@@ -170,7 +274,7 @@ export class CompetitionService {
     return (
       await this.database.pool.query<PositionRow>(
         `select p.id, p.market_id, a.mint_address, a.decimals, m.venue,
-                p.remaining_base_units, p.cost_basis_lamports, p.realized_pnl_lamports
+                p.remaining_base_units, p.cost_basis_lamports, p.realized_pnl_lamports, p.updated_at
          from positions p join assets a on a.id = p.asset_id join markets m on m.id = p.market_id
          where p.competition_account_id = $1 and p.status = 'OPEN' order by p.opened_at, p.id`,
         [accountId],
@@ -178,17 +282,19 @@ export class CompetitionService {
     ).rows;
   }
 
-  async getPositions(userId: string) {
+  async getPositions(userId: string, signal?: AbortSignal) {
     const account = await this.getCurrentAccount(userId);
     if (!account) return null;
-    const positions = await this.valuePositions(account.positions);
+    const positions = await this.valuePositions(account.positions, signal);
     const available = positions.every(({ valuation }) => valuation.status === 'AVAILABLE');
-    const executablePositionsLamports = available
-      ? positions.reduce(
-          (total, { valuation }) =>
-            total + (valuation.status === 'AVAILABLE' ? valuation.executablePaperSolLamports : 0n),
-          0n,
-        )
+    const conservativeValues = positions.map(({ valuation, sellPreflight }) =>
+      valuation.status === 'AVAILABLE'
+        ? valuation.executablePaperSolLamports
+        : (sellPreflight?.maxExecutableOutputLamports ?? null),
+    );
+    const conservativelyValued = conservativeValues.every((value) => value !== null);
+    const executablePositionsLamports = conservativelyValued
+      ? conservativeValues.reduce((total, value) => total + value!, 0n)
       : null;
     const portfolioEquityLamports =
       executablePositionsLamports === null
@@ -200,6 +306,11 @@ export class CompetitionService {
       cashLamports: BigInt(account.paper_sol_balance_lamports),
       startingPaperSolLamports: BigInt(account.starting_paper_sol_lamports),
       valuationStatus: available ? ('AVAILABLE' as const) : ('UNAVAILABLE' as const),
+      equityValuationStatus: !conservativelyValued
+        ? ('UNAVAILABLE' as const)
+        : available
+          ? ('FULL' as const)
+          : ('PARTIAL_LIQUIDITY' as const),
       executablePositionsLamports,
       portfolioEquityLamports,
       livePnlLamports:
@@ -211,44 +322,293 @@ export class CompetitionService {
     };
   }
 
-  private async valuePositions(positions: readonly PositionRow[]) {
-    const values: Array<PositionRow & { valuation: PositionValuation }> = [];
-    for (const position of positions) {
-      const valuedAt = this.now();
-      try {
-        const result = await valuePortfolioPositions(this.router, [
-          {
-            identity: {
-              protocolId: identifier(position.venue, 'ProtocolId'),
-              marketId: identifier(position.market_id, 'MarketId'),
-              tokenMint: identifier(position.mint_address, 'TokenMint'),
-            },
-            tokenQuantity: tokenBaseUnits(BigInt(position.remaining_base_units)),
-          },
-        ]);
-        const valued = result.positions[0]!;
-        values.push({
-          ...position,
-          valuation: {
-            status: 'AVAILABLE',
-            executablePaperSolLamports: valued.value.paperSolValue,
-            unrealizedPnlLamports:
-              valued.value.paperSolValue - BigInt(position.cost_basis_lamports),
-            currentProtocol: valued.value.identity.protocolId,
-            evidenceFingerprint: valued.evidence.fingerprint,
-            observedAt: valued.evidence.observedAt,
-            chainSlot: valued.evidence.chainSlot,
-            valuedAt,
-          },
-        });
-      } catch (error) {
-        values.push({ ...position, valuation: unavailableValuation(error, valuedAt) });
+  private async valuePositions(positions: readonly PositionRow[], signal?: AbortSignal) {
+    const values: Array<
+      PositionRow & {
+        valuation: PositionValuation;
+        sellPreflight?: Awaited<ReturnType<typeof exitPreflight>>;
       }
-    }
+    > = [];
+    let cursor = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(2, positions.length) }, async () => {
+        while (cursor < positions.length) {
+          const index = cursor++;
+          const position = positions[index]!;
+          const valuedAt = this.now();
+          try {
+            signal?.throwIfAborted();
+            const { exit } = await this.advisory.preflight(
+              {
+                protocolId: identifier(position.venue, 'ProtocolId'),
+                marketId: identifier(position.market_id, 'MarketId'),
+                tokenMint: identifier(position.mint_address, 'TokenMint'),
+              },
+              BigInt(position.remaining_base_units),
+              BigInt(position.cost_basis_lamports),
+              'background',
+              signal,
+            );
+            values[index] = {
+              ...position,
+              sellPreflight: exit,
+              valuation: exit.full.executable
+                ? {
+                    status: 'AVAILABLE',
+                    executablePaperSolLamports: exit.full.outputLamports!,
+                    unrealizedPnlLamports:
+                      exit.full.outputLamports! - BigInt(position.cost_basis_lamports),
+                    currentProtocol: exit.currentProtocol,
+                    evidenceFingerprint: exit.evidenceFingerprint,
+                    observedAt: exit.observedAt,
+                    chainSlot: exit.chainSlot,
+                    valuedAt,
+                  }
+                : { status: 'UNAVAILABLE', reason: exit.status, valuedAt },
+            };
+          } catch (error) {
+            values[index] = { ...position, valuation: unavailableValuation(error, valuedAt) };
+          }
+        }
+      }),
+    );
     return values;
   }
 
-  async buyPreflight(userId: string, mint: string) {
+  /** One coherent owner-scoped financial snapshot; never hold a DB transaction during RPC. */
+  private async viewedSnapshot(userId: string, mint: string) {
+    if (this.advisorySqlActive >= 8)
+      throw new ExecutionEngineError('MARKET_STATE_UNAVAILABLE', 'ADVISORY_SQL_BUSY');
+    this.advisorySqlActive++;
+    const query = this.database.pool.query<{
+      account_id: string;
+      round_id: string;
+      round_state: string;
+      ends_at: Date;
+      id: string | null;
+      market_id: string;
+      venue: string;
+      decimals: number;
+      quantity: string;
+      basis: string;
+      realized: string;
+      updated_at: Date;
+      financial_version?: string;
+    }>({
+      text: `select ca.id account_id,hr.id round_id,hr.state round_state,hr.ends_at_exclusive ends_at,
+      p.id,p.market_id,m.venue,a.decimals,p.remaining_base_units::text quantity,
+      p.cost_basis_lamports::text basis,p.realized_pnl_lamports::text realized,p.updated_at,
+      (select count(*)::text from fills vf join orders vo on vo.id=vf.order_id join markets vm on vm.id=vf.market_id
+       where vo.competition_account_id=ca.id and vm.base_asset_id=a.id) financial_version
+      from competition_accounts ca join hourly_rounds hr on hr.id=ca.hourly_round_id
+      left join assets a on a.mint_address=$2
+      left join positions p on p.competition_account_id=ca.id and p.asset_id=a.id and p.status='OPEN'
+      left join markets m on m.id=p.market_id
+      where ca.user_id=$1 and hr.starts_at <= $3 and hr.ends_at_exclusive > $3`,
+      values: [userId, mint, this.now()],
+      query_timeout: 600,
+    } as QueryConfig & { query_timeout: number });
+    const settled = query.finally(() => {
+      this.advisorySqlActive--;
+    });
+    void settled.catch(() => {});
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        settled,
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () =>
+              reject(new ExecutionEngineError('MARKET_STATE_UNAVAILABLE', 'ADVISORY_SQL_TIMEOUT')),
+            600,
+          );
+        }),
+      ]);
+      return result.rows[0];
+    } catch (error) {
+      if (error instanceof ExecutionEngineError) throw error;
+      throw new ExecutionEngineError('MARKET_STATE_UNAVAILABLE', 'ADVISORY_SQL_UNAVAILABLE');
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  async viewedPosition(userId: string, mint: string, signal?: AbortSignal) {
+    this.advisoryViews++;
+    try {
+      const started = performance.now();
+      const row = await this.viewedSnapshot(userId, mint);
+      let sqlMs = performance.now() - started;
+      const revision = (r: NonNullable<typeof row>) =>
+        createHash('sha256')
+          .update(
+            JSON.stringify([
+              r.account_id,
+              r.round_id,
+              r.id,
+              r.quantity,
+              r.basis,
+              r.realized,
+              r.updated_at,
+              r.financial_version,
+            ]),
+          )
+          .digest('hex');
+      const envelope = {
+        userId,
+        accountId: row?.account_id ?? null,
+        roundId: row?.round_id ?? null,
+        mint,
+        revision: row?.id ? revision(row) : null,
+        financialVersion: row?.financial_version ?? null,
+        positionUpdatedAt: row?.id ? row.updated_at.toISOString() : null,
+        snapshotAt: null as string | null,
+        chainSlot: null as string | null,
+        chainTime: null as string | null,
+        completedAt: this.now().toISOString(),
+      };
+      if (!row)
+        return {
+          ...envelope,
+          status: 'UNAVAILABLE',
+          reason: 'ROUND_ACCOUNT_NOT_FOUND',
+          position: null,
+        };
+      if (row.round_state !== 'OPEN')
+        return { ...envelope, status: 'ROUND_CLOSED', reason: 'ROUND_NOT_OPEN', position: null };
+      if (!row.id)
+        return { ...envelope, status: 'NOT_HELD', reason: 'POSITION_NOT_OPEN', position: null };
+      const position = {
+        id: row.id,
+        mint,
+        originMarketId: row.market_id,
+        originProtocol: row.venue,
+        tokenDecimals: row.decimals,
+        tokenQuantityBaseUnits: row.quantity,
+        costBasisPaperSolLamports: row.basis,
+        realizedPnlLamports: row.realized,
+      };
+      try {
+        signal?.throwIfAborted();
+        const { exit, metrics, chainTime } = await this.advisory.preflight(
+          {
+            protocolId: identifier(row.venue, 'ProtocolId'),
+            marketId: identifier(row.market_id, 'MarketId'),
+            tokenMint: identifier(mint, 'TokenMint'),
+          },
+          BigInt(row.quantity),
+          BigInt(row.basis),
+          'viewed',
+          signal,
+        );
+        const checkStart = performance.now(),
+          fresh = await this.viewedSnapshot(userId, mint);
+        sqlMs += performance.now() - checkStart;
+        signal?.throwIfAborted();
+        if (!fresh || fresh.round_state !== 'OPEN' || this.now() >= row.ends_at)
+          return {
+            ...envelope,
+            completedAt: this.now().toISOString(),
+            status: 'ROUND_CLOSED',
+            reason: 'ROUND_CHANGED',
+            position: null,
+          };
+        if (!fresh.id)
+          return {
+            ...envelope,
+            financialVersion: fresh.financial_version ?? null,
+            revision: null,
+            positionUpdatedAt: null,
+            completedAt: this.now().toISOString(),
+            status: 'NOT_HELD',
+            reason: 'POSITION_NOT_OPEN',
+            position: null,
+          };
+        if (revision(fresh) !== envelope.revision)
+          return {
+            ...envelope,
+            financialVersion: fresh.financial_version ?? null,
+            revision: revision(fresh),
+            positionUpdatedAt: fresh.updated_at.toISOString(),
+            completedAt: this.now().toISOString(),
+            status: 'UNAVAILABLE',
+            reason: 'POSITION_REVISION_CHANGED',
+            position: {
+              ...position,
+              id: fresh.id,
+              originMarketId: fresh.market_id,
+              originProtocol: fresh.venue,
+              tokenDecimals: fresh.decimals,
+              tokenQuantityBaseUnits: fresh.quantity,
+              costBasisPaperSolLamports: fresh.basis,
+              realizedPnlLamports: fresh.realized,
+              valuation: {
+                status: 'UNAVAILABLE' as const,
+                reason: 'POSITION_REVISION_CHANGED',
+                valuedAt: this.now(),
+              },
+            },
+          };
+        if (
+          exit.chainSlot === null ||
+          !chainTime ||
+          !Number.isFinite(Date.parse(chainTime)) ||
+          Date.now() - Date.parse(chainTime) > 2500 ||
+          Date.parse(chainTime) > Date.now() + 1000 ||
+          Date.now() - Date.parse(exit.observedAt) > 2500
+        )
+          throw new Error('SNAPSHOT_FRESHNESS_UNAVAILABLE');
+        const valuation = exit.full.executable
+          ? {
+              status: 'AVAILABLE' as const,
+              executablePaperSolLamports: exit.full.outputLamports!,
+              unrealizedPnlLamports: exit.full.outputLamports! - BigInt(row.basis),
+              currentProtocol: exit.currentProtocol,
+              evidenceFingerprint: exit.evidenceFingerprint,
+              observedAt: exit.observedAt,
+              chainSlot: exit.chainSlot,
+              valuedAt: this.now(),
+            }
+          : { status: 'UNAVAILABLE' as const, reason: exit.status, valuedAt: this.now() };
+        return {
+          ...envelope,
+          status: exit.full.executable ? 'AVAILABLE' : 'UNAVAILABLE',
+          reason: exit.full.executable ? null : exit.status,
+          snapshotAt: exit.observedAt,
+          chainSlot: exit.chainSlot,
+          chainTime,
+          completedAt: this.now().toISOString(),
+          retryAfterMs: this.advisory.retryAfterMs,
+          position: { ...position, valuation, sellPreflight: exit },
+          ...(process.env['VALUATION_DIAGNOSTICS_ENABLED'] === 'true'
+            ? { metrics: { ...metrics, sqlMs, concurrentRequests: this.advisoryViews } }
+            : {}),
+        };
+      } catch (error) {
+        const reason = signal?.aborted
+          ? 'ADVISORY_CANCELED'
+          : error instanceof Error && /^(ADVISORY_|SNAPSHOT_)/.test(error.message)
+            ? safeApiErrorMessage(error)
+            : error instanceof ExecutionEngineError
+              ? error.code
+              : 'VALUATION_UNAVAILABLE';
+        return {
+          ...envelope,
+          status: 'UNAVAILABLE',
+          reason,
+          completedAt: this.now().toISOString(),
+          retryAfterMs: this.advisory.retryAfterMs,
+          position: {
+            ...position,
+            valuation: { status: 'UNAVAILABLE', reason, valuedAt: this.now() },
+          },
+        };
+      }
+    } finally {
+      this.advisoryViews--;
+    }
+  }
+
+  async buyPreflight(userId: string, mint: string, signal?: AbortSignal) {
     const account = await this.getCurrentAccount(userId);
     if (!account) {
       throw new FinancialServiceError(
@@ -258,12 +618,14 @@ export class CompetitionService {
     }
     const positions = await this.valuePositions(account.positions);
     const allAvailable = positions.every(({ valuation }) => valuation.status === 'AVAILABLE');
-    const positionValues = allAvailable
-      ? positions.map(({ valuation }) =>
-          paperSolBaseUnits(
-            valuation.status === 'AVAILABLE' ? valuation.executablePaperSolLamports : 0n,
-          ),
-        )
+    const conservativeValues = positions.map(({ valuation, sellPreflight }) =>
+      valuation.status === 'AVAILABLE'
+        ? valuation.executablePaperSolLamports
+        : (sellPreflight?.maxExecutableOutputLamports ?? null),
+    );
+    const conservativelyValued = conservativeValues.every((value) => value !== null);
+    const positionValues = conservativelyValued
+      ? conservativeValues.map((value) => paperSolBaseUnits(value!))
       : null;
     const cash = paperSolBaseUnits(BigInt(account.paper_sol_balance_lamports));
     const equity = positionValues ? calculatePortfolioEquity(cash, positionValues) : null;
@@ -282,7 +644,8 @@ export class CompetitionService {
       | Awaited<ReturnType<CompetitionService['marketSupport']>>
       | { mint: string; supported: false; reason: string };
     try {
-      market = await this.marketSupport(mint);
+      signal?.throwIfAborted();
+      market = await this.marketSupport(mint, signal);
     } catch (error) {
       market = {
         mint,
@@ -312,6 +675,25 @@ export class CompetitionService {
       protocol: market.supported ? market.executionProtocol : null,
       marketStatus: market.supported ? market.status : market.reason,
       valuationStatus: allAvailable ? ('AVAILABLE' as const) : ('UNAVAILABLE' as const),
+      equityValuationStatus: !conservativelyValued
+        ? ('UNAVAILABLE' as const)
+        : allAvailable
+          ? ('FULL' as const)
+          : ('PARTIAL_LIQUIDITY' as const),
+      blockingReason: !market.supported
+        ? market.reason
+        : 'genericEntryAllowed' in market && market.genericEntryAllowed !== true
+          ? 'GENERIC_OPERATOR_ENTRY_DISABLED'
+          : !conservativelyValued
+            ? 'PORTFOLIO_EQUITY_UNAVAILABLE'
+            : null,
+      unavailablePositions: positions
+        .filter(({ valuation }) => valuation.status !== 'AVAILABLE')
+        .map(({ id, mint_address, valuation }) => ({
+          id,
+          mint: mint_address,
+          reason: valuation.status !== 'AVAILABLE' ? valuation.reason : null,
+        })),
       unavailablePositionIds: positions
         .filter(({ valuation }) => valuation.status !== 'AVAILABLE')
         .map(({ id }) => id),
@@ -324,25 +706,28 @@ export class CompetitionService {
     decimals: number;
     protocolId: string;
     migrated: boolean;
+    state: MarketState;
   }> {
-    const marketId = await pumpBondingCurveAddress(mint);
-    const identity: MarketIdentity = {
-      protocolId: PUMP_FUN_PROTOCOL_ID,
-      marketId: identifier(marketId, 'MarketId'),
-      tokenMint: identifier(mint, 'TokenMint'),
-    };
+    const identity: MarketIdentity = this.router.mintResolver
+      ? await this.router.mintResolver(mint)
+      : {
+          protocolId: PUMP_FUN_PROTOCOL_ID,
+          marketId: identifier(await pumpBondingCurveAddress(mint), 'MarketId'),
+          tokenMint: identifier(mint, 'TokenMint'),
+        };
+    const marketId = identity.marketId;
     let route;
     let state;
     try {
-      const resolved = await this.router.resolvePositionRoute(identity);
+      const resolved = await this.router.loadPositionRoute(identity);
       route = resolved.route;
-      state = await resolved.adapter.loadMarketState(route.executionIdentity);
+      state = resolved.state;
     } catch (error) {
       if (error instanceof ExecutionEngineError) throw error;
       throw new ExecutionEngineError('MARKET_STATE_UNAVAILABLE', 'Market state is unavailable.');
     }
     const decimalsValue = state.normalizedState['tokenDecimals'];
-    const decimals = typeof decimalsValue === 'string' ? Number(decimalsValue) : 6;
+    const decimals = typeof decimalsValue === 'string' ? Number(decimalsValue) : NaN;
     if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) {
       throw new ExecutionEngineError('INVALID_MARKET_STATE', 'Token decimals are invalid.');
     }
@@ -372,12 +757,12 @@ export class CompetitionService {
     await this.database.pool.query(
       `insert into markets (id, base_asset_id, quote_asset_id, venue, provider_market_id)
        values ($1, $2, $3, $4, $1) on conflict do nothing`,
-      [marketId, persistedAssetId, quoteAssetId, PUMP_FUN_PROTOCOL_ID],
+      [marketId, persistedAssetId, quoteAssetId, identity.protocolId],
     );
     if (route.migrated) {
       await this.database.pool.query(
         `insert into markets (id, base_asset_id, quote_asset_id, venue, provider_market_id, metadata)
-         values ($1, $2, $3, $4, $1, jsonb_build_object('migrationResolvedFromMarketId', $5))
+         values ($1, $2, $3, $4, $1, jsonb_build_object('migrationResolvedFromMarketId', $5::text))
          on conflict do nothing`,
         [
           route.executionIdentity.marketId,
@@ -393,38 +778,99 @@ export class CompetitionService {
       decimals,
       protocolId: route.executionIdentity.protocolId,
       migrated: route.migrated,
+      state,
     };
   }
 
-  async marketSupport(mint: string) {
+  private chartMetadataReads = 0;
+  async chartMetadata(context: string) {
+    if (this.chartMetadataReads >= 2)
+      throw new ExecutionEngineError('MARKET_STATE_UNAVAILABLE', 'CHART_METADATA_BUSY');
+    if (!this.router.chartMetadataResolver) throw new Error('CHART_TOKEN_METADATA_MISSING');
+    this.chartMetadataReads++;
     try {
-      const market = await this.ensurePumpMarket(mint);
-      const route = await this.router.resolvePositionRoute(market.identity);
-      return {
-        mint,
-        supported: true,
-        executionProtocol: route.route.executionIdentity.protocolId,
-        status: route.route.migrated ? 'MIGRATED_POOL' : 'ACTIVE_BONDING_CURVE',
-        marketId: route.route.executionIdentity.marketId,
-        originMarketId: market.identity.marketId,
-        tokenDecimals: market.decimals,
-      };
-    } catch (error) {
-      if (
-        error instanceof ExecutionEngineError &&
-        [
-          'MARKET_ACCOUNT_NOT_FOUND',
-          'UNSUPPORTED_PROTOCOL',
-          'UNSUPPORTED_MIGRATED_PROTOCOL',
-        ].includes(error.code)
-      ) {
-        return { mint, supported: false, reason: error.code };
-      }
-      throw error;
+      return await withAdvisoryRead(
+        {
+          signal: AbortSignal.timeout(8000),
+          metrics: { rpcRequests: 0, rpcMs: 0, retries: 0, rateLimits: 0 },
+        },
+        () => this.router.chartMetadataResolver!(context),
+      );
+    } finally {
+      this.chartMetadataReads--;
+    }
+  }
+
+  async marketSupport(mint: string, signal?: AbortSignal) {
+    if (this.metadataReads >= 2)
+      throw new ExecutionEngineError('MARKET_STATE_UNAVAILABLE', 'ADVISORY_METADATA_BUSY');
+    this.metadataReads++;
+    const bounded = AbortSignal.any([
+      signal ?? AbortSignal.timeout(8000),
+      AbortSignal.timeout(8000),
+    ]);
+    try {
+      return await withAdvisoryRead(
+        { signal: bounded, metrics: { rpcRequests: 0, rpcMs: 0, retries: 0, rateLimits: 0 } },
+        async () => {
+          try {
+            const requestedContext = mint;
+            if (this.router.contextResolver) mint = await this.router.contextResolver(mint);
+            const market = await this.ensurePumpMarket(mint);
+            const state = market.state;
+            return {
+              mint,
+              requestedContext,
+              supported: true as const,
+              executionProtocol: state.identity.protocolId,
+              status: market.migrated
+                ? 'MIGRATED_POOL'
+                : market.identity.protocolId === PUMP_FUN_PROTOCOL_ID
+                  ? 'ACTIVE_BONDING_CURVE'
+                  : 'RESOLVED_ROUTE',
+              route: state.normalizedState['hops'] ?? null,
+              routeIdentity: executionRouteRecord(state, true),
+              ...(state.identity.protocolId === 'GENERIC_PUMP_SWAP'
+                ? {
+                    genericEntryAllowed:
+                      state.normalizedState['genericBuyAdmissionAllowed'] === true,
+                  }
+                : {}),
+              chainSlot: state.chainSlot?.toString() ?? null,
+              marketId: state.identity.marketId,
+              originMarketId: market.identity.marketId,
+              tokenDecimals: market.decimals,
+              tokenSupplyBaseUnits: chartMintSupply(state.normalizedState, mint),
+            };
+          } catch (error) {
+            if (
+              error instanceof ExecutionEngineError &&
+              [
+                'MARKET_ACCOUNT_NOT_FOUND',
+                'UNSUPPORTED_PROTOCOL',
+                'UNSUPPORTED_MIGRATED_PROTOCOL',
+                'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+                'INSUFFICIENT_EXECUTABLE_LIQUIDITY',
+              ].includes(error.code)
+            ) {
+              return {
+                mint,
+                supported: false as const,
+                reason: error.code,
+                diagnostics: safeApiErrorMessage(error),
+              };
+            }
+            throw error;
+          }
+        },
+      );
+    } finally {
+      this.metadataReads--;
     }
   }
 
   async buy(userId: string, input: { mint: string; paperSol: string; idempotencyKey: string }) {
+    await assertPaperBuyAdmission(this.database, { userId });
     const account = await this.getCurrentAccount(userId);
     if (!account)
       throw new FinancialServiceError(
@@ -440,28 +886,54 @@ export class CompetitionService {
         'paperSol must be non-negative decimal text with at most nine decimal places.',
       );
     }
-    const originMarketId = await pumpBondingCurveAddress(input.mint);
+    const originMarketId =
+      account.positions.find((p) => p.mint_address === input.mint)?.market_id ??
+      (await pumpBondingCurveAddress(input.mint));
     const registered = (
-      await this.database.pool.query<{ id: string }>('select id from markets where id = $1', [
-        originMarketId,
-      ])
+      await this.database.pool.query<{ id: string; venue: string }>(
+        'select id, venue from markets where id = $1',
+        [originMarketId],
+      )
     ).rows[0];
     const market = registered
       ? {
           identity: {
-            protocolId: PUMP_FUN_PROTOCOL_ID,
+            protocolId: identifier(registered.venue ?? PUMP_FUN_PROTOCOL_ID, 'ProtocolId'),
             marketId: identifier(originMarketId, 'MarketId'),
             tokenMint: identifier(input.mint, 'TokenMint'),
           },
         }
       : await this.ensurePumpMarket(input.mint);
-    return executePaperBuy(this.database, this.router, {
+    const executionTime = this.now();
+    // Start optional presentation capture in parallel; it cannot gate execution or alter the quote.
+    const chartObservation = Promise.resolve()
+      .then(() => this.chartFx.lookup(executionTime))
+      .catch(() => ({
+        status: 'UNAVAILABLE' as const,
+        reason: 'CAPTURED_FX_PROVIDER_UNAVAILABLE',
+      }));
+    const result = await executePaperBuy(this.database, this.router, {
       competitionAccountId: account.id,
       marketId: market.identity.marketId,
       requestedPaperSolLamports,
       idempotencyKey: `user:${userId}:${input.idempotencyKey}`,
-      authoritativeTimestamp: this.now(),
+      authoritativeTimestamp: executionTime,
     });
+    this.liveCache = undefined;
+    this.advisory.invalidate();
+    try {
+      void saveCapturedFillFx(
+        this.database,
+        result.fillId,
+        result.executedAt,
+        chartObservation,
+      ).catch(() => {
+        /* Optional enrichment completes independently of the trade response. */
+      });
+    } catch {
+      /* The BUY already committed; optional display failure cannot change its outcome. */
+    }
+    return result;
   }
 
   async sell(userId: string, input: { mint: string; quantity: string; idempotencyKey: string }) {
@@ -500,13 +972,34 @@ export class CompetitionService {
         'No position exists for this mint.',
       );
     const scopedKey = `user:${userId}:${input.idempotencyKey}`;
+    const executionTime = this.now();
+    const chartObservation = Promise.resolve()
+      .then(() => this.chartFx.lookup(executionTime))
+      .catch(() => ({
+        status: 'UNAVAILABLE' as const,
+        reason: 'CAPTURED_FX_PROVIDER_UNAVAILABLE',
+      }));
     if (input.quantity === 'ALL') {
-      return executePaperSellAll(this.database, this.router, {
+      const result = await executePaperSellAll(this.database, this.router, {
         competitionAccountId: account.id,
         marketId: position.market_id,
         idempotencyKey: scopedKey,
-        authoritativeTimestamp: this.now(),
+        authoritativeTimestamp: executionTime,
       });
+      this.liveCache = undefined;
+      try {
+        void saveCapturedFillFx(
+          this.database,
+          result.fillId,
+          result.executedAt,
+          chartObservation,
+        ).catch(() => {
+          /* Optional enrichment completes independently of the trade response. */
+        });
+      } catch {
+        /* Optional display only. */
+      }
+      return result;
     }
     if (!wasOpen) {
       const replay = (
@@ -524,22 +1017,40 @@ export class CompetitionService {
       }
     }
     const quantity = BigInt(input.quantity);
-    return executePaperSell(this.database, this.router, {
+    const result = await executePaperSell(this.database, this.router, {
       competitionAccountId: account.id,
       marketId: position.market_id,
       requestedTokenQuantity: quantity,
       idempotencyKey: scopedKey,
-      authoritativeTimestamp: this.now(),
+      authoritativeTimestamp: executionTime,
     });
+    this.liveCache = undefined;
+    try {
+      void saveCapturedFillFx(
+        this.database,
+        result.fillId,
+        result.executedAt,
+        chartObservation,
+      ).catch(() => {
+        /* Optional enrichment completes independently of the trade response. */
+      });
+    } catch {
+      /* Optional display only. */
+    }
+    return result;
   }
 
-  async trades(userId: string, page: PageOptions) {
+  async trades(userId: string, page: PageOptions, mint?: string) {
     const cursor = decodeCursor(page.cursor);
     const values: unknown[] = [userId, page.limit + 1];
     let cursorSql = '';
     if (cursor) {
       values.push(cursor.timestamp, cursor.id);
       cursorSql = 'and (f.executed_at, f.id) < ($3::timestamptz, $4)';
+    }
+    if (mint) {
+      values.push(mint);
+      cursorSql += ` and a.mint_address = $${values.length}`;
     }
     const rows = (
       await this.database.pool.query<{
@@ -549,6 +1060,10 @@ export class CompetitionService {
         side: string;
         execution_context: string;
         mint_address: string;
+        chart_state: MarketState['normalizedState'] | null;
+        competition_account_id: string;
+        owner_user_id: string;
+        chart_closures: { id: string; quantity: string | null; at: string }[] | null;
         protocol_id: string;
         requested_base_units: string | null;
         requested_quote_lamports: string | null;
@@ -558,21 +1073,57 @@ export class CompetitionService {
         actual_input_lamports: string | null;
         actual_output_lamports: string | null;
         realized_pnl_lamports: string;
+        cost_basis_lamports_removed: string;
         executed_at: Date;
       }>(
-        `select f.id, f.order_id, ca.hourly_round_id, f.side, o.execution_context,
-                a.mint_address, f.protocol_id, o.requested_base_units, o.requested_quote_lamports,
+        `select f.id, f.order_id, ca.id as competition_account_id, ca.user_id as owner_user_id, ca.hourly_round_id, f.side, o.execution_context,
+                a.mint_address, a.decimals as token_decimals, f.protocol_id, o.requested_base_units, o.requested_quote_lamports,
                 f.base_quantity, f.quote_lamports, f.fee_lamports, f.actual_input_lamports,
-                f.actual_output_lamports, f.realized_pnl_lamports, f.executed_at
+                f.actual_output_lamports, f.realized_pnl_lamports, f.cost_basis_lamports_removed, f.executed_at,
+                mse.normalized_state as chart_state,
+                (select jsonb_agg(jsonb_build_object('id',j.id,'quantity',coalesce(j.metadata->>'tokenQuantity',r.token_quantity::text),'at',j.created_at))
+                 from journal_transactions j join positions cp on cp.id=j.source_entity_id
+                 left join settlement_writeoff_metadata_repairs r on r.journal_transaction_id=j.id
+                 where j.competition_account_id=ca.id and cp.asset_id=a.id
+                 and j.operation_type='FORCED_HOURLY_SETTLEMENT_WRITEOFF') as chart_closures
          from fills f join orders o on o.id = f.order_id
          join competition_accounts ca on ca.id = o.competition_account_id
          join markets m on m.id = f.market_id join assets a on a.id = m.base_asset_id
+         left join market_state_evidence mse on mse.id = f.market_state_evidence_id
          where ca.user_id = $1 ${cursorSql}
          order by f.executed_at desc, f.id desc limit $2`,
         values,
       )
     ).rows;
-    const items = rows.slice(0, page.limit);
+    const items: Array<
+      Omit<(typeof rows)[number], 'chart_state'> & {
+        token_supply_base_units: string | null;
+        sol_usd_at_execution: string | null;
+        sol_usd_fx: HistoricalChartFx;
+      }
+    > = [];
+    const chartDeadline = Date.now() + 2500;
+    // Bounded reads; oracle availability cannot block financial trade history.
+    for (let start = 0; start < Math.min(rows.length, page.limit); start += 4) {
+      items.push(
+        ...(await Promise.all(
+          rows
+            .slice(start, Math.min(start + 4, page.limit))
+            .map(async ({ chart_state, ...row }) => {
+              const fx =
+                mint && Date.now() < chartDeadline
+                  ? await historicalFillFx(this.database, row.id, row.executed_at)
+                  : { status: 'UNAVAILABLE' as const, reason: 'HISTORICAL_FX_ENRICHMENT_PENDING' };
+              return {
+                ...row,
+                token_supply_base_units: chartMintSupply(chart_state, row.mint_address),
+                sol_usd_at_execution: fx.status === 'AVAILABLE' ? fx.rate : null,
+                sol_usd_fx: fx,
+              };
+            }),
+        )),
+      );
+    }
     const last = items.at(-1);
     return {
       items,

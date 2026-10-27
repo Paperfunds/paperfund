@@ -1,3 +1,5 @@
+import { LEGACY_SETTLEMENT_POLICY, recordSettlementReview } from './legacy-settlement.js';
+import { withGenericAccount } from '@paperfund/protocols';
 import { createHash } from 'node:crypto';
 
 import type { PoolClient, QueryResult, QueryResultRow } from 'pg';
@@ -12,6 +14,7 @@ import {
 } from '@paperfund/core';
 import {
   createMarketStateEvidence,
+  canonicalExitPreflight,
   ExecutionEngineError,
   type ExecutionRouter,
   type JsonObject,
@@ -21,11 +24,12 @@ import {
   type SimulatedExecution,
 } from '@paperfund/execution';
 
-import type { DatabaseService } from './database.js';
+import type { DatabaseService, PaperBuyAdmissionContext } from './database.js';
 
 export const DEFAULT_STARTING_PAPER_SOL_LAMPORTS = 10_000_000_000n;
 
 export type FinancialErrorCode =
+  | 'PAPER_BUY_DISABLED'
   | 'INVALID_FINANCIAL_INPUT'
   | 'INVALID_SELL_QUANTITY'
   | 'IDEMPOTENCY_CONFLICT'
@@ -48,8 +52,11 @@ export type FinancialErrorCode =
   | 'POSITION_EXECUTION_ROUTE_UNAVAILABLE'
   | 'RPC_TIMEOUT'
   | 'RPC_ERROR'
+  | 'RPC_UNAVAILABLE'
   | 'POSITION_VALUATION_FAILED'
   | 'INVALID_EXECUTION_RESULT'
+  | 'INSUFFICIENT_EXECUTABLE_LIQUIDITY'
+  | 'ZERO_EXECUTABLE_OUTPUT'
   | 'PROTOCOL_DISABLED'
   | 'ADAPTER_VERSION_UNAVAILABLE'
   | 'EVIDENCE_CORRUPTED'
@@ -57,7 +64,8 @@ export type FinancialErrorCode =
   | 'SETTLEMENT_EXECUTION_FAILED'
   | 'TOKEN_LIMIT_EXCEEDED'
   | 'FINALIZATION_CONFLICT'
-  | 'DAILY_ATTRIBUTION_MISMATCH';
+  | 'DAILY_ATTRIBUTION_MISMATCH'
+  | 'SETTLEMENT_REVIEW';
 
 export class FinancialServiceError extends Error {
   readonly code: FinancialErrorCode;
@@ -69,6 +77,12 @@ export class FinancialServiceError extends Error {
   }
 }
 
+/** Fail closed independently of protocol flags, terminal, expired grants or idempotent results. */
+export async function assertPaperBuyAdmission(database: DatabaseService, context: PaperBuyAdmissionContext): Promise<void> {
+  let allowed = false;
+  try { allowed = (await database.authorizePaperBuy?.(context)) === true; } catch { /* unavailable authority denies */ }
+  if (!allowed) throw new FinancialServiceError('PAPER_BUY_DISABLED', 'Paper BUY entry is disabled by server admission control.');
+}
 export interface CompetitionAccountFinancialState {
   readonly id: string;
   readonly userId: string;
@@ -355,6 +369,7 @@ async function insertJournal(
     readonly sourceEntityType: string;
     readonly sourceEntityId: string;
     readonly idempotencyRecordId: string;
+    readonly metadata?: JsonObject;
     readonly entries: readonly JournalEntryInput[];
   },
 ): Promise<void> {
@@ -364,13 +379,17 @@ async function insertJournal(
   const credit = input.entries
     .filter(({ direction }) => direction === 'CREDIT')
     .reduce((total, { amountLamports }) => total + amountLamports, 0n);
-  if (input.entries.length < 2 || debit !== credit || debit <= 0n) {
+  const zeroCostWriteoff =
+    input.operationType === 'FORCED_HOURLY_SETTLEMENT_WRITEOFF' &&
+    input.entries.length === 0 &&
+    input.metadata?.['costBasisLamports'] === '0';
+  if (!zeroCostWriteoff && (input.entries.length < 2 || debit !== credit || debit <= 0n)) {
     throw new FinancialServiceError('INVALID_FINANCIAL_INPUT', 'Journal entries must balance.');
   }
   await client.query(
     `insert into journal_transactions
-      (id, competition_account_id, operation_type, source_entity_type, source_entity_id, idempotency_record_id)
-     values ($1, $2, $3, $4, $5, $6)`,
+      (id, competition_account_id, operation_type, source_entity_type, source_entity_id, idempotency_record_id, metadata)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
     [
       input.id,
       input.competitionAccountId,
@@ -378,6 +397,7 @@ async function insertJournal(
       input.sourceEntityType,
       input.sourceEntityId,
       input.idempotencyRecordId,
+      JSON.stringify(input.metadata ?? {}),
     ],
   );
   for (const [index, entry] of input.entries.entries()) {
@@ -663,6 +683,7 @@ export async function createOrder(
     readonly idempotencyKey: string;
   },
 ): Promise<string> {
+  if (input.side === 'BUY') await assertPaperBuyAdmission(database, { accountId: input.accountId });
   const validRequest =
     (input.side === 'BUY' &&
       input.requestedQuoteLamports !== undefined &&
@@ -677,6 +698,7 @@ export async function createOrder(
   }
   const requestHash = fingerprint(input);
   return runFinancialTransaction(database, async (client) => {
+    if (input.side === 'BUY') await assertPaperBuyAdmission(database, { accountId: input.accountId, client });
     const authority = firstRow(
       await client.query<{ state: string; finalized_at: Date | null }>(
         `select r.state, a.finalized_at
@@ -814,6 +836,7 @@ export async function applyFill(
       ),
       'Order',
     );
+    if (order.side === 'BUY') await assertPaperBuyAdmission(database, { accountId: order.competition_account_id, client });
     const account = await getAccountStateWithClient(client, order.competition_account_id, true);
     const claimed = await claimIdempotency(client, {
       operationClass: 'FILL_APPLICATION',
@@ -1340,6 +1363,15 @@ export async function reconcileAccountLedger(
     ),
     'Fill aggregate',
   );
+  const writeoffAggregate = firstRow<{ quantity: string }>(
+    await database.pool.query(
+      `select coalesce(sum(coalesce(r.token_quantity, (j.metadata->>'tokenQuantity')::numeric)), 0)::text as quantity
+       from journal_transactions j left join settlement_writeoff_metadata_repairs r on r.journal_transaction_id = j.id
+       where j.competition_account_id = $1 and j.source_entity_type = 'SETTLEMENT_WRITEOFF'`,
+      [accountId],
+    ),
+    'Settlement write-off aggregate',
+  );
   const ledger = await database.pool.query<{
     account_code: LedgerAccountCode;
     balance: string;
@@ -1375,7 +1407,7 @@ export async function reconcileAccountLedger(
   const realizedPnl = grossTradingPnl - tradingFees;
   const materializedPositionCost = BigInt(positionAggregate.cost);
   const materializedQuantity = BigInt(positionAggregate.quantity);
-  const quantityFromFills = BigInt(fillAggregate.quantity);
+  const quantityFromFills = BigInt(fillAggregate.quantity) - BigInt(writeoffAggregate.quantity);
   const journalCount = Number(journals.total);
   const balancedJournalCount = Number(journals.balanced);
   return {
@@ -1454,6 +1486,8 @@ function executionPrice(numerator: bigint, denominator: bigint): string {
 
 function normalizedFeeBreakdown(execution: SimulatedExecution): JsonObject {
   return {
+    canonicalRoute: execution.executionDetails?.['canonicalRoute'] ?? null,
+    executionDetails: execution.executionDetails ?? null,
     fees: execution.quote.fees.map((item) => ({
       category: item.category,
       asset: item.amount.asset,
@@ -1497,6 +1531,8 @@ function validateAuthoritativeExecution(input: {
     execution.actualInput.asset !== 'PAPER_SOL' ||
     execution.actualOutput.asset !== 'TOKEN' ||
     execution.actualOutput.tokenMint !== input.identity.tokenMint ||
+    typeof execution.actualInput.amount !== 'bigint' ||
+    typeof execution.actualOutput.amount !== 'bigint' ||
     execution.actualInput.amount <= 0n ||
     execution.actualOutput.amount <= 0n ||
     execution.actualInput.amount > input.requestedPaperSolLamports ||
@@ -1598,8 +1634,9 @@ async function getAuthoritativePaperBuyResult(
        from fills f
        join orders o on o.id = f.order_id
        join competition_accounts a on a.id = o.competition_account_id
+       left join order_market_state_evidence link on link.order_id = o.id and link.purpose = 'BUY_EXECUTION'
        join positions p on p.competition_account_id = o.competition_account_id
-                       and p.market_id = f.market_id
+                       and (p.id = link.position_id or (link.position_id is null and p.market_id = f.market_id))
        join market_state_evidence e on e.id = f.market_state_evidence_id
        where f.id = $1`,
       [fillId],
@@ -1640,6 +1677,8 @@ function translateExecutionError(error: unknown, valuation: boolean): never {
     }
     if (
       error.code === 'PROTOCOL_DISABLED' ||
+      error.code === 'INSUFFICIENT_EXECUTABLE_LIQUIDITY' ||
+      error.code === 'ZERO_EXECUTABLE_OUTPUT' ||
       error.code === 'ADAPTER_VERSION_UNAVAILABLE' ||
       error.code === 'EVIDENCE_CORRUPTED'
     ) {
@@ -1652,6 +1691,7 @@ function translateExecutionError(error: unknown, valuation: boolean): never {
       error.code === 'UNSUPPORTED_MIGRATED_PROTOCOL' ||
       error.code === 'POSITION_EXECUTION_ROUTE_UNAVAILABLE' ||
       error.code === 'RPC_TIMEOUT' ||
+      error.code === 'RPC_UNAVAILABLE' ||
       error.code === 'RPC_ERROR'
     ) {
       throw new FinancialServiceError(error.code, error.message);
@@ -1681,6 +1721,7 @@ export async function executePaperBuy(
     readonly authoritativeTimestamp: Date;
   },
 ): Promise<AuthoritativePaperBuyResult> {
+  await assertPaperBuyAdmission(database, { accountId: input.competitionAccountId });
   assertPositive(input.requestedPaperSolLamports, 'Requested Paper SOL');
   if (Number.isNaN(input.authoritativeTimestamp.getTime())) {
     throw new FinancialServiceError('INVALID_FINANCIAL_INPUT', 'Timestamp is invalid.');
@@ -1695,6 +1736,8 @@ export async function executePaperBuy(
   const executionId = deterministicEntityId('authoritative-buy-execution', input.idempotencyKey);
 
   return runFinancialTransaction(database, async (client) => {
+    await assertPaperBuyAdmission(database, { accountId: input.competitionAccountId, client });
+    await database.lockMarketExecution?.(client, input.competitionAccountId);
     const claimed = await claimIdempotency(client, {
       operationClass: 'AUTHORITATIVE_PAPER_BUY',
       idempotencyKey: input.idempotencyKey,
@@ -1770,81 +1813,61 @@ export async function executePaperBuy(
       value: bigint;
       evidence: MarketStateEvidence;
     }[] = [];
-    for (const position of positions) {
+    if (database.valueMarketPortfolio) {
+      try {
+        const values = await database.valueMarketPortfolio(
+          positions.map((p) => ({
+            positionId: p.id,
+            identity: {
+              protocolId: identifier(p.venue, 'ProtocolId'),
+              marketId: identifier(p.market_id, 'MarketId'),
+              tokenMint: identifier(p.mint_address, 'TokenMint'),
+            },
+            quantity: BigInt(p.remaining_base_units),
+          })),
+        );
+        if (values.length !== positions.length)
+          throw new ExecutionEngineError(
+            'INVALID_EXECUTION_RESULT',
+            'Portfolio valuation is incomplete.',
+          );
+        for (const [i, value] of values.entries()) {
+          const row = positions[i]!;
+          if (
+            value.positionId !== row.id ||
+            typeof value.value !== 'bigint' ||
+            value.value < 0n ||
+            value.evidence.identity.tokenMint !== row.mint_address
+          )
+            throw new ExecutionEngineError(
+              'INVALID_EXECUTION_RESULT',
+              'Portfolio valuation does not match the locked positions.',
+            );
+          valuations.push({ row, value: value.value, evidence: value.evidence });
+        }
+      } catch (error) {
+        translateExecutionError(error, true);
+      }
+    } else for (const position of positions) {
       const identity: MarketIdentity = {
         protocolId: identifier(position.venue, 'ProtocolId'),
         marketId: identifier(position.market_id, 'MarketId'),
         tokenMint: identifier(position.mint_address, 'TokenMint'),
       };
       try {
-        const { route, adapter } = await router.resolvePositionRoute(identity);
-        if (route.migrated) {
-          await client.query(
-            `insert into markets
-              (id, base_asset_id, quote_asset_id, venue, provider_market_id, metadata)
-             select $1, base_asset_id, quote_asset_id, $2, $1,
-                    jsonb_build_object('migrationResolvedFromMarketId', id)
-             from markets where id = $3
-             on conflict do nothing`,
-            [
-              route.executionIdentity.marketId,
-              route.executionIdentity.protocolId,
-              identity.marketId,
-            ],
-          );
-          const routedMarket = (
-            await client.query<AuthoritativeMarketRow>(
-              `select m.id, m.venue, m.base_asset_id, a.mint_address
-               from markets m join assets a on a.id = m.base_asset_id where m.id = $1`,
-              [route.executionIdentity.marketId],
-            )
-          ).rows[0];
-          if (
-            !routedMarket ||
-            routedMarket.venue !== route.executionIdentity.protocolId ||
-            routedMarket.base_asset_id !== position.asset_id ||
-            routedMarket.mint_address !== position.mint_address
-          ) {
-            throw new ExecutionEngineError(
-              'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
-              'The migrated valuation market is not registered for this position asset.',
-            );
-          }
-        }
-        const state = await adapter.loadMarketState(route.executionIdentity);
-        const evidence = createMarketStateEvidence(state);
-        if (
-          evidence.identity.protocolId !== route.executionIdentity.protocolId ||
-          evidence.identity.marketId !== route.executionIdentity.marketId ||
-          evidence.identity.tokenMint !== identity.tokenMint ||
-          evidence.adapterVersion !== adapter.adapterVersion
-        ) {
-          throw new ExecutionEngineError(
-            'INVALID_MARKET_STATE',
-            'Loaded valuation state does not match its requested market.',
-          );
-        }
-        const valuation = await adapter.valuePositionForExit(
-          {
-            identity: route.executionIdentity,
-            tokenQuantity: tokenBaseUnits(BigInt(position.remaining_base_units)),
-          },
-          state,
+        const exit = await withGenericAccount(input.competitionAccountId, () =>
+          canonicalExitPreflight(
+            router,
+            identity,
+            BigInt(position.remaining_base_units),
+            BigInt(position.cost_basis_lamports),
+          ),
         );
-        if (
-          valuation.identity.marketId !== route.executionIdentity.marketId ||
-          valuation.identity.protocolId !== route.executionIdentity.protocolId ||
-          valuation.identity.tokenMint !== identity.tokenMint ||
-          valuation.marketStateFingerprint !== evidence.fingerprint ||
-          valuation.adapterVersion !== adapter.adapterVersion ||
-          valuation.paperSolValue < 0n
-        ) {
-          throw new ExecutionEngineError(
-            'INVALID_EXECUTION_RESULT',
-            'Position valuation does not match its market state.',
-          );
-        }
-        valuations.push({ row: position, value: valuation.paperSolValue, evidence });
+        valuations.push({
+          row: position,
+          value: exit.maxExecutableOutputLamports,
+          evidence: exit.evidence,
+        });
       } catch (error) {
         translateExecutionError(error, true);
       }
@@ -1896,16 +1919,65 @@ export async function executePaperBuy(
     let execution: SimulatedExecution;
     let buyEvidence: MarketStateEvidence;
     let adapterVersion: string;
+    let executionIdentity = targetIdentity;
     try {
-      const adapter = router.resolve(targetIdentity.protocolId);
-      const state = await adapter.loadMarketState(targetIdentity);
+      const { route, adapter, state } = await withGenericAccount(input.competitionAccountId, () =>
+        router.loadPositionRoute(targetIdentity),
+      );
+      executionIdentity = route.executionIdentity;
+      // Temporary new-BUY containment only. Inspect the selected route, never discovery
+      // candidates or mint identity. SELL, settlement and historical replay bypass this point.
+      const selectedHops = state.normalizedState['hops'];
+      if (
+        Array.isArray(selectedHops) &&
+        selectedHops.some(
+          (hop) =>
+            hop !== null &&
+            typeof hop === 'object' &&
+            !Array.isArray(hop) &&
+            (hop['pool'] === 'J7wveuS29NdZDEDuJp8C7W1BvkkLU88bWHsCtLGaCcbx' ||
+              hop['pool'] === '2bDQiRwzoeqLfZ2nQ8decjqhDyAp8f1kx8WW33jwhYXH'),
+        )
+      ) {
+        throw new FinancialServiceError(
+          'UNSUPPORTED_PROTOCOL',
+          'New BUYs through this pool are temporarily unsupported pending sequential-liquidity simulation support.',
+        );
+      }
+      if (route.migrated) {
+        await client.query(
+          `insert into markets (id, base_asset_id, quote_asset_id, venue, provider_market_id, metadata)
+           select $1, base_asset_id, quote_asset_id, $2, $1,
+                  jsonb_build_object('migrationResolvedFromMarketId', id)
+           from markets where id = $3 on conflict do nothing`,
+          [executionIdentity.marketId, executionIdentity.protocolId, targetIdentity.marketId],
+        );
+      }
+      const destination = firstRow(
+        await client.query<AuthoritativeMarketRow>(
+          `select m.id, m.venue, m.base_asset_id, a.mint_address
+         from markets m join assets a on a.id = m.base_asset_id where m.id = $1`,
+          [executionIdentity.marketId],
+        ),
+        'Execution market',
+      );
+      if (
+        destination.venue !== executionIdentity.protocolId ||
+        destination.base_asset_id !== targetMarket.base_asset_id ||
+        destination.mint_address !== targetIdentity.tokenMint
+      ) {
+        throw new ExecutionEngineError(
+          'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+          'Resolved BUY market does not match its origin asset.',
+        );
+      }
       buyEvidence = createMarketStateEvidence(state);
       adapterVersion = adapter.adapterVersion;
       execution = await adapter.simulateBuy(
         {
           orderId: identifier(orderId, 'OrderId'),
           executionId: identifier(executionId, 'ExecutionId'),
-          identity: targetIdentity,
+          identity: executionIdentity,
           requestedPaperSol: paperSolBaseUnits(input.requestedPaperSolLamports),
           executedAt: utcInstant(input.authoritativeTimestamp),
         },
@@ -1918,7 +1990,7 @@ export async function executePaperBuy(
       execution: execution!,
       orderId,
       executionId,
-      identity: targetIdentity,
+      identity: executionIdentity,
       requestedPaperSolLamports: input.requestedPaperSolLamports,
       availablePaperSolLamports: account.paperSolBalanceLamports,
       evidence: buyEvidence!,
@@ -1928,6 +2000,7 @@ export async function executePaperBuy(
     const tokenOutput = execution!.actualOutput.amount;
     const feeLamports = paperSolFeeTotal(execution!);
     const quoteLamports = actualInput - feeLamports;
+    await assertPaperBuyAdmission(database, { accountId: input.competitionAccountId, client });
 
     await client.query(
       `insert into orders
@@ -1937,13 +2010,28 @@ export async function executePaperBuy(
       [
         orderId,
         input.competitionAccountId,
-        input.marketId,
+        executionIdentity.marketId,
         input.requestedPaperSolLamports,
         claimed.record.id,
         input.authoritativeTimestamp,
       ],
     );
     for (const valuation of valuations) {
+      // A later migration/composed venue may be first observed while valuing a holding.
+      // Register its economic asset linkage before persisting the snapshot's FK.
+      if (valuation.evidence.identity.marketId !== valuation.row.market_id) {
+        await client.query(
+          `insert into markets (id, base_asset_id, quote_asset_id, venue, provider_market_id, metadata)
+           select $1, base_asset_id, quote_asset_id, $2, $1,
+                  jsonb_build_object('migrationResolvedFromMarketId', id)
+           from markets where id = $3 on conflict do nothing`,
+          [
+            valuation.evidence.identity.marketId,
+            valuation.evidence.identity.protocolId,
+            valuation.row.market_id,
+          ],
+        );
+      }
       const evidenceId = await persistMarketStateEvidence(client, valuation.evidence);
       await client.query(
         `insert into order_market_state_evidence
@@ -1959,12 +2047,6 @@ export async function executePaperBuy(
       );
     }
     const buyEvidenceId = await persistMarketStateEvidence(client, buyEvidence!);
-    await client.query(
-      `insert into order_market_state_evidence
-        (id, order_id, evidence_id, purpose)
-       values ($1, $2, $3, 'BUY_EXECUTION')`,
-      [`${orderId}:buy-execution`, orderId, buyEvidenceId],
-    );
 
     const existingPosition =
       positions.find(({ market_id }) => market_id === input.marketId) ??
@@ -2009,6 +2091,12 @@ export async function executePaperBuy(
       );
     }
     await client.query(
+      `insert into order_market_state_evidence
+        (id, order_id, evidence_id, purpose, position_id)
+       values ($1, $2, $3, 'BUY_EXECUTION', $4)`,
+      [`${orderId}:buy-execution`, orderId, buyEvidenceId, positionId],
+    );
+    await client.query(
       `insert into fills
         (id, order_id, market_id, execution_id, side, base_quantity, quote_lamports,
          execution_price, fee_lamports, actual_input_lamports, fee_breakdown,
@@ -2019,7 +2107,7 @@ export async function executePaperBuy(
       [
         fillId,
         orderId,
-        input.marketId,
+        executionIdentity.marketId,
         executionId,
         tokenOutput,
         quoteLamports,
@@ -2027,7 +2115,7 @@ export async function executePaperBuy(
         feeLamports,
         actualInput,
         JSON.stringify(normalizedFeeBreakdown(execution!)),
-        targetIdentity.protocolId,
+        executionIdentity.protocolId,
         adapterVersion!,
         buyEvidenceId,
         claimed.record.id,
@@ -2064,6 +2152,7 @@ export async function executePaperBuy(
         { accountCode: 'CASH', direction: 'CREDIT', amountLamports: actualInput },
       ],
     });
+    await database.commitMarketExecution?.(client, { accountId: input.competitionAccountId, roundId: accountIdentity.hourly_round_id, fillId, execution: execution!, executionContext: 'NORMAL_USER' });
     await completeIdempotency(
       client,
       claimed.record.id,
@@ -2195,6 +2284,7 @@ function validateAuthoritativeSellExecution(input: {
     execution.actualInput.tokenMint !== input.identity.tokenMint ||
     execution.actualInput.amount !== input.requestedTokenQuantity ||
     execution.actualOutput.asset !== 'PAPER_SOL' ||
+    typeof execution.actualOutput.amount !== 'bigint' ||
     execution.actualOutput.amount <= 0n
   ) {
     throw new FinancialServiceError(
@@ -2231,6 +2321,7 @@ async function prepareAuthoritativeSell(
     readonly executionContext: SellExecutionContext;
   },
   ids: { readonly orderId: string; readonly executionId: string },
+  pinned?: MarketStateEvidence,
 ): Promise<PreparedSell> {
   const market = firstRow(
     await database.pool.query<AuthoritativeMarketRow>(
@@ -2246,9 +2337,15 @@ async function prepareAuthoritativeSell(
     tokenMint: identifier(market.mint_address, 'TokenMint'),
   };
   try {
-    const { route, adapter } = await router.resolvePositionRoute(
-      identity,
-      input.executionContext === 'FORCED_HOURLY_SETTLEMENT',
+    if (pinned && (pinned.identity.tokenMint !== identity.tokenMint ||
+        createMarketStateEvidence(pinned).fingerprint !== pinned.fingerprint))
+      throw new FinancialServiceError('EVIDENCE_CORRUPTED','Pinned liquidation evidence is invalid.');
+    const { route, adapter, state } = pinned ? {
+      route: {originIdentity:identity, executionIdentity:pinned.identity,
+        migrated:pinned.identity.marketId !== identity.marketId},
+      adapter: router.resolveVersion(pinned.identity.protocolId,pinned.adapterVersion), state:pinned,
+    } : await withGenericAccount(input.competitionAccountId, () =>
+      router.loadPositionRoute(identity, input.executionContext === 'FORCED_HOURLY_SETTLEMENT'),
     );
     if (route.migrated) {
       await database.pool.query(
@@ -2279,8 +2376,9 @@ async function prepareAuthoritativeSell(
         'The resolved execution market is not registered for this position asset.',
       );
     }
-    const state = await adapter.loadMarketState(route.executionIdentity);
     const evidence = createMarketStateEvidence(state);
+    if (input.executionContext === 'FORCED_HOURLY_SETTLEMENT' && pinned)
+      await database.bindMarketSettlementEvidence?.(input.competitionAccountId, pinned);
     const execution = await adapter.simulateSell(
       {
         orderId: identifier(ids.orderId, 'OrderId'),
@@ -2323,6 +2421,9 @@ async function executeAuthoritativePaperSell(
     readonly authoritativeTimestamp: Date;
     readonly executionContext: SellExecutionContext;
     readonly idempotencyIntent?: 'ALL';
+    readonly settlementEvidence?: MarketStateEvidence;
+    readonly settlementNetLimit?: bigint;
+    readonly persistedSettlementStep?: boolean;
   },
 ): Promise<AuthoritativePaperSellResult> {
   if (input.requestedTokenQuantity <= 0n) {
@@ -2380,9 +2481,13 @@ async function executeAuthoritativePaperSell(
   const prepared = await prepareAuthoritativeSell(database, router, input, {
     orderId,
     executionId,
-  });
+  }, input.settlementEvidence);
+  if (input.executionContext === 'FORCED_HOURLY_SETTLEMENT' &&
+      (!input.settlementEvidence || prepared.execution.actualOutput.amount !== input.settlementNetLimit))
+    throw new FinancialServiceError('SETTLEMENT_REVIEW','Forced execution must match its one pinned capacity quote.');
 
   return runFinancialTransaction(database, async (client) => {
+    await database.lockMarketExecution?.(client, input.competitionAccountId);
     const claimed = await claimIdempotency(client, {
       operationClass,
       idempotencyKey: input.idempotencyKey,
@@ -2452,16 +2557,12 @@ async function executeAuthoritativePaperSell(
         'Requested SELL quantity exceeds the open token balance.',
       );
     }
-    if (
-      input.executionContext === 'FORCED_HOURLY_SETTLEMENT' &&
-      input.requestedTokenQuantity !== quantityBefore
-    ) {
-      throw new FinancialServiceError(
-        'SETTLEMENT_EXECUTION_FAILED',
-        'Forced liquidation must close the entire position.',
-      );
+    if(input.executionContext === 'FORCED_HOURLY_SETTLEMENT' && !input.persistedSettlementStep) {
+      const prior=await client.query(`select 1 from fills f join orders o on o.id=f.order_id
+        join order_market_state_evidence e on e.order_id=o.id
+        where e.position_id=$1 and o.execution_context='FORCED_HOURLY_SETTLEMENT' limit 1`,[positionRow.id]);
+      if(prior.rowCount) throw new FinancialServiceError('SETTLEMENT_REVIEW','A prior forced liquidation requires independent review; capacity cannot be reused.');
     }
-
     const netProceeds = prepared.execution.actualOutput.amount;
     const feeLamports = paperSolFeeTotal(prepared.execution);
     const grossProceeds = netProceeds + feeLamports;
@@ -2539,6 +2640,13 @@ async function executeAuthoritativePaperSell(
         input.authoritativeTimestamp,
       ],
     );
+    if(input.executionContext === 'FORCED_HOURLY_SETTLEMENT' && !input.persistedSettlementStep) {
+      await client.query(`insert into legacy_settlement_liquidations
+       (position_id,hourly_round_id,policy_version,quantity_before,basis_before,sold_quantity,net_proceeds,fee_lamports,evidence_id,fill_id)
+       values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[positionRow.id,authority.hourly_round_id,LEGACY_SETTLEMENT_POLICY,
+         quantityBefore.toString(),costBefore,input.requestedTokenQuantity.toString(),netProceeds,feeLamports,evidenceId,fillId]);
+      if(remainingQuantity>0n) await recordSettlementReview(client,authority.hourly_round_id,positionRow.id,'PARTIAL_LIQUIDATION_REMAINDER');
+    }
     await client.query(
       `update competition_accounts
        set paper_sol_balance_lamports = paper_sol_balance_lamports + $2,
@@ -2582,6 +2690,12 @@ async function executeAuthoritativePaperSell(
       idempotencyRecordId: claimed.record.id,
       entries,
     });
+    await database.commitMarketExecution?.(client, { accountId: input.competitionAccountId, roundId: authority.hourly_round_id, fillId, execution: prepared.execution, executionContext: input.executionContext });
+    if(input.persistedSettlementStep){
+      if(input.executionContext!=='FORCED_HOURLY_SETTLEMENT'||!database.commitPersistedSettlementStep)
+        throw new FinancialServiceError('SETTLEMENT_REVIEW','Persisted settlement participant is required.');
+      await database.commitPersistedSettlementStep(client,{accountId:input.competitionAccountId,roundId:authority.hourly_round_id,positionId:positionRow.id,quantityBefore,basisBefore:costBefore,fillId,idempotencyKey:input.idempotencyKey,execution:prepared.execution,evidence:prepared.evidence});
+    }
     await completeIdempotency(
       client,
       claimed.record.id,
@@ -2591,6 +2705,284 @@ async function executeAuthoritativePaperSell(
     );
     return getAuthoritativePaperSellResult(client, fillId);
   });
+}
+
+/** Recover only uniquely provable legacy quantity evidence; never rewrite financial history. */
+export async function repairLegacySettlementWriteoffMetadata(
+  database: DatabaseService,
+  accountId: string,
+): Promise<void> {
+  await runFinancialTransaction(database, async (client) => {
+    await client.query('select id from competition_accounts where id = $1 for update', [accountId]);
+    const legacy = await client.query<{
+      id: string;
+      source_entity_id: string;
+      idempotency_record_id: string;
+    }>(
+      `select j.id, j.source_entity_id, j.idempotency_record_id from journal_transactions j
+       left join settlement_writeoff_metadata_repairs r on r.journal_transaction_id = j.id
+       where j.competition_account_id = $1 and j.operation_type = 'FORCED_HOURLY_SETTLEMENT_WRITEOFF'
+         and j.source_entity_type = 'SETTLEMENT_WRITEOFF' and j.metadata = '{}'::jsonb
+         and r.journal_transaction_id is null order by j.id`,
+      [accountId],
+    );
+    for (const journal of legacy.rows) {
+      const invalid = () =>
+        new FinancialServiceError(
+          'FINALIZATION_CONFLICT',
+          `Legacy write-off ${journal.id} cannot be reconstructed uniquely from immutable fills and ledger.`,
+        );
+      const position = (
+        await client.query<{
+          asset_id: string;
+          market_id: string;
+          status: string;
+          remaining_base_units: string;
+          cost_basis_lamports: string;
+          realized_pnl_lamports: string;
+        }>('select * from positions where id = $1 and competition_account_id = $2 for update', [
+          journal.source_entity_id,
+          accountId,
+        ])
+      ).rows[0];
+      if (
+        !position ||
+        position.status !== 'CLOSED' ||
+        BigInt(position.remaining_base_units) !== 0n ||
+        BigInt(position.cost_basis_lamports) !== 0n
+      )
+        throw invalid();
+      // Asset linkage handles migrated SELL venues. Multiple economic positions are ambiguous.
+      const peers = await client.query(
+        'select id from positions where competition_account_id = $1 and asset_id = $2',
+        [accountId, position.asset_id],
+      );
+      const writeoffs = await client.query(
+        `select id from journal_transactions where competition_account_id = $1
+         and source_entity_type = 'SETTLEMENT_WRITEOFF' and source_entity_id = $2`,
+        [accountId, journal.source_entity_id],
+      );
+      const idempotency = (
+        await client.query<IdempotencyRow>(
+          `select * from idempotency_records where id = $1
+          and competition_account_id = $2 and operation_class = 'FORCED_HOURLY_SETTLEMENT_WRITEOFF'`,
+          [journal.idempotency_record_id, accountId],
+        )
+      ).rows[0];
+      if (
+        peers.rowCount !== 1 ||
+        writeoffs.rowCount !== 1 ||
+        idempotency?.status !== 'COMPLETED' ||
+        idempotency.result_entity_type !== 'SETTLEMENT_WRITEOFF' ||
+        idempotency.result_entity_id !== journal.source_entity_id
+      )
+        throw invalid();
+      const fills = await client.query<{
+        id: string;
+        side: string;
+        base_quantity: string;
+        quote_lamports: string;
+        fee_lamports: string;
+        actual_input_lamports: string | null;
+        cost_basis_lamports_removed: string;
+        realized_pnl_lamports: string;
+      }>(
+        `select f.* from fills f join orders o on o.id = f.order_id
+          join markets m on m.id = f.market_id
+          where o.competition_account_id = $1 and m.base_asset_id = $2 order by f.id`,
+        [accountId, position.asset_id],
+      );
+      let quantity = 0n,
+        cost = 0n,
+        pnl = 0n;
+      for (const fill of fills.rows) {
+        quantity += (fill.side === 'BUY' ? 1n : -1n) * BigInt(fill.base_quantity);
+        cost +=
+          fill.side === 'BUY'
+            ? BigInt(
+                fill.actual_input_lamports ??
+                  (BigInt(fill.quote_lamports) + BigInt(fill.fee_lamports)).toString(),
+              )
+            : -BigInt(fill.cost_basis_lamports_removed);
+        pnl += BigInt(fill.realized_pnl_lamports);
+      }
+      const entries = await client.query<{
+        account_code: string;
+        direction: string;
+        amount_lamports: string;
+      }>(
+        'select account_code, direction, amount_lamports from ledger_entries where journal_transaction_id = $1',
+        [journal.id],
+      );
+      if (
+        quantity <= 0n ||
+        cost <= 0n ||
+        BigInt(position.realized_pnl_lamports) !== pnl - cost ||
+        entries.rowCount !== 2 ||
+        !entries.rows.some(
+          (e) =>
+            e.account_code === 'TRADING_PNL' &&
+            e.direction === 'DEBIT' &&
+            BigInt(e.amount_lamports) === cost,
+        ) ||
+        !entries.rows.some(
+          (e) =>
+            e.account_code === 'POSITION_COST' &&
+            e.direction === 'CREDIT' &&
+            BigInt(e.amount_lamports) === cost,
+        )
+      )
+        throw invalid();
+      await client.query(
+        `insert into settlement_writeoff_metadata_repairs
+         (journal_transaction_id, token_quantity, cost_basis_lamports, evidence) values ($1, $2, $3, $4::jsonb)`,
+        [
+          journal.id,
+          quantity,
+          cost,
+          JSON.stringify({
+            reason: 'LEGACY_WRITEOFF_METADATA_RECOVERY_V1',
+            positionId: journal.source_entity_id,
+            marketId: position.market_id,
+            fillIds: fills.rows.map((f) => f.id),
+            method:
+              'Immutable BUY quantity minus SELL quantity; capitalized BUY cost minus removed SELL basis; matching write-off ledger and closed-position P&L.',
+          }),
+        ],
+      );
+    }
+  });
+}
+
+/** Record an immutable zero-value remainder write-off after executable settlement capacity is exhausted. */
+async function writeOffSettlementRemainder(
+  database: DatabaseService,
+  input: {
+    readonly competitionAccountId: string;
+    readonly positionId: string;
+    readonly marketId: string;
+    readonly tokenQuantity: bigint;
+    readonly costBasis: bigint;
+    readonly evidence: MarketStateEvidence;
+    readonly authoritativeTimestamp: Date;
+    readonly idempotencyKey: string;
+    readonly transactionClient?: PoolClient;
+    readonly operatorResolution?: JsonObject;
+    readonly persistedCutoff?: {roundId:string;identity:MarketIdentity};
+  },
+): Promise<void> {
+  if (input.tokenQuantity <= 0n) return;
+  const applyWriteoff = async (client: PoolClient) => {
+    await client.query('select id from competition_accounts where id = $1 for update', [
+      input.competitionAccountId,
+    ]);
+    const round = firstRow(
+      await client.query<{ state: string }>(
+        `select r.state from hourly_rounds r join competition_accounts a on a.hourly_round_id = r.id
+       where a.id = $1 for share of r`,
+        [input.competitionAccountId],
+      ),
+      'Hourly round',
+    );
+    if (round.state !== 'SETTLING')
+      throw new FinancialServiceError('FINALIZATION_CONFLICT', 'Write-off requires SETTLING.');
+    const requestHash = fingerprint({
+      positionId: input.positionId,
+      marketId: input.marketId,
+      competitionAccountId: input.competitionAccountId,
+      authoritativeTimestamp: input.authoritativeTimestamp,
+    });
+    const claimed = await claimIdempotency(client, {
+      operationClass: 'FORCED_HOURLY_SETTLEMENT_WRITEOFF',
+      idempotencyKey: input.idempotencyKey,
+      requestHash,
+      competitionAccountId: input.competitionAccountId,
+    });
+    if (claimed.replay) return;
+    const position = firstRow<{
+      status: string;
+      remaining_base_units: string;
+      cost_basis_lamports: string;
+    }>(
+      await client.query(
+        `select status, remaining_base_units, cost_basis_lamports from positions where id = $1 and competition_account_id = $2 for update`,
+        [input.positionId, input.competitionAccountId],
+      ),
+      'Position',
+    );
+    const quantity = BigInt(position.remaining_base_units);
+    const cost = BigInt(position.cost_basis_lamports);
+    if (position.status !== 'OPEN' || quantity === 0n) {
+      await completeIdempotency(
+        client,
+        claimed.record.id,
+        'SETTLEMENT_WRITEOFF',
+        input.positionId,
+        input.competitionAccountId,
+      );
+      return;
+    }
+    if (quantity !== input.tokenQuantity || cost !== input.costBasis) {
+      throw new FinancialServiceError(
+        'SETTLEMENT_INCOMPLETE',
+        'Position changed after zero-capacity observation; reload before write-off.',
+      );
+    }
+    await client.query(
+      `update positions set remaining_base_units = 0, cost_basis_lamports = 0,
+         realized_pnl_lamports = realized_pnl_lamports - $2, status = 'CLOSED',
+         closed_at = $3, updated_at = $3 where id = $1`,
+      [input.positionId, cost, input.authoritativeTimestamp],
+    );
+    await client.query(
+      `update competition_accounts set realized_pnl_lamports = realized_pnl_lamports - $2 where id = $1`,
+      [input.competitionAccountId, cost],
+    );
+    await insertJournal(client, {
+      id: `journal:forced-writeoff:${input.positionId}`,
+      competitionAccountId: input.competitionAccountId,
+      operationType: 'FORCED_HOURLY_SETTLEMENT_WRITEOFF',
+      sourceEntityType: 'SETTLEMENT_WRITEOFF',
+      sourceEntityId: input.positionId,
+      idempotencyRecordId: claimed.record.id,
+      metadata: {
+        tokenQuantity: quantity.toString(),
+        costBasisLamports: cost.toString(),
+        marketId: input.marketId,
+        reason: input.operatorResolution
+          ? 'OPERATOR_APPROVED_DUST_RESOLUTION_V1'
+          : 'NO_POSITIVE_AUTHORITATIVE_EXECUTABLE_EXIT',
+        ...(input.operatorResolution ? { operatorResolution: input.operatorResolution } : {}),
+        marketStateEvidence: JSON.parse(
+          JSON.stringify(input.evidence, (_, value: unknown) =>
+            typeof value === 'bigint' ? value.toString() : value,
+          ),
+        ) as JsonObject,
+      },
+      entries:
+        cost === 0n
+          ? []
+          : [
+              { accountCode: 'TRADING_PNL', direction: 'DEBIT', amountLamports: cost },
+              { accountCode: 'POSITION_COST', direction: 'CREDIT', amountLamports: cost },
+            ],
+    });
+    if(input.persistedCutoff){
+      if(!database.commitPersistedSettlementWriteoff)throw new FinancialServiceError('SETTLEMENT_REVIEW','Persisted cutoff write-off participant is required.');
+      await database.commitPersistedSettlementWriteoff(client,{accountId:input.competitionAccountId,roundId:input.persistedCutoff.roundId,
+        positionId:input.positionId,identity:input.persistedCutoff.identity,quantity,basis:cost,
+        idempotencyKey:input.idempotencyKey,evidence:input.evidence,journalId:`journal:forced-writeoff:${input.positionId}`});
+    }
+    await completeIdempotency(
+      client,
+      claimed.record.id,
+      'SETTLEMENT_WRITEOFF',
+      input.positionId,
+      input.competitionAccountId,
+    );
+  };
+  if (input.transactionClient) await applyWriteoff(input.transactionClient);
+  else await runFinancialTransaction(database, applyWriteoff);
 }
 
 /** Server-authoritative normal user SELL. Forced settlement uses the internal context only. */
@@ -2678,6 +3070,7 @@ export interface SettlementFailure {
   readonly marketId: string | null;
   readonly code: FinancialErrorCode;
   readonly message: string;
+  readonly disposition: 'RETRY' | 'OPERATIONAL_ERROR';
 }
 
 export interface HourlySettlementResult {
@@ -2737,14 +3130,43 @@ function settlementFailure(
   competitionAccountId: string,
   marketId: string | null,
 ): SettlementFailure {
+  const retryCodes = new Set([
+    'RPC_UNAVAILABLE',
+    'RPC_TIMEOUT',
+    'RPC_ERROR',
+    'MARKET_STATE_UNAVAILABLE',
+    'MARKET_ACCOUNT_NOT_FOUND',
+    'MIGRATION_DESTINATION_UNAVAILABLE',
+    'POSITION_EXECUTION_ROUTE_UNAVAILABLE',
+    'MARKET_MIGRATED',
+    'SETTLEMENT_INCOMPLETE',
+    'INSUFFICIENT_EXECUTABLE_LIQUIDITY',
+    'ZERO_EXECUTABLE_OUTPUT',
+  ]);
   if (error instanceof FinancialServiceError) {
-    return { competitionAccountId, marketId, code: error.code, message: error.message };
+    return {
+      competitionAccountId,
+      marketId,
+      code: error.code,
+      message: error.message,
+      disposition: retryCodes.has(error.code) ? 'RETRY' : 'OPERATIONAL_ERROR',
+    };
+  }
+  if (error instanceof ExecutionEngineError) {
+    return {
+      competitionAccountId,
+      marketId,
+      code: error.code as FinancialErrorCode,
+      message: error.message,
+      disposition: retryCodes.has(error.code) ? 'RETRY' : 'OPERATIONAL_ERROR',
+    };
   }
   return {
     competitionAccountId,
     marketId,
     code: 'SETTLEMENT_EXECUTION_FAILED',
     message: 'Forced settlement failed without a safe authoritative result.',
+    disposition: 'OPERATIONAL_ERROR',
   };
 }
 
@@ -2753,6 +3175,35 @@ function settlementFailure(
  * finalization occur only after all positions are closed and reconciled.
  */
 export async function settleHourlyRound(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    readonly hourlyRoundId: string;
+    readonly authoritativeTimestamp: Date;
+  },
+): Promise<HourlySettlementResult> {
+  // Serialize whole passes across processes, including snapshot selection and finalization.
+  // Partial sales still commit individually, so crashes resume from persisted quantity.
+  const lock = await database.pool.connect();
+  try {
+    await lock.query(
+      "select pg_advisory_lock(hashtextextended('hourly-settlement:' || $1::text, 0))",
+      [input.hourlyRoundId],
+    );
+    return await settleHourlyRoundPass(database, router, input);
+  } finally {
+    try {
+      await lock.query(
+        "select pg_advisory_unlock(hashtextextended('hourly-settlement:' || $1::text, 0))",
+        [input.hourlyRoundId],
+      );
+    } finally {
+      lock.release();
+    }
+  }
+}
+
+async function settleHourlyRoundPass(
   database: DatabaseService,
   router: ExecutionRouter,
   input: {
@@ -2785,16 +3236,24 @@ export async function settleHourlyRound(
     };
   }
 
+  try {
+    await database.prepareMarketSettlement?.(input.hourlyRoundId, entered.endsAtExclusive);
+  } catch (error) {
+    return { hourlyRoundId: input.hourlyRoundId, state: 'SETTLING', forcedSells: [], hourlyResults: [],
+      failures: [settlementFailure(error, '', null)] };
+  }
+
   const positions = (
     await database.pool.query<{
       id: string;
       competition_account_id: string;
       market_id: string;
       remaining_base_units: string;
+      cost_basis_lamports: string;
       venue: string;
       mint_address: string;
     }>(
-      `select p.id, p.competition_account_id, p.market_id, p.remaining_base_units,
+      `select p.id, p.competition_account_id, p.market_id, p.remaining_base_units, p.cost_basis_lamports,
               m.venue, a.mint_address
        from positions p
        join competition_accounts ca on ca.id = p.competition_account_id
@@ -2809,17 +3268,58 @@ export async function settleHourlyRound(
   const failures: SettlementFailure[] = [];
   for (const position of positions) {
     try {
-      forcedSells.push(
-        await executeAuthoritativePaperSell(database, router, {
-          competitionAccountId: position.competition_account_id,
-          marketId: position.market_id,
-          requestedTokenQuantity: BigInt(position.remaining_base_units),
-          idempotencyKey: `hourly-settlement:${input.hourlyRoundId}:${position.id}`,
-          authoritativeTimestamp: entered.endsAtExclusive,
-          executionContext: 'FORCED_HOURLY_SETTLEMENT',
-        }),
-      );
+      const identity: MarketIdentity = {
+        protocolId: identifier(position.venue, 'ProtocolId'),
+        marketId: identifier(position.market_id, 'MarketId'),
+        tokenMint: identifier(position.mint_address, 'TokenMint'),
+      };
+      const prior=(await database.pool.query(`select f.id from fills f join orders o on o.id=f.order_id
+        join order_market_state_evidence e on e.order_id=o.id
+        where e.position_id=$1 and o.execution_context='FORCED_HOURLY_SETTLEMENT' limit 1`,[position.id])).rows;
+      const persistedParticipant = database.persistedSettlementAccount?.(position.competition_account_id, identity) ?? !!database.preparePersistedSettlementStep;
+      if(prior.length && !persistedParticipant) {
+        await recordSettlementReview(database.pool,input.hourlyRoundId,position.id,'PRIOR_FORCED_CAPACITY_ALREADY_CONSUMED');
+        throw new FinancialServiceError('SETTLEMENT_REVIEW','Previously consumed forced liquidity cannot be reloaded.');
+      }
+      const current=(await database.pool.query<{status:string;remaining_base_units:string;cost_basis_lamports:string}>(
+        'select status,remaining_base_units,cost_basis_lamports from positions where id=$1',[position.id])).rows[0]!;
+      if(current.status==='CLOSED')continue;
+      const quantity=BigInt(current.remaining_base_units),basis=BigInt(current.cost_basis_lamports);
+      if(persistedParticipant){
+        if(!database.preparePersistedSettlementStep || !database.commitPersistedSettlementStep)throw new FinancialServiceError('SETTLEMENT_REVIEW','Incomplete persisted settlement participant.');
+        const plan=await withGenericAccount(position.competition_account_id,()=>database.preparePersistedSettlementStep!({accountId:position.competition_account_id,roundId:input.hourlyRoundId,positionId:position.id,identity,quantity,basis}));
+        if(plan.writeoff===true&&plan.output===0n&&plan.quantity===quantity){
+          await writeOffSettlementRemainder(database,{competitionAccountId:position.competition_account_id,positionId:position.id,marketId:position.market_id,
+            tokenQuantity:quantity,costBasis:basis,evidence:plan.evidence,authoritativeTimestamp:entered.endsAtExclusive,idempotencyKey:plan.idempotencyKey,
+            persistedCutoff:{roundId:input.hourlyRoundId,identity}});
+          continue;
+        }
+        if(plan.quantity<=0n||plan.quantity>quantity||plan.output<=0n)throw new FinancialServiceError('SETTLEMENT_REVIEW','No supported positive persisted exit; remainder stays in REVIEW.');
+        forcedSells.push(await executeAuthoritativePaperSell(database,router,{
+          competitionAccountId:position.competition_account_id,marketId:position.market_id,
+          requestedTokenQuantity:plan.quantity,idempotencyKey:plan.idempotencyKey,
+          authoritativeTimestamp:entered.endsAtExclusive,executionContext:'FORCED_HOURLY_SETTLEMENT',
+          settlementEvidence:plan.evidence,settlementNetLimit:plan.output,persistedSettlementStep:true,
+        }));
+        continue;
+      }
+      const capacity=await withGenericAccount(position.competition_account_id,()=>canonicalExitPreflight(router,identity,quantity,basis,true));
+      if(capacity.maxExecutableQuantityBaseUnits===0n) {
+        await writeOffSettlementRemainder(database,{
+          competitionAccountId:position.competition_account_id,positionId:position.id,marketId:position.market_id,
+          tokenQuantity:quantity,costBasis:basis,evidence:capacity.evidence,authoritativeTimestamp:entered.endsAtExclusive,
+          idempotencyKey:`hourly-settlement-writeoff:${input.hourlyRoundId}:${position.id}`,
+        });
+      } else forcedSells.push(await executeAuthoritativePaperSell(database,router,{
+        competitionAccountId:position.competition_account_id,marketId:position.market_id,
+        requestedTokenQuantity:capacity.maxExecutableQuantityBaseUnits,
+        idempotencyKey:`hourly-settlement-once-v1:${input.hourlyRoundId}:${position.id}`,
+        authoritativeTimestamp:entered.endsAtExclusive,executionContext:'FORCED_HOURLY_SETTLEMENT',
+        settlementEvidence:capacity.evidence,settlementNetLimit:capacity.maxExecutableOutputLamports,
+      }));
     } catch (error) {
+      if(error instanceof FinancialServiceError && ['SETTLEMENT_REVIEW','EVIDENCE_CORRUPTED','INVALID_EXECUTION_RESULT','FINALIZATION_CONFLICT'].includes(error.code))
+        await recordSettlementReview(database.pool,input.hourlyRoundId,position.id,error.code);
       failures.push(settlementFailure(error, position.competition_account_id, position.market_id));
     }
   }
@@ -2851,6 +3351,7 @@ export async function settleHourlyRound(
       );
       let hourlyResult = existing.rows[0] ? toHourlyResult(existing.rows[0]) : undefined;
       if (!hourlyResult) {
+        await repairLegacySettlementWriteoffMetadata(database, account.id);
         const reconciliation = await reconcileAccountLedger(database, account.id);
         if (!reconciliation.reconciled || reconciliation.materializedCashLamports < 0n) {
           throw new FinancialServiceError(
@@ -2938,6 +3439,7 @@ export async function settleHourlyRound(
               marketId: null,
               code: 'SETTLEMENT_INCOMPLETE',
               message: 'The round remains incomplete and retryable.',
+              disposition: 'RETRY',
             },
           ]
         : failures,
@@ -3085,4 +3587,370 @@ export async function replayPersistedFill(
     marketStateFingerprint: row.state_fingerprint,
     adapterVersion: row.adapter_version,
   };
+}
+
+/** Exact incident scope; never used by the normal worker or a public API. */
+export const ONE_TIME_DUST_RESOLUTION = Object.freeze({
+  reason: 'OPERATOR_APPROVED_DUST_RESOLUTION_V1',
+  roundId: 'hourly:2026-10-10T23:00:00.000Z',
+  marketId: 'FHYwo1cVWX2NyixiK22jpM7N1RA1A35qGszMG7v6sYBf',
+  mint: 'FB5ViYXcLNSEcy8R2Jg1DmJwP36mizZsPKvAprM8pump',
+  accountId:
+    'account:hourly:2026-10-10T23:00:00.000Z:user:feb89522289b86e10f3bcaf3a54231c823690d2a5904fc5e80c137c8cbece4f8',
+  positionId:
+    'position:account:hourly:2026-10-10T23:00:00.000Z:user:feb89522289b86e10f3bcaf3a54231c823690d2a5904fc5e80c137c8cbece4f8:FHYwo1cVWX2NyixiK22jpM7N1RA1A35qGszMG7v6sYBf',
+});
+
+export async function resolveOneTimeDustSettlement(
+  database: DatabaseService,
+  router: ExecutionRouter,
+  input: {
+    execute?: boolean;
+    operatorIdentifier?: string;
+    approvalReference?: string;
+    acknowledgement?: string;
+    payoutExecutionDisabled?: boolean;
+    target?: Partial<Record<keyof typeof ONE_TIME_DUST_RESOLUTION, string>>;
+  } = {},
+) {
+  const scope = ONE_TIME_DUST_RESOLUTION;
+  const report = {
+    scope,
+    eligible: false,
+    resolved: false,
+    alreadyResolved: false,
+    liveExecutionBlocked: true,
+    abortReasons: [] as string[],
+    checks: {} as Record<string, boolean>,
+    position: null as null | {
+      remainingBaseUnits: string;
+      costBasisLamports: string;
+      cashLamports: string;
+      projectedPositionPnlLamports: string;
+      projectedAccountPnlLamports: string;
+      projectedHourlyPnlLamports: string;
+    },
+  };
+  const check = (name: string, ok: boolean) => {
+    report.checks[name] = ok;
+    if (!ok) report.abortReasons.push(name);
+    return ok;
+  };
+  check(
+    'EXACT_REQUEST_SCOPE',
+    !input.target ||
+      Object.entries(input.target).every(
+        ([key, value]) => value === scope[key as keyof typeof scope],
+      ),
+  );
+  if (input.execute)
+    check(
+      'EXPLICIT_OPERATOR_AUTHORIZATION',
+      !!input.operatorIdentifier?.trim() &&
+        !!input.approvalReference?.trim() &&
+        input.acknowledgement === scope.reason,
+    );
+  if (report.abortReasons.length) return report;
+  const client = await database.pool.connect();
+  try {
+    await client.query(input.execute ? 'begin' : 'begin read only');
+    await client.query("set local statement_timeout='15000ms'");
+    await client.query(
+      "select pg_advisory_xact_lock(hashtextextended('hourly-settlement:' || $1::text, 0))",
+      [scope.roundId],
+    );
+    const row = (
+      await client.query<{
+        account_id: string;
+        round_id: string;
+        market_id: string;
+        mint: string;
+        venue: string;
+        quote_mint: string;
+        state: string;
+        status: string;
+        quantity: string;
+        basis: string;
+        cash: string;
+        position_pnl: string;
+        account_pnl: string;
+        starting: string;
+        ends_at_exclusive: Date;
+      }>(
+        `select a.id account_id,a.hourly_round_id round_id,p.market_id,b.mint_address mint,m.venue,
+      q.mint_address quote_mint,r.state,p.status,p.remaining_base_units quantity,p.cost_basis_lamports basis,
+      a.paper_sol_balance_lamports cash,p.realized_pnl_lamports position_pnl,a.realized_pnl_lamports account_pnl,
+      a.starting_paper_sol_lamports starting,r.ends_at_exclusive from positions p
+      join competition_accounts a on a.id=p.competition_account_id join hourly_rounds r on r.id=a.hourly_round_id
+      join markets m on m.id=p.market_id join assets b on b.id=p.asset_id and b.id=m.base_asset_id
+      join assets q on q.id=m.quote_asset_id where p.id=$1`,
+        [scope.positionId],
+      )
+    ).rows[0];
+    if (
+      !check(
+        'EXACT_PERSISTED_IDENTITY',
+        !!row &&
+          row.account_id === scope.accountId &&
+          row.round_id === scope.roundId &&
+          row.market_id === scope.marketId &&
+          row.mint === scope.mint &&
+          row.venue === 'PUMP_FUN' &&
+          row.quote_mint === 'So11111111111111111111111111111111111111112',
+      )
+    ) {
+      await client.query('rollback');
+      return report;
+    }
+    const target = row!;
+    if (input.execute) {
+      await client.query('select id from competition_accounts where id=$1 for update', [
+        scope.accountId,
+      ]);
+      await client.query('select id from hourly_rounds where id=$1 for share', [scope.roundId]);
+      await client.query('select id from positions where id=$1 for update', [scope.positionId]);
+      Object.assign(
+        target,
+        (
+          await client.query(
+            `select remaining_base_units quantity,cost_basis_lamports basis,
+        realized_pnl_lamports position_pnl,status from positions where id=$1`,
+            [scope.positionId],
+          )
+        ).rows[0],
+      );
+      Object.assign(
+        target,
+        (
+          await client.query(
+            `select paper_sol_balance_lamports cash,realized_pnl_lamports account_pnl
+        from competition_accounts where id=$1`,
+            [scope.accountId],
+          )
+        ).rows[0],
+      );
+      target.state = (
+        await client.query('select state from hourly_rounds where id=$1', [scope.roundId])
+      ).rows[0].state;
+    }
+    report.position = {
+      remainingBaseUnits: target.quantity,
+      costBasisLamports: target.basis,
+      cashLamports: target.cash,
+      projectedPositionPnlLamports: (BigInt(target.position_pnl) - BigInt(target.basis)).toString(),
+      projectedAccountPnlLamports: (BigInt(target.account_pnl) - BigInt(target.basis)).toString(),
+      projectedHourlyPnlLamports: (BigInt(target.cash) - BigInt(target.starting)).toString(),
+    };
+    const prior = (
+      await client.query('select metadata from journal_transactions where id=$1', [
+        `journal:forced-writeoff:${scope.positionId}`,
+      ])
+    ).rows[0];
+    if (prior?.metadata.reason === scope.reason && target.status === 'CLOSED') {
+      report.alreadyResolved = true;
+      report.liveExecutionBlocked = false;
+      await client.query('rollback');
+      return report;
+    }
+    check(
+      'SETTLING_OPEN_POSITION',
+      target.state === 'SETTLING' &&
+        target.status === 'OPEN' &&
+        BigInt(target.quantity) > 0n &&
+        !prior,
+    );
+
+    const anchors = (
+      await client.query(
+        `select f.id,f.base_quantity,f.actual_input_lamports,e.state_fingerprint from fills f
+      join orders o on o.id=f.order_id join market_state_evidence e on e.id=f.market_state_evidence_id
+      where o.competition_account_id=$1 and f.market_id=$2 and f.side='BUY' order by f.executed_at`,
+        [scope.accountId, scope.marketId],
+      )
+    ).rows;
+    const expected = [
+      [
+        'authoritative-buy-fill:88d568303333dedf773f3a1537800bb3b25c53e01ac687e72dc392900699d615',
+        '32418102410735',
+        '946297321',
+        '416e01d775742231ea85d5c3f3c2736533df5fc89d1599d91dc10149077fa027',
+      ],
+      [
+        'authoritative-buy-fill:6a047be2e2896f7e4ccc85a42d92aa43fe7c773a15dd084c454ae9b780131e64',
+        '29264708405028',
+        '851667589',
+        '779175f4414b24e38b0e726b52cbd69e601eb769bd3bebfbd8aeaaa7b93e8f99',
+      ],
+    ];
+    check(
+      'RECORDED_BUY_BINDING',
+      anchors.length === 2 &&
+        expected.every(
+          (a, i) =>
+            a.join('|') ===
+            [
+              anchors[i]?.id,
+              anchors[i]?.base_quantity,
+              anchors[i]?.actual_input_lamports,
+              anchors[i]?.state_fingerprint,
+            ].join('|'),
+        ),
+    );
+    const history = (
+      await client.query(
+        `select f.id,f.base_quantity,f.quote_lamports,f.actual_output_lamports,f.fee_lamports,
+      e.state_fingerprint,e.chain_slot,e.normalized_state->>'realSolReserves' reserve,i.idempotency_key
+      from fills f join orders o on o.id=f.order_id join market_state_evidence e on e.id=f.market_state_evidence_id
+      join idempotency_records i on i.id=o.idempotency_record_id where o.competition_account_id=$1 and f.market_id=$2
+      and o.execution_context='FORCED_HOURLY_SETTLEMENT' order by f.created_at desc limit 32`,
+        [scope.accountId, scope.marketId],
+      )
+    ).rows;
+    check(
+      'PERSISTENT_RECORDED_DUST',
+      history.length === 32 &&
+        new Set(history.map((h) => h.id)).size === 32 &&
+        new Set(history.map((h) => h.chain_slot)).size >= 2 &&
+        history.every(
+          (h) =>
+            h.reserve === '5' &&
+            h.base_quantity === '214600' &&
+            h.quote_lamports === '5' &&
+            h.actual_output_lamports === '3' &&
+            h.fee_lamports === '2',
+        ) &&
+        history.every(
+          (h, i) =>
+            i === 0 ||
+            BigInt(history[i - 1]!.idempotency_key.split(':').at(-1)!) + 214600n ===
+              BigInt(h.idempotency_key.split(':').at(-1)!),
+        ) &&
+        BigInt(history[0]?.idempotency_key.split(':').at(-1) ?? '0') - 214600n ===
+          BigInt(target.quantity),
+    );
+    const plans = (
+      await client.query(
+        `select p.state,
+      exists(select 1 from payout_plan_approvals a where a.payout_plan_id=p.id) approved,
+      exists(select 1 from payout_executions e where e.payout_plan_id=p.id) execution from payout_plans p
+      where p.hourly_round_id=$1 or p.daily_competition_id in (select id from daily_competitions where utc_date='2026-10-10')`,
+        [scope.roundId],
+      )
+    ).rows;
+    check(
+      'PAYOUT_REVIEW_GATE',
+      input.payoutExecutionDisabled === true &&
+        plans.every(
+          (p) =>
+            ['CALCULATED', 'FROZEN', 'VALIDATED'].includes(p.state) && !p.approved && !p.execution,
+        ),
+    );
+    const readDatabase = {
+      pool: {
+        query: client.query.bind(client),
+        connect: async () => ({ query: client.query.bind(client), release() {} }),
+      },
+    } as unknown as DatabaseService;
+    check(
+      'FINANCIAL_RECONCILIATION',
+      (await reconcileAccountLedger(readDatabase, scope.accountId)).reconciled,
+    );
+    if (report.checks['RECORDED_BUY_BINDING']) {
+      for (const anchor of anchors) {
+        check(
+          `HISTORICAL_REPLAY:${anchor.id}`,
+          (await replayPersistedFill(readDatabase, router, anchor.id)).matched,
+        );
+      }
+    }
+    if (!report.abortReasons.length) {
+      const capacity = await canonicalExitPreflight(
+        router,
+        {
+          protocolId: identifier('PUMP_FUN', 'ProtocolId'),
+          marketId: identifier(scope.marketId, 'MarketId'),
+          tokenMint: identifier(scope.mint, 'TokenMint'),
+        },
+        BigInt(target.quantity),
+        BigInt(target.basis),
+        true,
+      );
+      const state = capacity.evidence,
+        n = state.normalizedState;
+      check(
+        'FRESH_DIRECT_PUMP_EVIDENCE',
+        state.identity.protocolId === 'PUMP_FUN' &&
+          state.identity.marketId === scope.marketId &&
+          state.identity.tokenMint === scope.mint &&
+          n['model'] === 'PUMP_FUN_BONDING_CURVE' &&
+          n['bondingCurveAddress'] === scope.marketId &&
+          n['quoteAsset'] === 'SOL' &&
+          n['complete'] === false &&
+          n['realSolReserves'] === '5' &&
+          n['protocolFeeBps'] === '95' &&
+          n['creatorFeeBps'] === '30' &&
+          state.chainSlot !== null &&
+          state.chainSlot >= BigInt(history[0]!.chain_slot) &&
+          Number.isFinite(Date.parse(state.observedAt)) &&
+          Date.now() - Date.parse(state.observedAt) >= -1000 &&
+          Date.now() - Date.parse(state.observedAt) <= 30000,
+      );
+      check(
+        'EXACT_PARTIAL_DUST_CAPACITY',
+        !capacity.full.executable &&
+          capacity.maxExecutableQuantityBaseUnits === 214600n &&
+          capacity.maxExecutableQuantityBaseUnits < BigInt(target.quantity) &&
+          capacity.maxExecutableOutputLamports === 3n,
+      );
+      report.eligible = !report.abortReasons.length;
+      report.liveExecutionBlocked = !report.eligible;
+      if (input.execute && report.eligible) {
+        await writeOffSettlementRemainder(database, {
+          competitionAccountId: scope.accountId,
+          positionId: scope.positionId,
+          marketId: scope.marketId,
+          tokenQuantity: BigInt(target.quantity),
+          costBasis: BigInt(target.basis),
+          evidence: state,
+          authoritativeTimestamp: target.ends_at_exclusive,
+          idempotencyKey: `hourly-settlement-writeoff:${scope.roundId}:${scope.positionId}`,
+          transactionClient: client,
+          operatorResolution: {
+            policy: scope.reason,
+            operatorIdentifier: input.operatorIdentifier!.trim(),
+            approvalReference: input.approvalReference!.trim(),
+            resolvedAt: new Date().toISOString(),
+            quotedExecutableQuantity: '214600',
+            quotedExecutableProceeds: '3',
+            creditedProceeds: '0',
+            payoutReviewGate: 'EXPLICIT_PAYOUT_APPROVAL_REQUIRED',
+            historicalFillIds: history.map((h) => h.id),
+            historicalStateFingerprints: history.map((h) => h.state_fingerprint),
+          },
+        });
+        if (!(await reconcileAccountLedger(readDatabase, scope.accountId)).reconciled)
+          throw new FinancialServiceError(
+            'FINALIZATION_CONFLICT',
+            'Post-resolution accounting does not reconcile.',
+          );
+        await client.query('commit');
+        report.resolved = true;
+        return report;
+      }
+    }
+    await client.query('rollback');
+    return report;
+  } catch (error) {
+    await client.query('rollback');
+    report.eligible = false;
+    report.liveExecutionBlocked = true;
+    report.abortReasons.push(
+      error instanceof FinancialServiceError || error instanceof ExecutionEngineError
+        ? error.code
+        : 'INCONCLUSIVE_VALIDATION',
+    );
+    return report;
+  } finally {
+    client.release();
+  }
 }

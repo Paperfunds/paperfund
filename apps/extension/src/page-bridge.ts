@@ -1,5 +1,11 @@
 import type { PageBridgeRequest, PageBridgeResponse } from './messages.js';
 import { isPaperfundAuthMessage } from './wallet-message.js';
+import { installChartBridge } from './chart-native.js';
+
+import { installDiagnosticCollector } from './diagnostics.js';
+
+installDiagnosticCollector();
+installChartBridge();
 
 const PAGE_CHANNEL = 'paperfund:page-bridge:v1' as const;
 

@@ -1,4 +1,9 @@
 import {
+  advisoryReadContext,
+  ADVISORY_CLOCK_ACCOUNT,
+  advisoryClockTime,
+} from './rpc-read-context.js';
+import {
   address,
   getAddressDecoder,
   getAddressEncoder,
@@ -47,6 +52,8 @@ import {
 export const PUMP_SWAP_PROTOCOL_ID: ProtocolId = identifier('PUMP_SWAP', 'ProtocolId');
 export const PUMP_SWAP_ADAPTER_VERSION = 'pump-swap-canonical-v1';
 export const PUMP_SWAP_NORMALIZATION_VERSION = 'pump-swap-state-v1';
+import { maximumConstantProductSell } from './sell-capacity.js';
+
 export const PUMP_AMM_PROGRAM_ID = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
 
 const ZERO_PUBLIC_KEY = '11111111111111111111111111111111';
@@ -248,7 +255,10 @@ export function pumpPoolAuthorityAddress(tokenMint: string): Promise<string> {
   ]);
 }
 
-export async function canonicalPumpSwapPoolAddress(tokenMint: string): Promise<string> {
+export async function canonicalPumpSwapPoolAddress(
+  tokenMint: string,
+  quoteMint: string = WRAPPED_SOL_MINT,
+): Promise<string> {
   const creator = await pumpPoolAuthorityAddress(tokenMint);
   const index = Buffer.alloc(2);
   index.writeUInt16LE(0);
@@ -257,7 +267,7 @@ export async function canonicalPumpSwapPoolAddress(tokenMint: string): Promise<s
     index,
     Buffer.from(addressEncoder.encode(address(creator))),
     Buffer.from(addressEncoder.encode(address(tokenMint))),
-    Buffer.from(addressEncoder.encode(address(WRAPPED_SOL_MINT))),
+    Buffer.from(addressEncoder.encode(address(quoteMint))),
   ]);
 }
 
@@ -328,6 +338,7 @@ interface PumpSwapNormalizedState extends JsonObject {
 }
 
 export class PumpSwapSolanaMarketStateSource implements MarketStateSource {
+  private links = new Map<string, { until: number; baseVault: string; quoteVault: string }>();
   constructor(
     readonly rpc: SolanaRpcClient,
     readonly log: PumpFunLogSink = discardLog,
@@ -352,14 +363,40 @@ export class PumpSwapSolanaMarketStateSource implements MarketStateSource {
         'Requested market is not the canonical PumpSwap pool.',
       );
     }
+    const advisory = advisoryReadContext();
+    let discoveredPool = advisory ? this.links.get(expectedPool) : undefined;
+    if (!discoveredPool || discoveredPool.until <= Date.now()) {
+      const discovery = await this.rpc.getMultipleAccounts([expectedPool]);
+      const account = discovery.value[0];
+      if (!account || account.owner !== PUMP_AMM_PROGRAM_ID)
+        throw new ExecutionEngineError(
+          'MIGRATION_DESTINATION_UNAVAILABLE',
+          'Canonical PumpSwap pool was not found.',
+        );
+      const pool = decodePumpSwapPool(decodeRpcAccount(account, 'PumpSwap discovery'));
+      discoveredPool = {
+        until: Date.now() + 60000,
+        baseVault: pool.baseVault,
+        quoteVault: pool.quoteVault,
+      };
+    }
     const first = await this.rpc.getMultipleAccounts([
       expectedPool,
       globalAddress,
       feeConfigAddress,
       identity.tokenMint,
+      discoveredPool.baseVault,
+      discoveredPool.quoteVault,
+      ...(advisory ? [ADVISORY_CLOCK_ACCOUNT] : []),
     ]);
-    const [poolAccount, globalAccount, feeAccount, mintAccount] =
-      first.value as readonly (RpcAccount | null)[];
+    const [
+      poolAccount,
+      globalAccount,
+      feeAccount,
+      mintAccount,
+      baseVaultAccount,
+      quoteVaultAccount,
+    ] = first.value as readonly (RpcAccount | null)[];
     if (!poolAccount) {
       throw new ExecutionEngineError(
         'MIGRATION_DESTINATION_UNAVAILABLE',
@@ -397,8 +434,17 @@ export class PumpSwapSolanaMarketStateSource implements MarketStateSource {
     ) {
       throw new ExecutionEngineError('INVALID_MARKET_STATE', 'PumpSwap pool identity is invalid.');
     }
-    const vaults = await this.rpc.getMultipleAccounts([pool.baseVault, pool.quoteVault]);
-    const [baseVaultAccount, quoteVaultAccount] = vaults.value as readonly (RpcAccount | null)[];
+    if (
+      pool.baseVault !== discoveredPool.baseVault ||
+      pool.quoteVault !== discoveredPool.quoteVault
+    ) {
+      this.links.delete(expectedPool);
+      throw new ExecutionEngineError(
+        'INVALID_MARKET_STATE',
+        'PumpSwap vault linkage changed during discovery.',
+      );
+    }
+    const vaults = first;
     if (!baseVaultAccount || !quoteVaultAccount) {
       throw new ExecutionEngineError(
         'MARKET_STATE_UNAVAILABLE',
@@ -445,7 +491,7 @@ export class PumpSwapSolanaMarketStateSource implements MarketStateSource {
     );
     const feeConfig = decodePumpSwapFeeConfig(decodeRpcAccount(feeAccount, 'PumpSwap fee config'));
     const effectiveQuote = quoteVault.amount + pool.virtualQuoteReserves;
-    if (effectiveQuote <= 0n || pool.virtualQuoteReserves < 0n) {
+    if (effectiveQuote <= 0n || effectiveQuote > 0xffffffffffffffffn) {
       throw new ExecutionEngineError(
         'INVALID_MARKET_STATE',
         'PumpSwap effective quote reserves are invalid.',
@@ -470,6 +516,7 @@ export class PumpSwapSolanaMarketStateSource implements MarketStateSource {
     }
     const normalizedState: PumpSwapNormalizedState = {
       model: 'PUMP_SWAP_CANONICAL_POOL',
+      ...(advisory ? { chainTime: advisoryClockTime(first.value[6], first.context.slot) } : {}),
       programId: PUMP_AMM_PROGRAM_ID,
       feeProgramId: PUMP_FEE_PROGRAM_ID,
       poolAddress: expectedPool,
@@ -511,6 +558,10 @@ export class PumpSwapSolanaMarketStateSource implements MarketStateSource {
       normalizationVersion: PUMP_SWAP_NORMALIZATION_VERSION,
       normalizedState,
     };
+    if (advisory) {
+      if (this.links.size >= 256) this.links.delete(this.links.keys().next().value!);
+      this.links.set(expectedPool, discoveredPool);
+    }
     this.log('pump_swap_market_state_loaded', {
       protocol: PUMP_SWAP_PROTOCOL_ID,
       market: expectedPool,
@@ -571,7 +622,15 @@ function mathState(state: MarketState): MathState {
     creatorFeeApplies: value.creatorFeeApplies,
     disableFlags: Number(bigintField(value.disableFlags, 'disable flags')),
   };
-  if (result.base <= 0n || result.rawQuote <= 0n || result.effectiveQuote <= 0n) {
+  if (
+    result.base <= 0n ||
+    result.rawQuote <= 0n ||
+    result.effectiveQuote <= 0n ||
+    result.effectiveQuote !== result.rawQuote + result.virtualQuote ||
+    result.effectiveQuote > 0xffffffffffffffffn ||
+    [result.lpFeeBps, result.protocolFeeBps, result.creatorFeeBps].some((fee) => fee < 0n) ||
+    result.lpFeeBps + result.protocolFeeBps + result.creatorFeeBps >= BPS_DENOMINATOR
+  ) {
     throw new ExecutionEngineError('INVALID_MARKET_STATE', 'PumpSwap reserves are invalid.');
   }
   return result;
@@ -675,7 +734,9 @@ export function simulatePumpSwapSellAmount(tokenInput: bigint, state: MathState)
   const net = gross - fees.total;
   if (gross <= 0n || net <= 0n || state.rawQuote < gross - fees.lp) {
     throw new ExecutionEngineError(
-      'INVALID_EXECUTION_RESULT',
+      state.rawQuote < gross - fees.lp
+        ? 'INSUFFICIENT_EXECUTABLE_LIQUIDITY'
+        : 'ZERO_EXECUTABLE_OUTPUT',
       'PumpSwap SELL exceeds reserves or produces no output.',
     );
   }
@@ -708,6 +769,28 @@ function assertIdentity(expected: MarketIdentity, actual: MarketIdentity): void 
 export class PumpSwapProtocolAdapter implements ProtocolAdapter {
   readonly protocolId = PUMP_SWAP_PROTOCOL_ID;
   readonly adapterVersion = PUMP_SWAP_ADAPTER_VERSION;
+  async maxExecutableSellQuantity(request: PositionExitValuationRequest, marketState: MarketState) {
+    assertIdentity(request.identity, marketState.identity);
+    const state = mathState(marketState);
+    if ((state.disableFlags & 16) !== 0)
+      throw new ExecutionEngineError('PROTOCOL_DISABLED', 'PumpSwap SELL is disabled.');
+    if (
+      state.lpFeeBps +
+        state.protocolFeeBps +
+        (state.creatorFeeApplies ? state.creatorFeeBps : 0n) >=
+      BPS_DENOMINATOR
+    )
+      return tokenBaseUnits(0n);
+    return tokenBaseUnits(
+      maximumConstantProductSell(
+        request.tokenQuantity,
+        state.base,
+        state.effectiveQuote,
+        (gross) => state.rawQuote >= gross - feesFor(gross, state).lp,
+        (gross) => gross - feesFor(gross, state).total,
+      ),
+    );
+  }
   constructor(
     readonly source: MarketStateSource,
     readonly log: PumpFunLogSink = discardLog,
@@ -843,7 +926,7 @@ export class PumpMigrationResolver implements ExecutionRouteResolver {
     if (curve.quoteMint !== ZERO_PUBLIC_KEY && curve.quoteMint !== WRAPPED_SOL_MINT) {
       throw new ExecutionEngineError(
         'UNSUPPORTED_MIGRATED_PROTOCOL',
-        'Only SOL-paired Pump migrations are supported.',
+        'Pump migration quote asset requires composed execution through the canonical router.',
       );
     }
     const pool = await canonicalPumpSwapPoolAddress(identity.tokenMint);

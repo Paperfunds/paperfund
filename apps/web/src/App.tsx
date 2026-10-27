@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 
 import { ApiError, api, errorMessage, type BuyResult, type SellResult } from './api.js';
 import {
@@ -25,6 +25,10 @@ import type {
   User,
 } from './types.js';
 import { encodeBase58, getInjectedWallet } from './wallet.js';
+import { buyPreflightMessage } from '@paperfund/shared/browser';
+
+import { LandingPage, PublicHeader, PublicFooter } from './Landing.js';
+import { RewardsPage } from './Rewards.js';
 
 type Notice = { tone: 'success' | 'error' | 'info'; title: string; body: ReactNode };
 
@@ -124,6 +128,34 @@ function useAccount(user: User | null) {
 }
 
 export function App() {
+  const location = useLocation();
+  const publicHost =
+    window.location.hostname === 'paperfund.app' ||
+    window.location.hostname === 'www.paperfund.app';
+  const applicationHost = ['trade.paperfund.app', 'app.paperfund.app'].includes(
+    window.location.hostname,
+  );
+  const publicPath = ['/', '/rules', '/privacy', '/support'].includes(location.pathname);
+  if (publicHost || (!applicationHost && publicPath))
+    return (
+      <div className="studio-site">
+        <PublicHeader />
+        <main>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/rules" element={<RulesPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/support" element={<SupportPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+        <PublicFooter />
+      </div>
+    );
+  return <TradingApp />;
+}
+
+function TradingApp() {
   const auth = useAuth();
   const round = useRound();
   const account = useAccount(auth.user);
@@ -150,76 +182,46 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <NavLink className="wordmark" to="/" aria-label="Paperfund home">
-          <BrandMark />
-          <span>Paperfund</span>
-        </NavLink>
-        <nav aria-label="Primary navigation">
-          <NavItem to="/" icon="⌂">
-            Home
-          </NavItem>
-          <NavItem to="/trade" icon="↗">
-            Trade
-          </NavItem>
-          <NavItem to="/hourly" icon="◷">
-            Hourly
-          </NavItem>
-          <NavItem to="/daily" icon="◇">
-            Daily
-          </NavItem>
-          <NavItem to="/history" icon="≡">
-            History
-          </NavItem>
-          <NavItem to="/rules" icon="§">
-            Rules
-          </NavItem>
-        </nav>
-        <div className="sidebar-foot">
-          <div>
-            <span className="status-dot" /> Paper trading only
-          </div>
-          <div className="legal-links">
-            <NavLink to="/privacy">Privacy</NavLink>
-            <NavLink to="/support">Support</NavLink>
-          </div>
-        </div>
-      </aside>
       <main>
-        <header className="topbar">
-          <div className="mobile-brand">
-            <BrandMark /> Paperfund
+        <header className="obsidian-header">
+          <a className="app-brand" href="https://paperfund.app" aria-label="Paperfund home">
+            <BrandMark />
+            <span>Paperfund</span>
+            <small>TRADE</small>
+          </a>
+          <nav aria-label="Primary navigation">
+            <NavItem to="/hourly">Hourly leaderboard</NavItem>
+            <NavItem to="/daily">Daily leaderboard</NavItem>
+            <NavItem to="/history">Trade history</NavItem>
+            <NavItem to="/rewards">Rewards</NavItem>
+          </nav>
+          <WalletControl auth={auth} />
+        </header>
+        <div className="competition-bar">
+          <div>
+            <span className="status-dot" /> PRIVATE BETA <span className="bar-separator">/</span>{' '}
+            SIMULATED TRADING
           </div>
           <div className="round-chip">
-            <span>ROUND</span>
+            <span>UTC ROUND</span>
             <strong>{currentRound ? roundLabel(currentRound) : 'Unavailable'}</strong>
           </div>
-          <div className="timer" aria-label={`${countdown} remaining`}>
+          <div className="timer">
             <span>{tradingOpen ? 'CLOSES IN' : 'STATUS'}</span>
             <strong>{tradingOpen ? countdown : (currentRound?.state ?? 'OFFLINE')}</strong>
           </div>
-          <div className="top-balance">
-            <span>PAPER SOL</span>
-            <strong>
-              {account.isLoading
-                ? '—'
-                : account.data
-                  ? formatSol(account.data.paperSolLamports, 3)
-                  : 'Not entered'}
-            </strong>
-          </div>
-          <WalletControl auth={auth} />
-        </header>
-        <div className="mobile-nav">
-          <NavItem to="/">Home</NavItem>
-          <NavItem to="/trade">Trade</NavItem>
-          <NavItem to="/hourly">Hourly</NavItem>
-          <NavItem to="/daily">Daily</NavItem>
-          <NavItem to="/history">History</NavItem>
-          <NavItem to="/rules">Rules</NavItem>
+          <NavLink to="/trade" className="paper-account-link">
+            {account.data
+              ? `${formatSol(account.data.paperSolLamports, 3)} Paper SOL`
+              : 'Paper trading account'}{' '}
+            ↗
+          </NavLink>
+        </div>
+        <div role="note" className="notice">
+          Invite-only technical beta. Real-SOL rewards are not active.
         </div>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<Navigate to="/hourly" replace />} />
           <Route
             path="/trade"
             element={
@@ -232,61 +234,25 @@ export function App() {
               />
             }
           />
-          <Route path="/hourly" element={<HourlyPage />} />
+          <Route path="/hourly" element={<HourlyPage user={auth.user} />} />
           <Route path="/daily" element={<DailyPage user={auth.user} />} />
           <Route path="/history" element={<HistoryPage user={auth.user} />} />
+          <Route path="/rewards" element={<RewardsPage user={auth.user} />} />
           <Route path="/rules" element={<RulesPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <footer className="app-footer">
+          <span>Paperfund / Simulated trading. Real-SOL rewards inactive.</span>
+          <div>
+            <NavLink to="/rules">Rules</NavLink>
+            <NavLink to="/privacy">Privacy</NavLink>
+            <NavLink to="/support">Support</NavLink>
+          </div>
+        </footer>
       </main>
     </div>
-  );
-}
-
-function LandingPage() {
-  return (
-    <PageFrame>
-      <section className="welcome launch-landing">
-        <BrandMark className="hero-mark" />
-        <div className="eyebrow">FREE HOURLY SOLANA PAPER TRADING</div>
-        <h1>
-          Prove your edge.
-          <br />
-          <em>Earn real rewards.</em>
-        </h1>
-        <p>
-          Start every UTC hour with 10 Paper SOL, trade simulated Solana markets with realistic
-          execution, and compete for creator-fee-funded rewards. Paperfund works on the web and
-          alongside Axiom, GMGN.ai, and Terminal.trade.
-        </p>
-        <div className="launch-actions">
-          <NavLink className="button primary" to="/trade">
-            Enter Paperfund
-          </NavLink>
-          <NavLink className="button secondary" to="/rules">
-            Read the rules
-          </NavLink>
-        </div>
-        <div className="rule-grid">
-          <Rule number="01" title="10 Paper SOL" body="A clean simulated account every hour." />
-          <Rule
-            number="02"
-            title="Realistic fills"
-            body="Fees, price impact, and forced settlement."
-          />
-          <Rule
-            number="03"
-            title="Real rewards"
-            body="Audited allocations funded by creator fees."
-          />
-        </div>
-        <span className="simulation-label">
-          Simulated trading only · Paper SOL has no monetary value · No trading deposits
-        </span>
-      </section>
-    </PageFrame>
   );
 }
 
@@ -300,9 +266,12 @@ function PrivacyPage() {
       <PageTitle
         eyebrow="PRIVACY"
         title="Paperfund privacy notice"
-        subtitle="Last updated September 28, 2026. This release-candidate notice must receive final legal and operator review before publication."
+        subtitle="Private-beta privacy notice. Retention periods and jurisdictional details remain under review."
       />
       <article className="policy-copy">
+        <p>
+          Privacy questions: <a href="mailto:support@paperfund.app">support@paperfund.app</a>.
+        </p>
         <h2>What Paperfund processes</h2>
         <p>
           Paperfund processes your public Solana wallet address, an authentication challenge and its
@@ -340,8 +309,8 @@ function PrivacyPage() {
         <h2>Questions and requests</h2>
         <p>
           Use the <NavLink to="/support">support page</NavLink> for help or privacy requests. The
-          legal entity, privacy contact, jurisdictional rights language, and final retention
-          schedule are explicit release gates and must be completed before store submission.
+          legal entity, jurisdictional rights language, and final retention schedule remain under
+          review for the private beta.
         </p>
       </article>
     </PageFrame>
@@ -368,7 +337,8 @@ function SupportPage() {
           Open a report in the{' '}
           <a href="https://github.com/Paperfunds/paperfund/issues">Paperfund issue tracker</a>.
           Never include a seed phrase, private key, session token, or other secret. A monitored
-          support email and legal contact remain required before Chrome Web Store submission.
+          support address is <a href="mailto:support@paperfund.app">support@paperfund.app</a>. Beta
+          access remains invite-only; real-SOL rewards are inactive.
         </p>
       </article>
     </PageFrame>
@@ -392,7 +362,7 @@ function RulesPage() {
         <Rule
           number="02"
           title="Position controls"
-          body="Each buy is capped at 20% of starting capital, and each account can hold at most five open position slots."
+          body="Each buy is capped at 20% of current portfolio equity. Five unique token entries are allowed per hour; selling does not free a slot, and rebuying the same token uses no additional slot."
         />
         <Rule
           number="03"
@@ -412,11 +382,14 @@ function RulesPage() {
         <Rule
           number="06"
           title="Reward funding"
-          body="Rewards are allocated from verified creator-fee proceeds, reviewed, approved, paid, and reconciled on-chain."
+          body="The reward model uses verified creator fees. Real-SOL rewards are inactive in this invite-only beta, with financial STOP asserted. Reviewed allocations are not paid rewards."
         />
       </section>
       <div className="rules-callout">
-        Rewards are not guaranteed. Only an approved payout allocation marked paid after on-chain
+        All finalized hourly gains and losses count toward the UTC day of the round start. Ties
+        share funded ordinal allocations. No top-ups, deposits or balance carryovers. Public
+        eligibility and geographic restrictions await final review before reward activation. Rewards
+        are not guaranteed. Only an approved payout allocation marked paid after on-chain
         verification represents a completed reward.
       </div>
     </PageFrame>
@@ -435,13 +408,20 @@ function NavItem({ to, icon, children }: { to: string; icon?: string; children: 
 function WalletControl({ auth }: { auth: ReturnType<typeof useAuth> }) {
   if (!auth.walletAddress && !auth.user)
     return (
-      <button
-        className="wallet-button"
-        onClick={() => auth.connect.mutate()}
-        disabled={auth.connect.isPending}
-      >
-        Connect Wallet
-      </button>
+      <div className="wallet-area">
+        <button
+          className="wallet-button"
+          onClick={() => auth.connect.mutate()}
+          disabled={auth.connect.isPending}
+        >
+          Connect Wallet
+        </button>
+        {auth.walletError && (
+          <span className="floating-error" role="alert">
+            {auth.walletError}
+          </span>
+        )}
+      </div>
     );
   if (!auth.user)
     return (
@@ -738,7 +718,10 @@ function OrderTicket({
   const canBuy =
     tradingOpen &&
     market.data?.supported &&
-    preflight.data?.valuationStatus === 'AVAILABLE' &&
+    preflight.data &&
+    (preflight.data.equityValuationStatus
+      ? preflight.data.equityValuationStatus !== 'UNAVAILABLE' && !preflight.data.blockingReason
+      : preflight.data.valuationStatus === 'AVAILABLE') &&
     preflight.data.marketSupported &&
     preflight.data.slotAvailable &&
     exactMax !== null &&
@@ -774,6 +757,9 @@ function OrderTicket({
       {market.error && <div className="market-status error">{errorMessage(market.error)}</div>}
       {market.data && <MarketCard market={market.data} />}
       {preflight.isFetching && <div className="market-status">Calculating exact maximum…</div>}
+      {buyPreflightMessage(preflight.data) && (
+        <div className="market-status error">{buyPreflightMessage(preflight.data)}</div>
+      )}
       {preflight.error && (
         <div className="market-status error">{errorMessage(preflight.error)}</div>
       )}
@@ -1006,6 +992,7 @@ function PositionRow({
           {([25, 50, 75] as const).map((percent) => (
             <button
               key={percent}
+              disabled={position.sellPreflight?.percentages[`${percent}`].executable === false}
               onClick={() =>
                 setQuantity(percentageQuantity(position.tokenQuantityBaseUnits, percent))
               }
@@ -1023,12 +1010,46 @@ function PositionRow({
         </button>
         <button
           className="button danger"
-          disabled={!tradingOpen || sell.isPending}
+          disabled={
+            !tradingOpen || sell.isPending || position.sellPreflight?.full.executable === false
+          }
           onClick={() => sell.mutate('ALL')}
         >
           Sell All
         </button>
       </div>
+      {position.sellPreflight && position.sellPreflight.status !== 'FULL' && (
+        <div className="market-status error">
+          {position.sellPreflight.status === 'NO_EXECUTABLE_LIQUIDITY' ? (
+            'Insufficient executable liquidity: no positive exit is currently possible.'
+          ) : (
+            <>
+              Liquidity-limited: full exit unavailable. Max executable exit:{' '}
+              {formatUnits(
+                position.sellPreflight.maxExecutableQuantityBaseUnits,
+                position.tokenDecimals,
+                position.tokenDecimals,
+              )}{' '}
+              tokens for {formatSol(position.sellPreflight.maxExecutableOutputLamports, 9)}.{' '}
+              Executable-portion P&amp;L:{' '}
+              {formatSol(position.sellPreflight.executablePortionPnlLamports!, 9)}. Not
+              full-position P&amp;L.
+              <button
+                className="button secondary"
+                disabled={!tradingOpen || sell.isPending}
+                onClick={() => sell.mutate(position.sellPreflight!.maxExecutableQuantityBaseUnits)}
+              >
+                Sell max executable
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {!position.sellPreflight && position.valuation.status !== 'AVAILABLE' && (
+        <div className="market-status error">
+          Exit valuation unavailable: {position.valuation.reason}. Retrying…
+        </div>
+      )}
     </article>
   );
 }
@@ -1045,7 +1066,15 @@ function TradeHistory({ user }: { user: User }) {
   return (
     <section className="panel activity-panel">
       <PanelHead eyebrow="LEDGER" title="Trade activity" count={items.length} />
-      {trades.isLoading ? (
+      {trades.error ? (
+        <NoticeCard
+          notice={{
+            tone: 'error',
+            title: 'Trade history unavailable',
+            body: errorMessage(trades.error),
+          }}
+        />
+      ) : trades.isLoading ? (
         <SkeletonRows />
       ) : items.length ? (
         <div className="table-scroll">
@@ -1093,7 +1122,9 @@ function TradeRow({ trade }: { trade: Trade }) {
   const forced = trade.execution_context === 'FORCED_HOURLY_SETTLEMENT';
   return (
     <tr>
-      <td>{utcTime(trade.executed_at)}</td>
+      <td title={new Date(trade.executed_at).toUTCString()}>
+        {new Date(trade.executed_at).toISOString().slice(0, 10)} · {utcTime(trade.executed_at)} UTC
+      </td>
       <td>
         <span className={`trade-side ${trade.side.toLowerCase()}`}>
           {forced ? 'AUTO CLOSE' : trade.side}
@@ -1119,7 +1150,99 @@ function TradeRow({ trade }: { trade: Trade }) {
   );
 }
 
-function HourlyPage() {
+function LiveHourlyBoard({ user }: { user: User | null }) {
+  const [roundId, setRoundId] = useState<string | undefined>(undefined);
+  const board = useQuery({
+    queryKey: ['hourly-live', roundId],
+    queryFn: () => api.liveHourly(roundId),
+    refetchInterval: 4_000,
+    retry: false,
+  });
+  const data = board.data;
+  useEffect(() => {
+    if (!roundId && data) setRoundId(data.round.id);
+  }, [roundId, data]);
+  return (
+    <section aria-label="Live hourly leaderboard">
+      <PageTitle
+        eyebrow={
+          data?.phase === 'LIVE' ? 'LIVE / PROVISIONAL' : (data?.phase ?? 'LIVE / PROVISIONAL')
+        }
+        title="Current hourly standings"
+        subtitle="Executable equity minus starting Paper SOL. Provisional scores never allocate rewards; only settled final results count."
+      />
+      {data && (
+        <p>
+          {new Date(data.round.starts_at).toUTCString()} ·{' '}
+          {data.phase === 'LIVE' ? 'Refreshes every 4 seconds' : data.phase}
+        </p>
+      )}
+      {board.error || data?.status === 'UNAVAILABLE' ? (
+        <EmptyState
+          title="Live ranking temporarily unavailable"
+          body="One or more accounts cannot be fully valued, or market data is unavailable. Retrying; no partial ranks are shown."
+        />
+      ) : data?.phase === 'SETTLING' ? (
+        <EmptyState
+          title="Settling"
+          body="Final positions are being force-settled. Rankings are not final yet."
+        />
+      ) : data?.phase === 'FINALIZED' ? (
+        <Leaderboard entries={data.entries} kind="hourly" user={user} />
+      ) : data?.entries.length ? (
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Provisional rank</th>
+                <th>Trader</th>
+                <th>Executable equity</th>
+                <th>Provisional P&amp;L</th>
+                <th>Slots used</th>
+                <th>Open positions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.entries.map((entry) => (
+                <tr key={entry.user_id} className={entry.user_id === user?.id ? 'user-row' : ''}>
+                  <td>
+                    {entry.rank}
+                    {entry.tied ? ` (tie ×${entry.tieGroupSize})` : ''}
+                  </td>
+                  <td>
+                    <span title={entry.wallet_address}>{shorten(entry.wallet_address, 7)}</span>
+                    {entry.user_id === user?.id && <span className="you">YOU</span>}
+                  </td>
+                  <td>{formatSol(entry.equityLamports!)}</td>
+                  <td>{signedSol(entry.score)}</td>
+                  <td>{entry.slotsUsed}</td>
+                  <td>{entry.openPositions}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyState
+          title={board.isLoading ? 'Loading live standings…' : 'No participants yet'}
+          body="Enter the current hour to appear in provisional standings."
+        />
+      )}
+      {data && data.phase !== 'LIVE' && (
+        <button
+          className="button secondary"
+          onClick={() => {
+            setRoundId(undefined);
+          }}
+        >
+          View current round
+        </button>
+      )}
+    </section>
+  );
+}
+
+function HourlyPage({ user }: { user: User | null }) {
   const board = useQuery({
     queryKey: ['hourly'],
     queryFn: api.hourly,
@@ -1128,6 +1251,7 @@ function HourlyPage() {
   });
   return (
     <PageFrame>
+      <LiveHourlyBoard user={user} />
       <PageTitle
         eyebrow="FINALIZED RESULTS"
         title="Hourly leaderboard"
@@ -1136,12 +1260,18 @@ function HourlyPage() {
       {board.isLoading ? (
         <SkeletonPanel />
       ) : board.error ? (
-        <EmptyState
-          title="Round in progress"
-          body="The latest hourly leaderboard is not finalized yet. Rankings appear only after forced settlement completes."
-        />
+        <EmptyState title="Hourly leaderboard unavailable" body={errorMessage(board.error)} />
       ) : board.data ? (
-        <Leaderboard entries={board.data.entries} kind="hourly" />
+        <>
+          <div className="board-context">
+            <span>
+              {new Date(board.data.round.starts_at).toUTCString()} ·{' '}
+              {roundRange(board.data.round.starts_at, board.data.round.ends_at_exclusive)}
+            </span>
+            <span className="badge">{board.data.round.state}</span>
+          </div>
+          <Leaderboard entries={board.data.entries} kind="hourly" user={user} />
+        </>
       ) : (
         <EmptyState
           title="No finalized rounds yet"
@@ -1169,6 +1299,24 @@ function DailyPage({ user }: { user: User | null }) {
         title="Daily leaderboard"
         subtitle="Every finalized hourly gain and loss contributes to the current UTC day's cumulative score."
       />
+      {board.error && (
+        <NoticeCard
+          notice={{
+            tone: 'error',
+            title: 'Daily standings unavailable',
+            body: errorMessage(board.error),
+          }}
+        />
+      )}
+      {board.data && (
+        <div className="board-context">
+          <span>
+            {new Date(board.data.dailyCompetition.starts_at).toUTCString()} —{' '}
+            {new Date(board.data.dailyCompetition.ends_at_exclusive).toUTCString()}
+          </span>
+          <span className="badge">{board.data.dailyCompetition.state} · UTC day</span>
+        </div>
+      )}
       {latestDailyReward?.won && (
         <section className="round-complete">
           <div>
@@ -1243,7 +1391,7 @@ function Leaderboard({
                   {entry.tied && <small className="tie">T{entry.tieGroupSize}</small>}
                 </td>
                 <td className="mono">
-                  {shorten(entry.wallet_address, 7)}
+                  <span title={entry.wallet_address}>{shorten(entry.wallet_address, 7)}</span>
                   {entry.user_id === user?.id && <span className="you">YOU</span>}
                 </td>
                 {kind === 'hourly' ? (
@@ -1282,13 +1430,23 @@ function HistoryPage({ user }: { user: User | null }) {
     <PageFrame>
       <PageTitle
         eyebrow="YOUR RECORD"
-        title="Round history"
-        subtitle="Final results remain attached to their original UTC hour. New rounds always begin from 10 Paper SOL."
+        title="Trade history"
+        subtitle="Your recorded paper buys, sells and forced settlements, followed by finalized hourly results."
       />
+      {user && <TradeHistory user={user} />}
+      <h2 className="history-results-title">Finalized hourly results</h2>
       {!user ? (
         <EmptyState
           title="Sign in to view history"
           body="Connect your wallet and sign in to load finalized personal results."
+        />
+      ) : results.error ? (
+        <NoticeCard
+          notice={{
+            tone: 'error',
+            title: 'Round history unavailable',
+            body: errorMessage(results.error),
+          }}
         />
       ) : results.isLoading ? (
         <SkeletonPanel />
