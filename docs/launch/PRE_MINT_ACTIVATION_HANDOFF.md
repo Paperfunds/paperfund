@@ -1,13 +1,13 @@
 # Ten-minute pre-mint handoff — review only
 
-Status: PREPARATION. Nothing here is a financial approval or a deployment instruction. This file belongs to a draft GitHub branch, not the installed protected Windows operator bundle. An address reserved for a forthcoming token does NOT establish an on-chain mint, creator, route, or earning event.
+Status: PREPARATION. Nothing here is a financial approval or a deployment instruction. This file belongs to a draft GitHub branch, not the installed protected Windows operator bundle. The owner reports the official mint is launched. An owner-supplied address alone does NOT independently establish an on-chain creator, fee route, transaction finality or earning event.
 
 ## Identities to pin and verify
 - Official intended developer/creator: `7BRznQJJbj5EFpMeafDc5c4oaCHSBchBiLagx9DRL6Sz`. Not yet enrolled in the protected development signer.
 - Historic backing wallet: `8x4L1a7vEFqvJu5B2GceMRjNVtSGgnwuHKuJH69aruae`. Never relabel or rotate its protected historical liabilities to 7BRzn.
 - Reward treasury: `Tt1rWaCT329MXgmPixU4aYtcXCmpS6fDDE5bGcYweXv`.
 - 10% platform-fee destination: `53sJCZ59TSkVynoD9SfaAXZMKyZtvRgN9QZTrzqRXrbx`.
-- Official mint: `ACTUAL_MINT` (reserved address is not verified until created and finalized).
+- Official mint supplied by the owner after launch (2026-10-28): `8NuGjbo1ZcUL3iVCy1hQHJeEABSK6V2D1xpRpHbVpump`. **Owner reports live**; creator, mint state, claim route and finality still require independent read-only mainnet RPC verification before any transaction authority.
 
 ## Before mint creation
 1. Owner confirms launch configuration: native SOL quote, correct creator set to 7BRzn, direct single-creator fees, and whether fee sharing or cashback may be enabled. An incompatible feature is a financial HOLD, not a reason to guess or route around safeguards.
