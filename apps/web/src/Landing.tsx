@@ -53,283 +53,127 @@ export function PublicFooter() {
 }
 export function LandingPage() {
   return (
-    <>
-      <section className="studio-hero">
-        <div className="hero-kicker">
-          <span className="public-dot" />
-          SOLANA PAPER TRADING / HOURLY COMPETITIONS
+    <div className="league-home">
+      <section className="league-hero" aria-labelledby="league-hero-title">
+        <div className="league-hero-glow" aria-hidden="true" />
+        <div className="league-eyebrow"><span className="league-signal" /> THE SOLANA TRADING LEAGUE</div>
+        <h1 id="league-hero-title">The market is real.<br /><span>The trades are not.</span></h1>
+        <p className="league-hero-lede">
+          Trade on paper. Compete every hour. Earn your position on the leaderboard.
+        </p>
+        <div className="league-actions">
+          <a className="league-cta league-cta-primary" href={siteConfig.appUrl}>
+            Enter Paperfund <span aria-hidden="true">↗</span>
+          </a>
+          <a className="league-cta league-cta-secondary" href={siteConfig.extensionUrl} target="_blank" rel="noreferrer">
+            Get the extension <span aria-hidden="true">↗</span>
+          </a>
         </div>
-        <h1>
-          <span>Prove your edge.</span>
-          <br />
-          <span className="hero-serif">Keep your capital.</span>
-        </h1>
-        <div className="hero-bottom">
-          <p>
-            Your terminals. A fresh start every hour.
-            <br />
-            Paper trade Solana markets, climb the leaderboard, and build a record that speaks for
-            itself.
-          </p>
-          <div className="hero-buttons">
-            <a
-              className="studio-button dark"
-              href={siteConfig.extensionUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span>↓</span> Get the Chrome extension <span>↗</span>
-            </a>
-            <a className="studio-text-link" href={siteConfig.appUrl}>
-              Enter Paperfund <span>↗</span>
-            </a>
+        <div className="league-hero-facts" aria-label="Competition rules">
+          <div><strong>10</strong><span>Starting Paper SOL</span></div>
+          <div><strong>1H / 1D</strong><span>UTC competitions</span></div>
+          <div><strong>5</strong><span>Unique tokens per hour</span></div>
+        </div>
+        <div className="league-stage" aria-label="Illustration of the Paperfund competition format">
+          <div className="league-stage-head">
+            <div>
+              <span className="league-stage-kicker">THE COMPETITION</span>
+              <strong>One hour. One leaderboard.</strong>
+            </div>
+            <span className="league-stage-pill"><span /> PAPER TRADING</span>
+          </div>
+          <div className="league-stage-body">
+            <div className="league-score">
+              <span className="league-stage-kicker">YOUR STARTING BALANCE</span>
+              <div className="league-score-value">10.00 <small>PAPER SOL</small></div>
+              <p>No deposit. No real-money orders.</p>
+              <div className="league-score-bars" aria-hidden="true">
+                <span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span /><span />
+              </div>
+            </div>
+            <div className="league-podium">
+              <span className="league-stage-kicker">HOW RANKING WORKS</span>
+              <div className="league-podium-row"><b>01</b><span>Trade on supported terminals</span><i /></div>
+              <div className="league-podium-row"><b>02</b><span>Finish the UTC hour</span><i /></div>
+              <div className="league-podium-row"><b>03</b><span>Rank by settled P&amp;L</span><i /></div>
+              <small>Illustrative process · Not live results</small>
+            </div>
           </div>
         </div>
-        <div className="hero-footnote">
-          No trading deposits. No real-money trades. Just your decisions.
-        </div>
       </section>
-      <section className="studio-principles" aria-label="Competition at a glance">
-        <div>
-          <span>01 / START FRESH</span>
-          <strong>
-            10 <em>Paper SOL</em>
-          </strong>
-          <p>A new simulated account every UTC hour.</p>
-        </div>
-        <div>
-          <span>02 / FIND YOUR EDGE</span>
-          <strong>
-            Your <em>familiar terminals.</em>
-          </strong>
-          <p>Axiom, GMGN.ai, and Terminal / Padre.</p>
-        </div>
-        <div>
-          <span>03 / COMPETE FAIRLY</span>
-          <strong>
-            One <em>shared rulebook.</em>
-          </strong>
-          <p>Server-authoritative results. Transparent rewards.</p>
-        </div>
-      </section>
-      <section className="studio-section purpose">
-        <div className="section-index">THE IDEA / 01</div>
-        <div>
-          <h2>
-            A place to get better.
-            <br />
-            <span>Before capital is on the line.</span>
-          </h2>
-          <p>
-            Markets move fast. Learning shouldn’t mean risking your wallet. Paperfund brings a
-            structured paper-trading competition into the Solana terminals you already use, with
-            simulated execution, clear limits, and a fresh opportunity every hour.
-          </p>
-          <p>
-            Trade through the Paperfund extension on Axiom, GMGN and Padre. Follow the competition
-            here. Your Paper SOL is simulated and cannot be withdrawn.
-          </p>
-        </div>
-      </section>
-      <section className="studio-section how-section" id="how-it-works">
-        <div className="section-index">GET STARTED / 02</div>
-        <div>
-          <h2>
-            Your next hour
-            <br />
-            <span>starts here.</span>
-          </h2>
-          <ol className="studio-steps">
-            <li>
-              <span>01</span>
-              <div>
-                <h3>Install the extension.</h3>
-                <p>
-                  Get the published Paperfund extension from the Chrome Web Store. Open a supported
-                  Solana market on Axiom, GMGN.ai or Padre.
-                </p>
-              </div>
-              <a
-                href={siteConfig.extensionUrl}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Install Paperfund from Chrome Web Store"
-              >
-                ↗
-              </a>
-            </li>
-            <li>
-              <span>02</span>
-              <div>
-                <h3>Connect. Sign. Join.</h3>
-                <p>
-                  Connect a Solana wallet and sign an authentication message. Paperfund never
-                  asks for your private key or a trading deposit. Reward eligibility is separate
-                  from PAPER competition participation.
-                </p>
-              </div>
-            </li>
-            <li>
-              <span>03</span>
-              <div>
-                <h3>Make the hour count.</h3>
-                <p>
-                  Enter with 10 Paper SOL. Up to five unique token entries per hour; each buy is
-                  limited to 20% of current portfolio equity. Follow live standings and your own
-                  trade history.
-                </p>
-              </div>
-              <a href={siteConfig.appUrl} aria-label="Enter the Paperfund application">
-                ↗
-              </a>
-            </li>
-          </ol>
-        </div>
-      </section>
-      <section className="competition-section">
-        <div className="section-index">THE COMPETITION / 03</div>
-        <div className="competition-intro">
-          <h2>
-            Every hour, a reset.
-            <br />
-            <span>Every day, a bigger picture.</span>
-          </h2>
-          <p>One competition for the next decision. Another for consistency across the day.</p>
-        </div>
-        <div className="competition-grid">
+
+      <section className="league-intro" id="how-it-works">
+        <span className="league-eyebrow">THE FORMAT</span>
+        <h2>Pure competition.<br /><span>Clear rules.</span></h2>
+        <div className="league-feature-grid">
           <article>
-            <span className="competition-number">
-              60<span>MIN</span>
-            </span>
-            <div>
-              <span className="section-index">HOURLY LEADERBOARD</span>
-              <h3>A clean slate.</h3>
-              <p>
-                Every UTC hour starts with 10 Paper SOL. Positions are force-settled at cutoff
-                before results become final. The approved reward model allocates to the top 10, with
-                ties sharing funded places.
-              </p>
-              <a href={`${siteConfig.appUrl}/hourly`}>Explore hourly standings ↗</a>
-            </div>
+            <span className="league-feature-index">01 / TRADE</span>
+            <h3>Trade the tokens you know.</h3>
+            <p>Use Paperfund alongside Axiom, GMGN and Padre. Positions are simulated with market-based pricing.</p>
           </article>
           <article>
-            <span className="competition-number">
-              24<span>HRS</span>
-            </span>
-            <div>
-              <span className="section-index">DAILY CHAMPIONSHIP</span>
-              <h3>The whole day counts.</h3>
-              <p>
-                All finalized hourly gains and losses add to your UTC-day score. There is no
-                best-hour filter or loss protection. The approved daily reward model allocates to
-                the top 25.
-              </p>
-              <a href={`${siteConfig.appUrl}/daily`}>Explore daily standings ↗</a>
-            </div>
+            <span className="league-feature-index">02 / COMPETE</span>
+            <h3>Every hour counts.</h3>
+            <p>Hourly results settle at the UTC cutoff. Each finalized hour also contributes to the daily leaderboard.</p>
+          </article>
+          <article>
+            <span className="league-feature-index">03 / LIMITS</span>
+            <h3>The same rules for everyone.</h3>
+            <p>Start with 10 Paper SOL. Five unique tokens per hour. Maximum 20% of portfolio equity per buy.</p>
           </article>
         </div>
       </section>
-      <section className="studio-section rewards-explainer" id="rewards">
-        <div className="section-index">THE REWARD MODEL / 04</div>
-        <div>
-          <h2>
-            Paper trades.
-            <br />
-            <span>A real-SOL reward model.</span>
-          </h2>
-          <p>
-            Paper SOL has no monetary value. Separately, the approved reward model is funded by
-            verified actual creator fees from the Paperfund token—not user deposits or estimated
-            volume. Rewards depend on verified funding, final results and operator approval.
-          </p>
-          <div className="allocation-visual" aria-label="Normal mode allocation">
-            <div className="allocation-hourly">
-              63%<span>Hourly</span>
-            </div>
-            <div className="allocation-daily">
-              27%<span>Daily</span>
-            </div>
-            <div className="allocation-platform">
-              10%<span>Platform</span>
-            </div>
-          </div>
-          <p className="allocation-note">
-            Normal mode: 63% hourly / 27% daily / 10% platform. Buffer accumulation mode: 58% hourly
-            / 5% reward buffer / 27% daily / 10% platform. The player share remains 90%; buffer
-            support is subject to recorded available funds.
-          </p>
-          <div className="beta-disclosure">
-            <span className="public-dot" />
-            <div>
-              <strong>Real-SOL payouts require verified funding and approval.</strong>
-              <p>
-                Payouts require verified creator fees, qualified competition results, accepted
-                funding and financial authorization. Observations and REVIEW allocations are not
-                paid rewards. Follow the actual funding and payment status in the app.
-              </p>
-            </div>
-          </div>
-          <a className="studio-text-link" href={`${siteConfig.appUrl}/rewards`}>
-            View reward transparency <span>↗</span>
+
+      <section className="league-championship" id="competitions">
+        <div className="league-championship-head">
+          <span className="league-eyebrow">COMPETITION MODES</span>
+          <h2>Two ways<br />to prove it.</h2>
+        </div>
+        <div className="league-mode-grid">
+          <a className="league-mode" href={siteConfig.appUrl + '/hourly'}>
+            <span className="league-feature-index">THE SPRINT</span>
+            <span className="league-mode-number">01<span>H</span></span>
+            <div><h3>Hourly competition</h3><p>Fresh scoring window. Final P&amp;L decides the rank.</p></div>
+            <span className="league-mode-arrow" aria-hidden="true">↗</span>
+          </a>
+          <a className="league-mode" href={siteConfig.appUrl + '/daily'}>
+            <span className="league-feature-index">THE CHAMPIONSHIP</span>
+            <span className="league-mode-number">24<span>H</span></span>
+            <div><h3>Daily competition</h3><p>Every finalized hourly result adds to your UTC day.</p></div>
+            <span className="league-mode-arrow" aria-hidden="true">↗</span>
           </a>
         </div>
       </section>
-      <section className="studio-faq">
+
+      <section className="league-funding" id="rewards">
         <div>
-          <span className="section-index">GOOD TO KNOW / 05</span>
-          <h2>
-            Clear rules.
-            <br />
-            <span>From the start.</span>
-          </h2>
-          <NavLink className="studio-text-link" to="/rules">
-            Read the full rules ↗
-          </NavLink>
+          <span className="league-eyebrow">REWARDS & TRANSPARENCY</span>
+          <h2>Real SOL.<br /><span>Verified funding.</span></h2>
+          <p>Reward funding comes from verified creator fees—not paper balances. Payouts require qualified results, received funds and financial authorization.</p>
+          <a href={siteConfig.appUrl + '/rewards'} className="league-text-link">
+            View funding and payout status <span aria-hidden="true">↗</span>
+          </a>
         </div>
-        <div>
-          <details>
-            <summary>Am I trading real SOL?</summary>
-            <p>
-              No. Every trade is simulated. Paper SOL and positions have no monetary value and
-              cannot be withdrawn. Connecting and signing in authenticates your wallet; it does not
-              authorize a swap.
-            </p>
-          </details>
-          <details>
-            <summary>Who can join Paperfund?</summary>
-            <p>
-              Connect a Solana wallet to participate in available paper-trading competitions.
-              Reward eligibility and geographic restrictions may apply separately. See the
-              Rewards page for verified funding and payout status.
-            </p>
-          </details>
-          <details>
-            <summary>What happens at the end of an hour?</summary>
-            <p>
-              Open positions go through forced settlement. Final settled Paper SOL determines the
-              hourly result. Each new hour starts with a fresh account; there are no top-ups or
-              balance carryovers.
-            </p>
-          </details>
-          <details>
-            <summary>Are rewards guaranteed?</summary>
-            <p>
-              No. Real-SOL rewards depend on verified creator fees, accepted competition results
-              and authorized funding. Observed fees, reviewed allocations, qualified funds,
-              reserved funds and verified payments are separate states. Only verified on-chain
-              payments are paid rewards.
-            </p>
-          </details>
+        <div className="league-funding-model">
+          <div className="league-funding-top"><span>NORMAL ALLOCATION</span><span>CREATOR FEES</span></div>
+          <div className="league-allocation-track" role="img" aria-label="63 percent hourly, 27 percent daily, 10 percent platform">
+            <span style={{ width: '63%' }} /><span style={{ width: '27%' }} /><span style={{ width: '10%' }} />
+          </div>
+          <div className="league-split-list">
+            <div><b>63%</b><span>Hourly</span></div>
+            <div><b>27%</b><span>Daily</span></div>
+            <div><b>10%</b><span>Platform</span></div>
+          </div>
+          <p>Amounts are not payable unless qualified and funded. The alternate buffer mode is described in the competition rules.</p>
         </div>
       </section>
-      <section className="studio-final">
-        <span className="section-index">YOUR EDGE IS EARNED.</span>
-        <h2>Give it an hour.</h2>
-        <a className="studio-button dark" href={siteConfig.appUrl}>
-          Enter Paperfund <span>↗</span>
-        </a>
-        <p>Public paper trading · Simulated positions · No deposit</p>
+
+      <section className="league-outro">
+        <span className="league-eyebrow">PAPERFUND</span>
+        <h2>Make every trade<br />count.</h2>
+        <a className="league-cta league-cta-primary" href={siteConfig.appUrl}>Enter the competition <span aria-hidden="true">↗</span></a>
+        <p>Paper trading only. No trading deposits. Reward status is verified separately.</p>
       </section>
-    </>
+    </div>
   );
 }
