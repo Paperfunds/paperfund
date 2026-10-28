@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Paperfund P symbol">
+<defs><linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#211a32"/><stop offset=".48" stop-color="#8555c7"/><stop offset="1" stop-color="#dcb7f5"/></linearGradient><linearGradient id="right" x1=".1" y1="1" x2=".95" y2="0"><stop stop-color="#5720ad"/><stop offset=".55" stop-color="#7d33ca"/><stop offset="1" stop-color="#bd77ed"/></linearGradient><linearGradient id="stem" x1=".1" y1=".1" x2=".85" y2="1"><stop stop-color="#4c2b71"/><stop offset=".54" stop-color="#7542aa"/><stop offset="1" stop-color="#b369d2"/></linearGradient></defs>
+<path d="M308 385 449 261 H749 Q762 261 771 273 L813 336 Q820 347 810 357 L760 416 644 386 623 386Z" fill="url(#top)"/>
+<path d="M813 338 761 469 Q748 496 723 517 L613 596 H431 L532 505 Q555 488 583 488 H604 Q626 488 638 465 L671 404 Q675 396 667 390 L645 385 H738Z" fill="url(#right)"/>
+<path d="M497 488 390 720 Q381 744 355 756 L285 797 H208 L286 591 Q293 576 311 560 L410 492 Q417 487 432 487Z" fill="url(#stem)"/>
+<path d="M308 385 449 261 H749 Q760 261 769 272" fill="none" stroke="#e1b9fa" stroke-opacity=".6" stroke-width="3"/>
+<path d="M208 797 285 797 355 756" stroke="#b17bde" stroke-opacity=".32" stroke-width="3" fill="none"/>
+</svg>
