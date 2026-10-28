@@ -819,7 +819,7 @@ export function Overlay({
     >
       <header className="pf-header" onPointerDown={onDragStart}>
         <div className="pf-brand">
-          <img src={chrome.runtime.getURL('icons/paperfund-mark.png')} alt="" />
+          <img src={chrome.runtime.getURL('icons/paperfund-mark-v2.svg')} alt="" />
           <div>
             <strong>PAPERFUND</strong>
             <small>PAPER TRADING ONLY</small>
