@@ -29,6 +29,11 @@ Status: PREPARATION. Nothing here is a financial approval or a deployment instru
 6. After UTC cutoff plus the real finalization grace, verify full source/quote/clock evidence, accepted fee revenue, genuine immutable winner amounts, fees and complete solvency. Obtain the separate exact first funded-plan owner approval before hourly-only execution. Keep daily payouts held.
 7. Recurring automatic claiming and subsequent hourly payouts need their OWN reviewed bounded standing scopes and expiry. One-off pilot approval is not indefinite authority. STOP stays asserted until each relevant independent authorization/acceptance stage passes.
 
+## Existing source capability — avoid rebuilding
+- `packages/db/src/creator-fee-ingestion.ts` already includes Pump AMM buy/sell event decoders and Pump v3 instruction discriminators. Reuse and focus targeted tests on correct attribution across graduation; do not assume this alone proves the new fee sweep/claim path.
+- `scripts/operator/automation-claim.mjs` **does not** execute PumpSwap fee collection; it constructs `collectCreatorFeeV2` and explicitly rejects completed bonding curves. This is the missing post-graduation execution integration, not an ingestion rewrite.
+- Standalone eight-case offline classifier test command passed under Node 22 on October 28, 2026: `node --test scripts/operator/creator-fee-route-readiness.test.mjs`. This validates classification only, not live claims or financial acceptance.
+
 ## Hard NO-GO conditions
 - No actual finalized mint or creator mismatch; unsupported PumpSwap/graduation/sharing/cashback topology; unavailable protected 7BRzn signer; insufficient unrestricted payer gas; lack of authentic fee claims or actual earning-hour attribution; unsettled treasury receipt; absent winner evidence or plan; changed recipient or balance; no current independent financial authorization; any STOP-generation mismatch.
 - No spontaneous signer rebind, on-chain authority transfer, auto-retry of uncertain transfers, historical-fund use, or global payout switch.
