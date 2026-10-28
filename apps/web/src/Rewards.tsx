@@ -29,7 +29,7 @@ export type RewardEvidence = {
   providerObservedAt: string | null;
   fundingObservedAt: string | null;
   stop: string;
-  payoutsActive: false;
+  payoutsActive: boolean;
   observedCreatorFeesLamports: string | null;
   receivedCreatorFeesLamports: string | null;
   qualifiedLamports: string | null;
@@ -118,6 +118,10 @@ export function RewardsPage({ user }: { user: User | null }) {
     refetchInterval: 15000,
   });
   const h = hourly.data;
+  const payoutsEnabled =
+    evidence.data?.payoutsActive === true &&
+    typeof evidence.data.stop === 'string' &&
+    !['ASSERTED', 'UNKNOWN', 'STATUS UNAVAILABLE'].includes(evidence.data.stop.toUpperCase());
   return (
     <div className="page rewards-page">
       <header className="page-title">
@@ -131,10 +135,17 @@ export function RewardsPage({ user }: { user: User | null }) {
       <div className="reward-hold">
         <span className="hold-icon">Ⅱ</span>
         <div>
-          <strong>Real-SOL rewards inactive · Financial STOP</strong>
+          <strong>
+            {payoutsEnabled
+              ? 'Real-SOL payout channel enabled'
+              : evidence.data
+                ? 'Real-SOL payouts on hold · Financial authorization required'
+                : 'Real-SOL payout status unavailable'}
+          </strong>
           <p>
-            Invite-only technical beta. Observed revenue and REVIEW calculations are not qualified,
-            reserved or paid rewards.
+            {payoutsEnabled
+              ? 'Only finalized, funded and authorized winner allocations can be paid. Verify payments in the on-chain history below.'
+              : 'PAPER competitions are separate from financial payouts. Observed revenue and REVIEW allocations are not qualified, reserved or paid rewards.'}
           </p>
         </div>
         <span className="badge">{evidence.data?.stop ?? 'STATUS UNAVAILABLE'}</span>
@@ -344,7 +355,7 @@ export function RewardsPage({ user }: { user: User | null }) {
         {!user ? (
           <div className="empty">
             <h3>Sign in to view your allocations</h3>
-            <p>Connect an invited wallet and sign the authentication message.</p>
+            <p>Connect your wallet and sign the authentication message.</p>
           </div>
         ) : mine.error ? (
           <p role="alert">{errorMessage(mine.error)}</p>
