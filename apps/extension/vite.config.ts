@@ -126,7 +126,7 @@ export default defineConfig(({ mode }) => {
                 ],
                 web_accessible_resources: [
                   {
-                    resources: ['content.js', 'chunks/*.js', 'icons/paperfund-mark.png'],
+                    resources: ['content.js', 'chunks/*.js', 'icons/paperfund-mark.png', 'icons/paperfund-mark-v2.svg'],
                     matches: [
                       'https://axiom.trade/*',
                       'https://gmgn.ai/*',
