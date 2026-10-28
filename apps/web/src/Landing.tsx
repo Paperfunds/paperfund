@@ -57,7 +57,7 @@ export function LandingPage() {
       <section className="studio-hero">
         <div className="hero-kicker">
           <span className="public-dot" />
-          PRIVATE BETA / SOLANA PAPER TRADING
+          SOLANA PAPER TRADING / HOURLY COMPETITIONS
         </div>
         <h1>
           <span>Prove your edge.</span>
@@ -163,8 +163,9 @@ export function LandingPage() {
               <div>
                 <h3>Connect. Sign. Join.</h3>
                 <p>
-                  Use an invited Solana wallet and sign an authentication message. Paperfund never
-                  asks for your private key or a trading deposit. Beta access remains invite-only.
+                  Connect a Solana wallet and sign an authentication message. Paperfund never
+                  asks for your private key or a trading deposit. Reward eligibility is separate
+                  from PAPER competition participation.
                 </p>
               </div>
             </li>
@@ -260,11 +261,11 @@ export function LandingPage() {
           <div className="beta-disclosure">
             <span className="public-dot" />
             <div>
-              <strong>Private beta. Real-SOL rewards are not active.</strong>
+              <strong>Real-SOL payouts require verified funding and approval.</strong>
               <p>
-                Financial STOP remains asserted. Observations and REVIEW allocations are not
-                qualified or paid rewards. No payment is promised. Follow the actual funding and
-                payout states in the app.
+                Payouts require verified creator fees, qualified competition results, accepted
+                funding and financial authorization. Observations and REVIEW allocations are not
+                paid rewards. Follow the actual funding and payment status in the app.
               </p>
             </div>
           </div>
@@ -295,11 +296,11 @@ export function LandingPage() {
             </p>
           </details>
           <details>
-            <summary>Who can join the beta?</summary>
+            <summary>Who can join Paperfund?</summary>
             <p>
-              Only invited wallets can enter. Installing the published extension does not grant beta
-              access. Public reward eligibility and geographic restrictions require final review
-              before activation; no public reward launch is being announced.
+              Connect a Solana wallet to participate in available paper-trading competitions.
+              Reward eligibility and geographic restrictions may apply separately. See the
+              Rewards page for verified funding and payout status.
             </p>
           </details>
           <details>
@@ -313,9 +314,10 @@ export function LandingPage() {
           <details>
             <summary>Are rewards guaranteed?</summary>
             <p>
-              No. Real-SOL rewards are inactive during the current beta. Observed fees, reviewed
-              calculations, qualified funds, reserved funds and verified payments are separate
-              states. Only verified on-chain payments are paid rewards.
+              No. Real-SOL rewards depend on verified creator fees, accepted competition results
+              and authorized funding. Observed fees, reviewed allocations, qualified funds,
+              reserved funds and verified payments are separate states. Only verified on-chain
+              payments are paid rewards.
             </p>
           </details>
         </div>
@@ -326,7 +328,7 @@ export function LandingPage() {
         <a className="studio-button dark" href={siteConfig.appUrl}>
           Enter Paperfund <span>↗</span>
         </a>
-        <p>Invite-only beta · Simulated trading · No deposit</p>
+        <p>Public paper trading · Simulated positions · No deposit</p>
       </section>
     </>
   );
