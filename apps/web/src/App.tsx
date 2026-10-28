@@ -199,8 +199,8 @@ function TradingApp() {
         </header>
         <div className="competition-bar">
           <div>
-            <span className="status-dot" /> PRIVATE BETA <span className="bar-separator">/</span>{' '}
-            SIMULATED TRADING
+            <span className="status-dot" /> PAPER TRADING <span className="bar-separator">/</span>{' '}
+            HOURLY COMPETITIONS
           </div>
           <div className="round-chip">
             <span>UTC ROUND</span>
@@ -218,7 +218,7 @@ function TradingApp() {
           </NavLink>
         </div>
         <div role="note" className="notice">
-          Invite-only technical beta. Real-SOL rewards are not active.
+          Paper SOL is simulated. Real-SOL payouts require verified funding and authorization. See Rewards for current status.
         </div>
         <Routes>
           <Route path="/" element={<Navigate to="/hourly" replace />} />
@@ -244,7 +244,7 @@ function TradingApp() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <footer className="app-footer">
-          <span>Paperfund / Simulated trading. Real-SOL rewards inactive.</span>
+          <span>Paperfund / Simulated trading. Real-SOL payout status is on the Rewards page.</span>
           <div>
             <NavLink to="/rules">Rules</NavLink>
             <NavLink to="/privacy">Privacy</NavLink>
@@ -266,7 +266,7 @@ function PrivacyPage() {
       <PageTitle
         eyebrow="PRIVACY"
         title="Paperfund privacy notice"
-        subtitle="Private-beta privacy notice. Retention periods and jurisdictional details remain under review."
+        subtitle="Paperfund privacy notice. Retention periods and jurisdictional details remain under review."
       />
       <article className="policy-copy">
         <p>
@@ -310,7 +310,7 @@ function PrivacyPage() {
         <p>
           Use the <NavLink to="/support">support page</NavLink> for help or privacy requests. The
           legal entity, jurisdictional rights language, and final retention schedule remain under
-          review for the private beta.
+          review for the current service.
         </p>
       </article>
     </PageFrame>
@@ -337,8 +337,8 @@ function SupportPage() {
           Open a report in the{' '}
           <a href="https://github.com/Paperfunds/paperfund/issues">Paperfund issue tracker</a>.
           Never include a seed phrase, private key, session token, or other secret. A monitored
-          support address is <a href="mailto:support@paperfund.app">support@paperfund.app</a>. Beta
-          access remains invite-only; real-SOL rewards are inactive.
+          support address is <a href="mailto:support@paperfund.app">support@paperfund.app</a>. Competition access and reward eligibility are separate. Check Rewards for
+          current funding and payout status.
         </p>
       </article>
     </PageFrame>
@@ -382,7 +382,7 @@ function RulesPage() {
         <Rule
           number="06"
           title="Reward funding"
-          body="The reward model uses verified creator fees. Real-SOL rewards are inactive in this invite-only beta, with financial STOP asserted. Reviewed allocations are not paid rewards."
+          body="The reward model uses verified creator fees. Real-SOL payouts require verified fee funding, accepted results and authorized execution. See Rewards for current status. Reviewed allocations are not paid rewards."
         />
       </section>
       <div className="rules-callout">
