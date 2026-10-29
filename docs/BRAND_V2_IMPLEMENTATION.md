@@ -11,7 +11,7 @@ The landing page intentionally loads these real cropped screenshots (not fabrica
 - `apps/web/public/extension-axiom-real.webp`
 - `apps/web/public/extension-gmgn-real.webp`
 
-Because GitHub text file editing cannot add binary assets directly in this connector workflow, these images are distributed with the companion `paperfund_brand_assets_for_repo.zip` chat attachment. Extract its contents at the repository root on the local Windows checkout BEFORE building/deploying this branch. Do not deploy with broken image references. The zip also contains Chrome toolbar PNG icon sizes 16/32/48/128 and popup/overlay original-size icon in their existing `apps/extension/public/icons/` paths.
+Both real Axiom and GMGN screenshot files are committed directly to this GitHub branch as WebP images (compressed 200px-wide crops of existing installed-extension screenshots). They can now be pulled directly into the Windows checkout; no ZIP download is required for the **website-only** deployment. Chrome toolbar PNG icons remain a separate extension-release task and are NOT needed for the website-only deployment. Do not modify or ship the extension in this website rollout.
 
 The actual screenshot crops show the old-branded Paperfund extension; capture replacement screenshots only AFTER the new style is manually smoke-tested on Axiom/GMGN/Padre. Do not fabricate a purported product screenshot.
 
