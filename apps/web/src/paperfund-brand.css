@@ -1,0 +1,191 @@
+/* Paperfund identity v2 — approved light minimal / graphite / restrained violet.
+   Design-only layer after styles.css and redesign.css. */
+:root {
+  --pf-bg: #fcfcfd; --pf-surface: #fff; --pf-text: #201e25; --pf-muted: #77737e;
+  --pf-line: #e8e5ed; --pf-purple: #7652ae; --pf-lavender: #f3eff8;
+}
+body { background: var(--pf-bg); }
+.studio-site { --ink: var(--pf-text); --paper: var(--pf-bg); --quiet: var(--pf-muted); --rule: var(--pf-line);
+  background: var(--pf-bg); color: var(--pf-text); font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.studio-site main { max-width: none; }
+.studio-site .public-header { max-width: 1248px; min-height: 79px; padding: 11px 42px;
+  background: rgba(252,252,253,.97); border-bottom: 1px solid var(--pf-line); }
+.studio-site .public-brand { color: #201e25; font-size: 20px; font-weight: 750; letter-spacing: -.045em; }
+.studio-site .public-brand img { background: #14101b; border-radius: 9px; width: 36px; height: 36px; }
+.studio-site .public-header nav { font-size: 12px; gap: 25px; color: #6c6675; }
+.studio-site .public-header nav a:hover { color: var(--pf-purple); }
+.studio-site .public-enter { border: 1px solid #201c27; background: #201c27; color: #fff;
+  border-radius: 9px; padding: 12px 16px; font-size: 12px; font-weight: 650; }
+.studio-site .public-enter:hover { color: #fff; background: #443355; }
+.studio-site .public-footer { background: #f8f7f9; border-top: 1px solid var(--pf-line); }
+.studio-site .public-footer .public-brand { color: #201e25; }
+.studio-site .public-footer .footer-links, .studio-site .footer-disclosure { color: #746f7d; }
+.pf2-home { background: #fcfcfd; }
+.pf2-container { max-width: 1248px; margin: 0 auto; padding: 0 44px; }
+.pf2-home h1, .pf2-home h2, .pf2-home h3, .pf2-home p { font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+.pf2-hero { min-height: 600px; padding: 96px 0 72px; position: relative; isolation: isolate; overflow: hidden; }
+.pf2-hero::before { content: ""; position: absolute; z-index: -1; inset: 0 0 0 39%;
+  background: radial-gradient(ellipse at 50% 52%, #dedce4 0%, #f8f8fa 32%, transparent 72%); }
+.pf2-hero-form { position: absolute; right: -12%; bottom: -10%; width: 60%; height: 68%; z-index: -1;
+  transform: rotate(-14deg); pointer-events: none; opacity: .77; }
+.pf2-hero-form span { position: absolute; height: 24%; width: 110%; border-radius: 50%;
+  background: linear-gradient(172deg,#dedce3,#f5f4f8 60%,#b4b0bd);
+  box-shadow: 0 14px 45px #6c626d18; }
+.pf2-hero-form span:nth-child(1) { top: 7%; left: 0; }
+.pf2-hero-form span:nth-child(2) { top: 30%; left: 6%; opacity: .75; }
+.pf2-hero-form span:nth-child(3) { top: 51%; left: 10%; opacity: .52; }
+.pf2-kicker, .pf2-label { font-size: 10px; text-transform: uppercase; letter-spacing: .14em; color: #795da2; font-weight: 750; }
+.pf2-hero h1 { font-size: clamp(48px,6.7vw,81px); max-width: 890px; line-height: 1.065;
+  color: #1f1d23; letter-spacing: -.072em; margin: 28px 0 26px; font-weight: 750; }
+.pf2-hero h1 span { display: block; color: #827b8e; }
+.pf2-lead, .pf2-subtitle { color: #77737e; font-size: 16px; line-height: 1.76; max-width: 610px; }
+.pf2-lead { margin: 0; max-width: 490px; }
+.pf2-actions { display: flex; gap: 11px; flex-wrap: wrap; margin-top: 32px; }
+.pf2-button { min-height: 45px; display: inline-flex; align-items: center; gap: 20px;
+  justify-content: center; font-size: 12px; font-weight: 700; padding: 12px 21px; border-radius: 9px; transition: background .2s ease; }
+.pf2-primary { color: #fff; background: #1f1c25; }
+.pf2-primary:hover { background: #4b355f; color: #fff; }
+.pf2-secondary { border: 1px solid #e0dce6; color: #28232d; background: rgba(255,255,255,.8); }
+.pf2-secondary:hover { background: #f1eef5; }
+.pf2-hero-facts { display: flex; flex-wrap: wrap; gap: 40px; max-width: 670px; padding-top: 38px;
+  margin-top: 48px; border-top: 1px solid #e2dfe7; }
+.pf2-hero-facts div { display: grid; gap: 6px; }
+.pf2-hero-facts strong { color: #232028; font-size: 19px; font-weight: 730; letter-spacing: -.035em; }
+.pf2-hero-facts span { color: #827d8a; font-size: 11px; }
+.pf2-section { border-top: 1px solid var(--pf-line); padding: 104px 0; }
+.pf2-home h2 { font-size: clamp(36px,4.1vw,54px); line-height: 1.12; letter-spacing: -.065em; color: #222027;
+  margin: 18px 0 18px; font-weight: 740; }
+.pf2-home h3 { letter-spacing: -.038em; color: #26212d; }
+.pf2-subtitle { max-width: 690px; margin: 0; font-size: 15px; }
+.pf2-steps { display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+  border-top: 1px solid var(--pf-line); margin-top: 42px; }
+.pf2-steps article { padding: 27px 28px 4px 0; border-right: 1px solid var(--pf-line); margin-right: 27px; }
+.pf2-steps article:last-child { border: 0; margin-right: 0; }
+.pf2-steps article > span { color: #7154a0; font-size: 10px; font-weight: 750; letter-spacing: .08em; }
+.pf2-steps h3 { font-size: 18px; font-weight: 700; margin: 37px 0 10px; }
+.pf2-steps p, .pf2-allocation-card p { color: #797480; line-height: 1.75; font-size: 12px; }
+.pf2-product { background: #f6f4f8; }
+.pf2-product-grid { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 65px; }
+.pf2-product .pf2-subtitle { margin-bottom: 25px; }
+.pf2-text-link { font-size: 12px; font-weight: 720; color: #5d3e88; border-bottom: 1px solid #ac92cd; padding-bottom: 5px; }
+.pf2-product-proof { background: #fff; border: 1px solid #e3dfe8; border-radius: 16px; padding: 22px;
+  box-shadow: 0 14px 45px #24202b09; }
+.pf2-proof-head { display: flex; justify-content: space-between; gap: 10px; font-weight: 750; font-size: 10px;
+  letter-spacing: .085em; color: #4f4659; }
+.pf2-proof-head small { font-size: 10px; font-weight: 500; color: #89818f; }
+.pf2-product-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; margin-top: 20px; }
+.pf2-product-photos img { display: block; width: 100%; object-fit: contain; object-position: top; border: 1px solid #e7e3eb;
+  border-radius: 8px; background: #faf9fc; max-height: 350px; }
+.pf2-product-proof p { font-size: 10px; line-height: 1.6; color: #817b89; margin: 14px 0 0; }
+.pf2-split-heading { display: flex; justify-content: space-between; gap: 50px; align-items: end; }
+.pf2-split-heading p { max-width: 360px; font-size: 13px; line-height: 1.75; color: #817b88; }
+.pf2-allocation-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 32px; }
+.pf2-allocation-card { background: #fff; border: 1px solid var(--pf-line); border-radius: 14px; padding: 30px; }
+.pf2-card-head { display: flex; gap: 16px; align-items: center; justify-content: space-between; }
+.pf2-card-head strong { color: #29232e; font-size: 14px; }
+.pf2-card-head span { color: #96909b; font-size: 9px; letter-spacing: .1em; }
+.pf2-track { height: 9px; display: flex; gap: 2px; background: #e6e1eb; border-radius: 10px; overflow: hidden; margin: 30px 0 22px; }
+.pf2-track span:nth-child(1) { background: #7652ae; }
+.pf2-track span:nth-child(2) { background: #bea8ce; }
+.pf2-track span:nth-child(3) { background: #b6b1bc; }
+.pf2-buffer-track span:nth-child(2) { background: #c7a776; }
+.pf2-buffer-track span:nth-child(3) { background: #bea8ce; }
+.pf2-buffer-track span:nth-child(4) { background: #b6b1bc; }
+.pf2-values { display: flex; gap: 17px; justify-content: space-between; }
+.pf2-values div { display: grid; gap: 7px; }
+.pf2-values strong { color: #29232d; font-size: 26px; letter-spacing: -.055em; }
+.pf2-values span { color: #817c88; font-size: 11px; }
+.pf2-allocation-card > p { margin: 20px 0 0; }
+.pf2-buffer { background: #faf9fb; }
+.pf2-buffer-grid { display: grid; grid-template-columns: .87fr 1.13fr; gap: 70px; align-items: center; }
+.pf2-buffer-rows { background: #fff; padding: 16px 30px; border: 1px solid var(--pf-line); border-radius: 14px; }
+.pf2-buffer-rows div { display: flex; justify-content: space-between; align-items: center; gap: 30px; padding: 17px 0; border-bottom: 1px solid var(--pf-line); }
+.pf2-buffer-rows div:last-child { border: 0; }
+.pf2-buffer-rows strong { font-size: 12px; flex: 0 0 36%; color: #302c35; }
+.pf2-buffer-rows span { font-size: 12px; color: #817b89; text-align: right; line-height: 1.6; }
+.pf2-payout-steps { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-top: 37px; }
+.pf2-payout-steps div { padding: 22px; background: #fff; border: 1px solid var(--pf-line); border-radius: 10px; }
+.pf2-payout-steps div > span { font-size: 10px; font-weight: 750; color: #7352a1; }
+.pf2-payout-steps strong { display: block; margin: 24px 0 8px; font-size: 13px; color: #27212c; }
+.pf2-payout-steps p { margin: 0; font-size: 11px; line-height: 1.65; color: #847e8a; }
+.pf2-financial-notice { background: #f5f3f6; border: 1px solid #e9e5ec; border-radius: 9px; margin-top: 23px;
+  padding: 16px 18px; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11px; color: #76717d; }
+.pf2-financial-notice > span:first-child { background: #cb9869; width: 7px; height: 7px; border-radius: 50%; }
+.pf2-financial-notice strong { color: #332d38; }
+.pf2-financial-notice a { font-weight: 730; color: #61428f; margin-left: auto; }
+@media(max-width: 960px) {
+  .pf2-product-grid, .pf2-buffer-grid { grid-template-columns: 1fr; gap: 35px; }
+  .pf2-split-heading { align-items: start; flex-direction: column; gap: 0; }
+  .pf2-payout-steps { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media(max-width: 760px) {
+  .studio-site .public-header { padding: 16px 5%; }
+  .studio-site .public-header nav { gap: 13px; flex-wrap: wrap; font-size: 10px; }
+  .pf2-container { padding: 0 20px; }
+  .pf2-hero { padding: 75px 0 55px; }
+  .pf2-hero-form { opacity: .25; width: 80%; right: -35%; }
+  .pf2-hero h1 { font-size: clamp(44px,9vw,65px); }
+  .pf2-hero-facts { gap: 23px; margin-top: 42px; }
+  .pf2-section { padding: 65px 0; }
+  .pf2-steps { grid-template-columns: 1fr; }
+  .pf2-steps article { border-right: 0; border-bottom: 1px solid var(--pf-line); margin: 0; padding: 25px 0; }
+  .pf2-steps h3 { margin-top: 15px; }
+  .pf2-allocation-grid { grid-template-columns: 1fr; }
+  .pf2-payout-steps { grid-template-columns: 1fr 1fr; }
+  .pf2-buffer-rows div { gap: 15px; }
+}
+@media(max-width: 420px) {
+  .pf2-hero-facts { gap: 17px; }
+  .pf2-payout-steps { grid-template-columns: 1fr; }
+  .pf2-product-photos { gap: 8px; }
+}
+
+/* Light competition workspace. Override visual tokens only: routes, layouts and actions unchanged. */
+.app-shell {
+  --bg: #faf9fc; --panel: #fff; --panel-2: #f7f5fa; --line: #e5e1ea; --muted: #7b7584; --soft: #6c6673;
+  --green: #7652ae; --green-deep: #f0ebf8;
+  color-scheme: light; background: #faf9fc; color: #26212c; font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.app-shell .obsidian-header { min-height: 78px; background: #fff; border-bottom: 1px solid #e7e3ea; }
+.app-shell .app-brand { color: #251f2a; font-weight: 750; letter-spacing: -.045em; }
+.app-shell .brand-mark { background: #15101c; border-radius: 8px; }
+.app-shell .app-brand small { background: #f7f3fa; border-color: #e7ddef; color: #775b99; }
+.app-shell .obsidian-header .nav-item { color: #7a7480; font-weight: 580; }
+.app-shell .obsidian-header .nav-item.active { color: #251f2a; border-color: #7e60b3; }
+.app-shell .obsidian-header .nav-item:hover { color: #4d356f; }
+.app-shell .obsidian-header .wallet-button { background: #211d27; color: #fff; border-radius: 8px; }
+.app-shell .competition-bar { background: #f5f3f8; color: #726b7c; border-bottom-color: #e6e2eb; font-family: Inter,-apple-system,sans-serif; }
+.app-shell .competition-bar strong { color: #29232e; }
+.app-shell .paper-account-link { color: #704d9d; }
+.app-shell > main > .notice { background: #f7f3fa; color: #746982; border: 1px solid #e7ddeb; border-radius: 8px; }
+.app-shell .page-title h1 { color: #242028; font-weight: 700; letter-spacing: -.05em; }
+.app-shell .page-title p, .app-shell .eyebrow { color: #78717f; }
+.app-shell .panel, .app-shell .empty, .app-shell .table-scroll { background: #fff; border-color: #e7e3eb; border-radius: 12px; }
+.app-shell .panel-head { border-color: #e7e3eb; }
+.app-shell .panel-head h2, .app-shell .empty h2, .app-shell .empty h3, .app-shell h3 { color: #29232f; }
+.app-shell .empty p, .app-shell .table-note, .app-shell .board-context { color: #7f7887; }
+.app-shell th { background: #f8f6fa; color: #766c7b; }
+.app-shell td { color: #29232f; border-color: #eeeaf1; }
+.app-shell tbody tr:hover { background: #faf8fd; }
+.app-shell .badge { background: #f3eff9; color: #684892; border: 1px solid #e1d7ee; border-radius: 5px; }
+.app-shell .rank { color: #42354e; }
+.app-shell .rank-1,.app-shell .rank-2,.app-shell .rank-3 { color: #664a86; background: #f3eef8; }
+.app-shell .reward-metrics { background: #fff; border-color: #e7e3eb; border-radius: 12px; }
+.app-shell .reward-metric { border-color: #e7e3eb; }
+.app-shell .reward-metric > span, .app-shell .reward-metric > small { color: #827c88; }
+.app-shell .reward-metric > strong, .app-shell .reward-detail b { color: #25212b; }
+.app-shell .reward-detail span, .app-shell .reward-model { color: #77717e; }
+.app-shell .reward-model h3 { color: #302936; }
+.app-shell .reward-hold { border: 1px solid #e9d9c1; background: #fff8ee; border-radius: 10px; }
+.app-shell .reward-hold strong { color: #6d4b25; }
+.app-shell .reward-hold p { color: #806e58; }
+.app-shell .reward-hold .badge { border-color: #e9d9c1; color: #775c37; background: #fff3df; }
+.app-shell .hold-icon { color: #9d7c51; }
+.app-shell .claim-receipt { background: #faf8fd; border-color: #e8deef; }
+.app-shell .claim-receipt p { color: #84798b; }
+.app-shell .transaction-link { color: #65458e; }
+.app-shell .review-label { color: #84613d; }
+.app-shell .app-footer { color: #8b8591; border-color: #e7e2ec; }
+.app-shell input, .app-shell select, .app-shell textarea { color-scheme: light; }
+/* Keep financial P&L colors semantic; violet is identity, not a replacement for gains/losses. */
+@media(prefers-reduced-motion:reduce) { .pf2-home *, .studio-site .public-enter { transition: none !important; } }

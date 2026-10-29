@@ -257,7 +257,7 @@ function TradingApp() {
 }
 
 function BrandMark({ className = '' }: { className?: string }) {
-  return <img className={`brand-mark ${className}`} src="/paperfund-mark.png" alt="" />;
+  return <img className={`brand-mark ${className}`} src="/paperfund-mark-v2.svg" alt="" />;
 }
 
 function PrivacyPage() {
