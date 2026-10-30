@@ -100,11 +100,11 @@ export function LandingPage() {
             <div className="pf2-proof-head"><span>PAPERFUND IN THE TERMINAL</span><small>Actual extension screenshots</small></div>
             <div className="pf2-product-photos">
               <figure>
-                <img src="/extension-axiom-hq.webp" alt="Actual Paperfund extension overlay on Axiom trading terminal" loading="lazy" width="540" height="672" />
+                <img src="/extension-axiom-hq.webp" alt="Actual Paperfund extension overlay on Axiom trading terminal" loading="lazy" width="600" height="746" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.classList.add('pf2-original-shot'); event.currentTarget.src = '/extension-axiom-real.webp'; }} />
                 <figcaption>Axiom</figcaption>
               </figure>
               <figure>
-                <img src="/extension-gmgn-hq.webp" alt="Actual Paperfund extension overlay on GMGN trading terminal" loading="lazy" width="540" height="666" />
+                <img src="/extension-gmgn-hq.webp" alt="Actual Paperfund extension overlay on GMGN trading terminal" loading="lazy" width="616" height="760" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.classList.add('pf2-original-shot'); event.currentTarget.src = '/extension-gmgn-real.webp'; }} />
                 <figcaption>GMGN.ai</figcaption>
               </figure>
             </div>
