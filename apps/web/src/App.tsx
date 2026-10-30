@@ -220,6 +220,20 @@ function TradingApp() {
         <div role="note" className="notice">
           Paper trades are simulated. No trading deposit required.
         </div>
+        <div className="pf-night-workspace">
+          <aside className="pf-night-side" aria-label="Competition shortcuts">
+            <div className="pf-night-side-label">COMPETITIONS</div>
+            <NavLink to="/hourly" className={({ isActive }) => isActive ? 'pf-night-side-link active' : 'pf-night-side-link'}>◇ <span>Hourly</span></NavLink>
+            <NavLink to="/daily" className={({ isActive }) => isActive ? 'pf-night-side-link active' : 'pf-night-side-link'}>◈ <span>Daily</span></NavLink>
+            <NavLink to="/trade" className={({ isActive }) => isActive ? 'pf-night-side-link active' : 'pf-night-side-link'}>↗ <span>Trade</span></NavLink>
+            <NavLink to="/rewards" className={({ isActive }) => isActive ? 'pf-night-side-link active' : 'pf-night-side-link'}>♢ <span>Rewards hub</span></NavLink>
+            <NavLink to="/history" className={({ isActive }) => isActive ? 'pf-night-side-link active' : 'pf-night-side-link'}>▤ <span>History</span></NavLink>
+            <div className="pf-night-side-foot">
+              <strong>Paperfund</strong>
+              <span>Real markets.<br />Simulated trades.</span>
+            </div>
+          </aside>
+          <div className="pf-night-page">
         <Routes>
           <Route path="/" element={<Navigate to="/hourly" replace />} />
           <Route
@@ -243,6 +257,8 @@ function TradingApp() {
           <Route path="/support" element={<SupportPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+          </div>
+        </div>
         <footer className="app-footer">
           <span>Paperfund · Trading competitions · Reward status on the Rewards page.</span>
           <div>
