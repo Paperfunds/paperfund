@@ -1,0 +1,202 @@
+/* Paperfund Night — visual-only rebrand. Keep routes, trading, payout and auth logic unchanged. */
+:root {
+  --pf-night: #090b14;
+  --pf-night-panel: #111422;
+  --pf-night-surface: #171a2b;
+  --pf-night-border: #29283f;
+  --pf-night-text: #f4f1fc;
+  --pf-night-muted: #aca7c0;
+  --pf-violet: #a47dff;
+  --pf-violet-light: #d7c1ff;
+}
+html { background: var(--pf-night); }
+body { background: var(--pf-night); }
+.studio-site {
+  --ink: var(--pf-night-text);
+  --paper: var(--pf-night);
+  --quiet: var(--pf-night-muted);
+  --rule: var(--pf-night-border);
+  background: #0b0d18;
+  color: var(--pf-night-text);
+  color-scheme: dark;
+}
+.studio-site .public-header {
+  background: rgba(11,13,24,.97);
+  border-bottom: 1px solid #2a273c;
+}
+.studio-site .public-header .public-brand,
+.studio-site .public-footer .public-brand { color: #faf8ff; }
+.studio-site .public-brand img { background: #11101b; }
+.studio-site .public-header nav { color: #b0a9c0; }
+.studio-site .public-header nav a:hover { color: #d7bcff; }
+.studio-site .public-enter {
+  color: #0e0c16; background: #ebe0ff; border: 1px solid #ebe0ff;
+  box-shadow: 0 2px 17px #9870e022; border-radius: 9px;
+}
+.studio-site .public-enter:hover { background: #d6b7ff; color: #0e0c16; }
+.studio-site .public-footer { background: #0b0d18; border-color: #2b293b; }
+.studio-site .public-footer p,
+.studio-site .public-footer .footer-links,
+.studio-site .public-footer .footer-disclosure { color: #9e96ad; }
+.pf2-home { background: #0b0d18; color: #ede9fa; }
+.pf2-hero {
+  position: relative; overflow: hidden; padding: 93px 0 94px; min-height: auto;
+  background:
+    radial-gradient(ellipse 65% 75% at 93% 13%, #43366883 0%, transparent 71%),
+    radial-gradient(ellipse 54% 43% at -14% 81%, #4932784f 0%, transparent 78%),
+    linear-gradient(125deg, #10131e 6%, #090b14 61%, #17182c);
+}
+.pf2-hero::before { display: none; }
+.pf2-hero-form { display: none; }
+.pf2-kicker, .pf2-label { color: #bda0f8; }
+.pf2-hero h1 {
+  color: #faf9ff; max-width: 800px; letter-spacing: -.064em;
+  font-weight: 770; font-size: clamp(51px,6vw,80px);
+}
+.pf2-hero h1 span {
+  background: linear-gradient(110deg,#f5edff 2%,#b999ff 48%,#9383bb 100%);
+  background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.pf2-lead, .pf2-subtitle, .pf2-hero-facts span { color: #b0abc4; }
+.pf2-lead { max-width: 620px; font-size: 16px; }
+.pf2-primary {
+  color: #141020; background: #e8dbff; box-shadow: 0 8px 30px #9976e529;
+}
+.pf2-primary:hover { color: #141020; background: #d8c4ff; }
+.pf2-secondary {
+  color: #f4efff; background: #1a1d2b; border: 1px solid #42405a;
+}
+.pf2-secondary:hover { color: #fff; background: #262539; }
+.pf2-hero-facts { border-color: #39344d; max-width: 720px; }
+.pf2-hero-facts strong { color: #f6f2ff; }
+.pf2-hero-art { position: relative; width: 100%; max-width: 1198px;
+  margin: 55px auto 0; border: 1px solid #5c467a; border-radius: 17px;
+  background: linear-gradient(130deg,#0d0f18,#252039);
+  box-shadow: 0 34px 88px #0008,0 0 70px #865ac32e; overflow: hidden;
+}
+.pf2-hero-art img { width: 100%; height: auto; display: block; }
+.pf2-art-caption { position: absolute; left: 16px; bottom: 13px; padding: 6px 9px;
+  font-size: 10px; color: #dad2e7; background: rgba(8,9,17,.88);
+  border-radius: 5px; border: 1px solid #474158; }
+.pf2-section { border-top: 1px solid #28283e; background: #0b0d18; }
+.pf2-section:nth-of-type(even) { background: #11121e; }
+.pf2-home h2 { color: #f7f4fc; }
+.pf2-home h3 { color: #eeeafb; }
+.pf2-steps { border-color: #353047; }
+.pf2-steps article { border-color: #353047; }
+.pf2-steps article > span { color: #b79af4; }
+.pf2-steps p,.pf2-allocation-card p { color: #b1a9bb; }
+.pf2-product { background: #10121e; }
+.pf2-product-proof { background: #151625; border-color: #36314c;
+  box-shadow: 0 15px 65px #06061263;
+}
+.pf2-proof-head { color: #e4dbee; }
+.pf2-proof-head small,.pf2-product-proof p { color: #a49aaf; }
+.pf2-product-photos { gap: 15px; }
+.pf2-product-photos img { background: #0b0c15; border-color: #3d3654;
+  object-fit: contain; max-height: 490px; }
+.pf2-text-link { color: #c4a4ff; border-color: #7658a6; }
+.pf2-split-heading p { color: #b2aabd; }
+.pf2-allocation-card { background: #161827; border: 1px solid #34304a; box-shadow: 0 5px 28px #0002; }
+.pf2-card-head strong,.pf2-values strong { color: #f5f0ff; }
+.pf2-card-head span,.pf2-values span { color: #aaa0b7; }
+.pf2-track { background: #2d2a40; }
+.pf2-track span:nth-child(1) { background: #9965f5; }
+.pf2-track span:nth-child(2) { background: #8066a4; }
+.pf2-track span:nth-child(3) { background: #b9a7cf; }
+.pf2-buffer-track span:nth-child(2) { background: #c9a66c; }
+.pf2-buffer-track span:nth-child(3) { background: #8066a4; }
+.pf2-buffer-track span:nth-child(4) { background: #b9a7cf; }
+.pf2-buffer { background: #10111d; }
+.pf2-buffer-rows { background: #171826; border-color: #333046; }
+.pf2-buffer-rows div { border-color: #333046; }
+.pf2-buffer-rows strong { color: #ece7f5; }
+.pf2-buffer-rows span { color: #b5adbd; }
+.pf2-payout-steps div { background: #171827; border-color: #373146; }
+.pf2-payout-steps div > span { color: #c9b0ff; }
+.pf2-payout-steps strong { color: #f5f0fa; }
+.pf2-payout-steps p { color: #a9a1b5; }
+.pf2-financial-notice { background: #1b1a26; border-color: #4a3c40; color: #bdb4be; }
+.pf2-financial-notice strong { color: #e9d5b6; }
+.pf2-financial-notice a { color: #d3b7ff; }
+.pf2-product-disclaimer { padding: 13px 0 0; color: #a79eb4; font-size: 11px; line-height: 1.65; }
+.pf2-illustrations { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px; }
+.pf2-illustrations figure { margin: 0; }
+.pf2-illustrations img { width:100%; height: auto; display:block; border:1px solid #39334a; border-radius: 11px; }
+.pf2-illustrations figcaption { font-size:11px; color: #aba3b5; margin-top:9px; }
+/* Public legal and informational pages remain readable in dark mode. */
+.studio-site .page { color: #f1edf8; }
+.studio-site .page-title h1,.studio-site .policy-copy h2,.studio-site .rule strong { color: #f1edf8; }
+.studio-site .page-title p,.studio-site .policy-copy,.studio-site .rule p,.studio-site .rule > span { color: #c6bed1; }
+.studio-site .rules-callout,.studio-site .rule { background: #161827; border-color: #343047; color: #d5cbdd; }
+.studio-site .policy-copy a,.studio-site .policy-copy code { color: #d4b7ff; }
+/* Authenticated trading and leaderboards: preserve actual data, routes, tables and interactions. */
+.app-shell {
+  --bg: #0b0c15; --panel: #141624; --panel-2: #1b1d30; --line: #303049;
+  --muted: #aaa4bc; --soft: #c3b9d5; --green: #a47dff; --green-deep: #30243e;
+  color-scheme: dark; background: #0b0c15; color: #efebf9;
+}
+.app-shell .obsidian-header { background: #111321; border-color: #343045; }
+.app-shell .app-brand { color: #fcfaff; }
+.app-shell .brand-mark { background: #171122; border-radius: 9px; }
+.app-shell .app-brand small { background: #2d233a; border-color: #5d407b; color: #d5b4ff; }
+.app-shell .obsidian-header .nav-item { color: #bbb3c9; font-weight: 600; }
+.app-shell .obsidian-header .nav-item.active { color: #fff; border-color: #a16af7;
+  background: linear-gradient(0deg,#aa68ef1a,transparent);
+}
+.app-shell .obsidian-header .nav-item:hover { color: #fff; }
+.app-shell .obsidian-header .wallet-button { background: #261f35; color: #ece0fb; border:1px solid #5b496c; border-radius:8px; }
+.app-shell .competition-bar { background: #111321; color: #c2b9d0; border-color: #313148; }
+.app-shell .competition-bar strong { color: #f4effc; }
+.app-shell .paper-account-link { color: #d1b4ff; }
+.app-shell > main > .notice { background: #171725; border: 1px solid #453c53; color: #c0b6cb; }
+.app-shell .page-title h1 { color: #f8f5fd; font-size: clamp(32px,4vw,46px); font-weight:750; }
+.app-shell .page-title p,.app-shell .eyebrow { color: #ada3bc; }
+.app-shell .panel,.app-shell .empty,.app-shell .table-scroll {
+  background: #141624; border: 1px solid #302d45; border-radius: 13px; color: #f2edf9;
+  box-shadow: 0 9px 32px #04050b42;
+}
+.app-shell .panel-head { border-color: #363149; }
+.app-shell .panel-head h2, .app-shell .empty h2, .app-shell .empty h3, .app-shell h3 { color: #f2edf9; }
+.app-shell .empty p,.app-shell .table-note,.app-shell .board-context { color: #a9a2b5; }
+.app-shell th { background: #181b2a; color: #b4a8ca; border-color: #343047; }
+.app-shell td { color: #eee9f7; border-color: #302d43; }
+.app-shell tbody tr:hover { background: #242036; }
+.app-shell .badge { background: #332542; color: #d6b5ff; border-color: #6d4388; }
+.app-shell .rank { color: #eee5fc; }
+.app-shell .rank-1 { color: #ffcf80; background: #362d25; }
+.app-shell .rank-2 { color: #cfcbec; background: #29293f; }
+.app-shell .rank-3 { color: #e6b08a; background: #39292b; }
+.app-shell .reward-metrics,.app-shell .reward-metric { background: #141624; border-color: #343047; }
+.app-shell .reward-metric > span,.app-shell .reward-metric > small { color: #b4acc1; }
+.app-shell .reward-metric > strong,.app-shell .reward-detail b { color: #f9f6ff; }
+.app-shell .reward-detail span,.app-shell .reward-model { color: #b7aebf; }
+.app-shell .reward-model h3 { color: #f8f3fb; }
+.app-shell .reward-hold { background: #251e22; border: 1px solid #675243; border-radius: 12px; }
+.app-shell .reward-hold strong { color: #f1c996; }
+.app-shell .reward-hold p { color: #cfba9e; }
+.app-shell .reward-hold .badge { color: #eccda2; background: #382c29; border-color: #6d503d; }
+.app-shell .hold-icon { color: #d5a76a; }
+.app-shell .claim-receipt { background: #1b2030; border-color: #40405b; }
+.app-shell .claim-receipt p { color: #bcb4c6; }
+.app-shell .transaction-link { color: #c9a5ff; }
+.app-shell .review-label { color: #eac08a; }
+.app-shell .app-footer { background: #0b0c15; border-color: #373148; color: #a8a0b7; }
+.app-shell .app-footer a { color: #c6b6db; }
+.app-shell input,.app-shell select,.app-shell textarea { color-scheme: dark; }
+.app-shell .wallet-address { color: #f4ebfa; }
+.app-shell .button.primary { background: #9563e2; color: #fff; border-color: #9a7ad3; }
+.app-shell .button.primary:hover { background: #ab7bfa; }
+/* Do not recolor semantic profit/loss or simulate new data. */
+@media(max-width:900px) {
+  .pf2-illustrations { grid-template-columns: 1fr; }
+  .pf2-hero-art { margin-top:40px; }
+}
+@media(max-width:660px) {
+  .pf2-hero { padding:70px 0 60px; }
+  .pf2-hero h1 { font-size:clamp(43px,10vw,58px); }
+  .pf2-hero-art { border-radius:9px; }
+  .pf2-art-caption { position:static; border-radius:0; }
+  .pf2-allocation-card { padding: 20px; }
+}
+@media(prefers-reduced-motion:reduce) { .pf2-home *, .app-shell * { transition-duration:0s!important; } }
