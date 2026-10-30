@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="535" viewBox="0 0 1200 535" role="img" aria-label="Paperfund leaderboard design illustration">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#17192d"/><stop offset="1" stop-color="#090b15"/></linearGradient>
+<linearGradient id="violet" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d9baff"/><stop offset=".6" stop-color="#9063df"/><stop offset="1" stop-color="#3b2863"/></linearGradient>
+<linearGradient id="wave" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#8d65eb" stop-opacity="0"/><stop offset=".5" stop-color="#b48aff"/><stop offset="1" stop-color="#8d65eb" stop-opacity="0"/></linearGradient>
+<filter id="glow"><feGaussianBlur stdDeviation="23"/></filter></defs>
+<rect width="1200" height="535" rx="16" fill="url(#bg)"/>
+<circle cx="970" cy="68" r="220" fill="#553785" opacity=".23" filter="url(#glow)"/>
+<path d="M-100 330 Q350 65 630 185 T1300 9" fill="none" stroke="url(#wave)" stroke-width="3" opacity=".78"/>
+<path d="M-60 358 Q350 84 630 209 T1230 28" fill="none" stroke="#9165dc" stroke-width="44" opacity=".07"/>
+<rect x="0" y="0" width="205" height="535" fill="#10111f"/>
+<path d="M205 0V535" stroke="#333148"/>
+<path d="M27 26H38L44 17H68L52 44H39L35 57H25L34 37Z" fill="url(#violet)"/>
+<text x="79" y="45" fill="#f7f4ff" font-size="20" font-family="Arial" font-weight="700">Paperfund</text>
+<rect x="15" y="102" width="174" height="45" rx="9" fill="#382759" stroke="#684ba1"/>
+<text x="37" y="130" fill="#e9dcff" font-size="14" font-family="Arial" font-weight="600">◈  Leaderboard</text>
+<text x="37" y="194" fill="#c2b6d8" font-size="14" font-family="Arial">↗  Trade</text>
+<text x="37" y="252" fill="#c2b6d8" font-size="14" font-family="Arial">◇  Rewards</text>
+<text x="37" y="310" fill="#c2b6d8" font-size="14" font-family="Arial">◻  History</text>
+<rect x="17" y="441" width="172" height="74" rx="12" fill="#211c35" stroke="#46375f"/>
+<text x="31" y="470" font-size="14" fill="#fff" font-family="Arial" font-weight="700">Trade. Compete.</text>
+<text x="31" y="489" font-size="14" fill="#cdafff" font-family="Arial">Rank.</text>
+<text x="243" y="48" fill="#d0b3ff" font-size="13" font-family="Arial">PAPERFUND / COMPETITIONS</text>
+<text x="243" y="100" fill="#faf7ff" font-size="40" font-family="Arial" font-weight="700">Leaderboard</text>
+<text x="245" y="125" fill="#aca3c0" font-size="14" font-family="Arial">Hourly and daily ranking. Real market prices, simulated trades.</text>
+<rect x="240" y="153" width="630" height="339" rx="13" fill="#131525" stroke="#40364e"/>
+<rect x="251" y="165" width="128" height="39" rx="8" fill="#392a55" stroke="#7654a8"/>
+<text x="275" y="190" fill="#eddfff" font-size="14" font-family="Arial">Hourly</text>
+<text x="416" y="190" fill="#c0b6ce" font-size="14" font-family="Arial">Daily</text>
+<path d="M240 216H870" stroke="#39334a"/>
+<text x="269" y="239" fill="#a79dbb" font-size="12" font-family="Arial">RANK</text>
+<text x="344" y="239" fill="#a79dbb" font-size="12" font-family="Arial">TRADER</text>
+<text x="652" y="239" fill="#a79dbb" font-size="12" font-family="Arial">PERFORMANCE</text>
+<g font-family="Arial" font-size="15" fill="#e9e4f3">
+<text x="272" y="281" fill="#f5c16c">01</text><text x="344" y="281">Trader 01</text>
+<text x="272" y="326" fill="#c8c0e0">02</text><text x="344" y="326">Trader 02</text>
+<text x="272" y="371" fill="#d9a586">03</text><text x="344" y="371">Trader 03</text>
+<text x="272" y="416">04</text><text x="344" y="416">Trader 04</text>
+<text x="272" y="461">05</text><text x="344" y="461">Trader 05</text>
+</g>
+<g stroke="#363046"><path d="M255 293H855M255 338H855M255 383H855M255 428H855"/></g>
+<g fill="#916ce2"><rect x="653" y="268" width="175" height="9" rx="4"/><rect x="653" y="313" width="144" height="9" rx="4"/><rect x="653" y="358" width="117" height="9" rx="4"/><rect x="653" y="403" width="91" height="9" rx="4"/><rect x="653" y="448" width="59" height="9" rx="4"/></g>
+<rect x="891" y="153" width="282" height="147" rx="12" fill="#171827" stroke="#40364e"/>
+<text x="912" y="182" font-size="13" fill="#b6a9c6" font-family="Arial">CURRENT ROUND</text>
+<text x="912" y="229" font-size="30" fill="#f5f0ff" font-family="Arial" font-weight="700">UTC Hourly</text>
+<rect x="910" y="253" width="245" height="6" rx="3" fill="#34304b"/>
+<rect x="910" y="253" width="155" height="6" rx="3" fill="#a681ef"/>
+<text x="912" y="281" font-size="12" fill="#b2a9bb" font-family="Arial">Results finalized at cutoff</text>
+<rect x="891" y="317" width="282" height="175" rx="12" fill="#171827" stroke="#40364e"/>
+<text x="912" y="346" font-size="13" fill="#b6a9c6" font-family="Arial">YOUR COMPETITION</text>
+<text x="912" y="390" font-size="34" fill="#f5f0ff" font-family="Arial" font-weight="700">10 Paper SOL</text>
+<text x="912" y="412" font-size="12" fill="#b8abca" font-family="Arial">Starting simulated balance</text>
+<rect x="912" y="438" width="239" height="34" rx="7" fill="#46315f"/>
+<text x="961" y="459" font-size="13" fill="#e7d7ff" font-family="Arial">Enter competition</text>
+</svg>
