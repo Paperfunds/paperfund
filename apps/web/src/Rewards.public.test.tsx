@@ -48,7 +48,7 @@ afterEach(() => {
 it('shows a truthful financial hold without obsolete private-beta wording', async () => {
   renderWithEvidence({ stop: 'ASSERTED', payoutsActive: false });
   expect(
-    await screen.findByText('Real-SOL payouts on hold · Financial authorization required'),
+    await screen.findByText('SOL payouts currently unavailable'),
   ).toBeInTheDocument();
   expect(screen.queryByText(/invite.only technical beta/i)).not.toBeInTheDocument();
 });
@@ -56,18 +56,18 @@ it('shows a truthful financial hold without obsolete private-beta wording', asyn
 it('never claims active payouts when financial STOP is asserted even if a flag disagrees', async () => {
   renderWithEvidence({ stop: 'ASSERTED', payoutsActive: true });
   expect(
-    await screen.findByText('Real-SOL payouts on hold · Financial authorization required'),
+    await screen.findByText('SOL payouts currently unavailable'),
   ).toBeInTheDocument();
-  expect(screen.queryByText('Real-SOL payout channel enabled')).not.toBeInTheDocument();
+  expect(screen.queryByText('SOL payouts available')).not.toBeInTheDocument();
 });
 
 it('uses the live payout signal only when financial STOP is not asserted', async () => {
   renderWithEvidence({ stop: 'CLEARED', payoutsActive: true });
-  expect(await screen.findByText('Real-SOL payout channel enabled')).toBeInTheDocument();
+  expect(await screen.findByText('SOL payouts available')).toBeInTheDocument();
 });
 
 it('never invents an active status when payment evidence cannot be loaded', async () => {
   renderWithEvidence(null);
-  expect(await screen.findByText('Real-SOL payout status unavailable')).toBeInTheDocument();
-  expect(screen.queryByText('Real-SOL payout channel enabled')).not.toBeInTheDocument();
+  expect(await screen.findByText('Payout status unavailable')).toBeInTheDocument();
+  expect(screen.queryByText('SOL payouts available')).not.toBeInTheDocument();
 });
