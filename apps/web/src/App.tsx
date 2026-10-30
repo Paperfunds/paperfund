@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 
 import { ApiError, api, errorMessage, type BuyResult, type SellResult } from './api.js';
+import { WebsiteMarketPicker, WebsiteMarketChart } from './WebsiteMarkets.js';
+import { mintFromSearch, validMint } from './market-discovery.js';
 import {
   formatSol,
   formatUnits,
@@ -190,6 +192,7 @@ function TradingApp() {
             <small>TRADE</small>
           </a>
           <nav aria-label="Primary navigation">
+            <NavItem to="/trade">Trade</NavItem>
             <NavItem to="/hourly">Hourly leaderboard</NavItem>
             <NavItem to="/daily">Daily leaderboard</NavItem>
             <NavItem to="/history">Trade history</NavItem>
@@ -235,7 +238,7 @@ function TradingApp() {
           </aside>
           <div className="pf-night-page">
         <Routes>
-          <Route path="/" element={<Navigate to="/hourly" replace />} />
+          <Route path="/" element={<Navigate to="/trade" replace />} />
           <Route
             path="/trade"
             element={
@@ -482,6 +485,12 @@ function TradePage({
   tradingOpen: boolean;
 }) {
   const client = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedMint = mintFromSearch(searchParams.toString()) ?? '';
+  function selectMint(mint: string) {
+    const checked = validMint(mint);
+    if (checked) setSearchParams({ mint: checked }, { replace: true });
+  }
   const [notice, setNotice] = useState<Notice | null>(null);
   const enter = useMutation({
     mutationFn: api.enterRound,
@@ -557,28 +566,36 @@ function TradePage({
     <PageFrame>
       {notice && <NoticeCard notice={notice} />}
       <AccountStrip account={account} round={round} valuations={valuations.data} />
-      <div className="trade-layout">
+      <WebsiteMarketPicker selectedMint={selectedMint} onSelect={selectMint} />
+      <div className="pf-web-workbench">
+        <WebsiteMarketChart mint={selectedMint} />
         <section className="panel order-panel">
           <PanelHead
             eyebrow="EXECUTION"
             title="Paper trade"
             badge={tradingOpen ? 'MARKET OPEN' : 'CLOSED'}
           />
-          <OrderTicket account={account} tradingOpen={tradingOpen} onNotice={setNotice} />
-        </section>
-        <section className="panel positions-panel">
-          <PanelHead
-            eyebrow="PORTFOLIO"
-            title="Open positions"
-            count={(valuations.data?.positions ?? account.positions).length}
-          />
-          <Positions
-            positions={valuations.data?.positions ?? account.positions}
+          <OrderTicket
+            account={account}
             tradingOpen={tradingOpen}
             onNotice={setNotice}
+            initialMint={selectedMint}
+            onSelectMint={selectMint}
           />
         </section>
       </div>
+      <section className="panel positions-panel pf-web-positions">
+        <PanelHead
+          eyebrow="PORTFOLIO"
+          title="Open positions"
+          count={(valuations.data?.positions ?? account.positions).length}
+        />
+        <Positions
+          positions={valuations.data?.positions ?? account.positions}
+          tradingOpen={tradingOpen}
+          onNotice={setNotice}
+        />
+      </section>
       <TradeHistory user={user} />
     </PageFrame>
   );
@@ -594,8 +611,8 @@ function WelcomePanel() {
         <em>Risk nothing real.</em>
       </h1>
       <p>
-        Connect a Solana wallet, sign one authentication message, and compete with 10 Paper SOL
-        every UTC hour.
+        Everything happens here in your browser: choose a Solana token, inspect its chart,
+        place paper BUY and SELL orders, and compete with 10 Paper SOL every UTC hour.
       </p>
       <div className="rule-grid">
         <Rule number="01" title="10 Paper SOL" body="A fresh simulated balance every round." />
@@ -688,15 +705,25 @@ function OrderTicket({
   account,
   tradingOpen,
   onNotice,
+  initialMint,
+  onSelectMint,
 }: {
   account: Account;
   tradingOpen: boolean;
   onNotice(notice: Notice): void;
+  initialMint: string;
+  onSelectMint(mint: string): void;
 }) {
   const client = useQueryClient();
-  const [mint, setMint] = useState('');
-  const [checkedMint, setCheckedMint] = useState('');
+  const [mint, setMint] = useState(initialMint);
+  const [checkedMint, setCheckedMint] = useState(initialMint);
+  const [mintError, setMintError] = useState('');
   const [amount, setAmount] = useState('');
+  useEffect(() => {
+    setMint(initialMint);
+    setCheckedMint(initialMint);
+    setMintError('');
+  }, [initialMint]);
   const market = useQuery({
     queryKey: ['market', checkedMint],
     enabled: checkedMint.length > 0,
@@ -744,7 +771,15 @@ function OrderTicket({
     !buy.isPending;
   function inspect(event: FormEvent) {
     event.preventDefault();
-    setCheckedMint(mint.trim());
+    const accepted = validMint(mint);
+    if (!accepted) {
+      setMintError('Enter a valid Solana token mint.');
+      setCheckedMint('');
+      return;
+    }
+    setMintError('');
+    setCheckedMint(accepted);
+    onSelectMint(accepted);
   }
   return (
     <div className="ticket">
@@ -756,6 +791,7 @@ function OrderTicket({
             value={mint}
             onChange={(event) => {
               setMint(event.target.value);
+              setMintError('');
               if (event.target.value.trim() !== checkedMint) setCheckedMint('');
             }}
             placeholder="Paste Solana mint address"
@@ -766,6 +802,7 @@ function OrderTicket({
           </button>
         </div>
       </form>
+      {mintError && <div className="market-status error" role="alert">{mintError}</div>}
       {market.isFetching && <div className="market-status">Loading authoritative market…</div>}
       {market.error && <div className="market-status error">{errorMessage(market.error)}</div>}
       {market.data && <MarketCard market={market.data} />}
