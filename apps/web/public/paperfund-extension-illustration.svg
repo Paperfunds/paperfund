@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="690" viewBox="0 0 1020 690" role="img" aria-label="Paperfund overlay styling concept on a trading terminal">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111421"/><stop offset="1" stop-color="#0b0c15"/></linearGradient><linearGradient id="purple" x1="0" y1="0" x2="1" y2=".7"><stop stop-color="#d7b5ff"/><stop offset="1" stop-color="#8350dd"/></linearGradient></defs>
+<rect width="1020" height="690" rx="15" fill="#080a11"/>
+<rect x="12" y="12" width="996" height="40" rx="9" fill="#1a1d2a"/>
+<circle cx="34" cy="32" r="6" fill="#dd6b74"/><circle cx="53" cy="32" r="6" fill="#e7bd7a"/><circle cx="72" cy="32" r="6" fill="#67b895"/>
+<text x="104" y="37" font-family="Arial" font-size="14" fill="#e5e1ec">GMGN — Trading Terminal</text>
+<rect x="12" y="64" width="679" height="610" rx="9" fill="#10131d" stroke="#292c3c"/>
+<text x="34" y="100" fill="#faf9ff" font-family="Arial" font-weight="700" font-size="21">GMGN</text>
+<text x="133" y="99" fill="#aea6b6" font-family="Arial" font-size="13">Market overview     Trending     Tokens     Portfolio</text>
+<path d="M26 120H676" stroke="#363544"/>
+<text x="35" y="150" fill="#e7e1eb" font-family="Arial" font-size="16">Token market · SOL pair</text>
+<text x="35" y="179" fill="#a39aaa" font-family="Arial" font-size="11">Illustrative market chart</text>
+<rect x="30" y="198" width="645" height="340" rx="7" fill="#0d1019" stroke="#343240"/>
+<g stroke="#282c39" stroke-width="1"><path d="M30 256H675M30 315H675M30 374H675M30 433H675M30 492H675M105 198V538M190 198V538M275 198V538M360 198V538M445 198V538M530 198V538M615 198V538"/></g>
+<path d="M44 390 L70 348 L91 353 L119 302 L147 318 L171 294 L194 330 L225 365 L251 379 L278 420 L309 399 L338 439 L364 405 L393 388 L421 405 L451 349 L479 369 L503 326 L532 345 L558 299 L591 272 L618 277 L650 236" fill="none" stroke="#49ce9b" stroke-width="4"/>
+<path d="M44 390 L70 348 L91 353 L119 302 L147 318 L171 294 L194 330 L225 365 L251 379 L278 420 L309 399 L338 439 L364 405 L393 388 L421 405 L451 349 L479 369 L503 326 L532 345 L558 299 L591 272 L618 277 L650 236" fill="none" stroke="#51d1a4" stroke-width="12" opacity=".1"/>
+<text x="30" y="568" fill="#a9a3af" font-family="Arial" font-size="13">Activity   ·   Positions   ·   Market data</text>
+<g stroke="#323241"><path d="M30 584H675M30 616H675M30 648H675"/></g>
+<rect x="706" y="71" width="302" height="603" rx="13" fill="url(#bg)" stroke="#76539b" stroke-width="1.5"/>
+<path d="M725 98H733L739 89H754L740 110H731L727 120H718Z" fill="url(#purple)"/>
+<text x="764" y="111" fill="#fff" font-family="Arial" font-weight="700" font-size="20">Paperfund</text>
+<path d="M706 137H1008" stroke="#39304c"/>
+<text x="730" y="164" fill="#d6c1ff" font-family="Arial" font-size="12">PAPER TRADING</text>
+<rect x="724" y="183" width="265" height="77" rx="9" fill="#1b1b30" stroke="#47405c"/>
+<text x="740" y="207" fill="#c5b7d3" font-family="Arial" font-size="11">CURRENT BALANCE</text>
+<text x="740" y="242" fill="#fff" font-family="Arial" font-weight="700" font-size="23">10.00 Paper SOL</text>
+<rect x="724" y="274" width="265" height="98" rx="9" fill="#171725" stroke="#44405a"/>
+<text x="740" y="296" fill="#b8aac9" font-family="Arial" font-size="11">UTC HOURLY ROUND</text>
+<rect x="740" y="318" width="229" height="9" rx="4" fill="#343149"/>
+<rect x="740" y="318" width="125" height="9" rx="4" fill="#9d75eb"/>
+<text x="740" y="352" fill="#cfbadf" font-family="Arial" font-size="12">5 token entries / hour</text>
+<text x="740" y="405" fill="#c8bed3" font-family="Arial" font-size="12">Paper SOL amount</text>
+<rect x="724" y="418" width="265" height="51" rx="8" fill="#131422" stroke="#514261"/>
+<text x="741" y="450" fill="#f2edf9" font-family="Arial" font-size="20">0.00</text>
+<g fill="#222030" stroke="#51435b"><rect x="724" y="480" width="81" height="32" rx="6"/><rect x="815" y="480" width="81" height="32" rx="6"/><rect x="907" y="480" width="82" height="32" rx="6"/></g>
+<g font-family="Arial" font-size="12" fill="#ded4e9"><text x="750" y="501">25%</text><text x="837" y="501">50%</text><text x="935" y="501">MAX</text></g>
+<rect x="724" y="525" width="127" height="44" rx="8" fill="url(#purple)"/>
+<rect x="861" y="525" width="128" height="44" rx="8" fill="#24243a" stroke="#5a5266"/>
+<text x="767" y="553" fill="#150f25" font-family="Arial" font-weight="700" font-size="16">BUY</text>
+<text x="905" y="553" fill="#eeebf8" font-family="Arial" font-weight="700" font-size="16">SELL</text>
+<rect x="724" y="586" width="265" height="70" rx="8" fill="#161724" stroke="#4c425d"/>
+<text x="740" y="609" fill="#e1daed" font-family="Arial" font-size="12">POSITION</text>
+<text x="740" y="638" fill="#bbb2c8" font-family="Arial" font-size="12">Your simulated positions</text>
+</svg>
