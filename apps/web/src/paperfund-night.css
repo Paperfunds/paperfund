@@ -200,3 +200,8 @@ body { background: var(--pf-night); }
   .pf2-allocation-card { padding: 20px; }
 }
 @media(prefers-reduced-motion:reduce) { .pf2-home *, .app-shell * { transition-duration:0s!important; } }
+
+/* Responsive vector concept art used on the landing page; all real trading data stays dynamic. */
+.pf2-extension-concept { display:block; width:100%; height:auto; border-radius:9px; border:1px solid #413750; background:#10121e; margin-top:18px; }
+.pf2-product-proof { overflow:hidden; }
+.pf2-hero-art img { max-width:100%; }
