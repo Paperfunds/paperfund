@@ -21,3 +21,4 @@ jobs:
       - run: npm run build:extension
       - run: npm run test:extension
       - run: npm run test:publication
+      - run: npx vitest run apps/web/src/Rewards.public.test.tsx
