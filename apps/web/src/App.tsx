@@ -218,7 +218,7 @@ function TradingApp() {
           </NavLink>
         </div>
         <div role="note" className="notice">
-          Paper SOL is simulated. Real-SOL payouts require verified funding and authorization. See Rewards for current status.
+          Paper trades are simulated. No trading deposit required.
         </div>
         <Routes>
           <Route path="/" element={<Navigate to="/hourly" replace />} />
@@ -244,7 +244,7 @@ function TradingApp() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <footer className="app-footer">
-          <span>Paperfund / Simulated trading. Real-SOL payout status is on the Rewards page.</span>
+          <span>Paperfund · Trading competitions · Reward status on the Rewards page.</span>
           <div>
             <NavLink to="/rules">Rules</NavLink>
             <NavLink to="/privacy">Privacy</NavLink>
@@ -282,8 +282,7 @@ function PrivacyPage() {
         </p>
         <p>
           Technical records may include timestamps, request route and status, network address, and
-          operational errors. Final retention periods remain a pre-publication operator and legal
-          review item.
+          operational errors. Final retention periods and jurisdiction-specific privacy details remain under review.
         </p>
         <h2>Browser storage and authentication</h2>
         <p>
@@ -387,9 +386,7 @@ function RulesPage() {
       </section>
       <div className="rules-callout">
         All finalized hourly gains and losses count toward the UTC day of the round start. Ties
-        share funded ordinal allocations. No top-ups, deposits or balance carryovers. Public
-        eligibility and geographic restrictions await final review before reward activation. Rewards
-        are not guaranteed. Only an approved payout allocation marked paid after on-chain
+        share funded ordinal allocations. No top-ups, deposits or balance carryovers. Reward eligibility and regional restrictions may apply. Rewards are not guaranteed. Only an approved payout allocation marked paid after on-chain
         verification represents a completed reward.
       </div>
     </PageFrame>

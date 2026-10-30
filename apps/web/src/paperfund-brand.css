@@ -65,7 +65,8 @@ body { background: var(--pf-bg); }
 .pf2-steps h3 { font-size: 18px; font-weight: 700; margin: 37px 0 10px; }
 .pf2-steps p, .pf2-allocation-card p { color: #797480; line-height: 1.75; font-size: 12px; }
 .pf2-product { background: #f6f4f8; }
-.pf2-product-grid { display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 65px; }
+.pf2-product-grid { display: grid; grid-template-columns: 1fr; align-items: center; gap: 34px; }
+.pf2-product-grid > div:first-child { max-width: 780px; }
 .pf2-product .pf2-subtitle { margin-bottom: 25px; }
 .pf2-text-link { font-size: 12px; font-weight: 720; color: #5d3e88; border-bottom: 1px solid #ac92cd; padding-bottom: 5px; }
 .pf2-product-proof { background: #fff; border: 1px solid #e3dfe8; border-radius: 16px; padding: 22px;
@@ -73,9 +74,11 @@ body { background: var(--pf-bg); }
 .pf2-proof-head { display: flex; justify-content: space-between; gap: 10px; font-weight: 750; font-size: 10px;
   letter-spacing: .085em; color: #4f4659; }
 .pf2-proof-head small { font-size: 10px; font-weight: 500; color: #89818f; }
-.pf2-product-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; margin-top: 20px; }
-.pf2-product-photos img { display: block; width: 100%; object-fit: contain; object-position: top; border: 1px solid #e7e3eb;
-  border-radius: 8px; background: #faf9fc; max-height: 350px; }
+.pf2-product-photos { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; align-items: stretch; margin-top: 20px; }
+.pf2-product-photos figure { min-width: 0; margin: 0; background: #f5f2f8; border: 1px solid #ebe6ee; border-radius: 12px; padding: 16px; }
+.pf2-product-photos img { display: block; width: 100%; height: 500px; object-fit: contain; object-position: center; border-radius: 8px; background: #12131b; }
+.pf2-product-photos figcaption { padding: 12px 4px 1px; color: #51485a; font-size: 12px; font-weight: 690; }
+.pf2-product-photos .pf2-original-shot { max-width: 220px; margin: 0 auto; object-fit: contain; }
 .pf2-product-proof p { font-size: 10px; line-height: 1.6; color: #817b89; margin: 14px 0 0; }
 .pf2-split-heading { display: flex; justify-content: space-between; gap: 50px; align-items: end; }
 .pf2-split-heading p { max-width: 360px; font-size: 13px; line-height: 1.75; color: #817b88; }
@@ -137,7 +140,8 @@ body { background: var(--pf-bg); }
 @media(max-width: 420px) {
   .pf2-hero-facts { gap: 17px; }
   .pf2-payout-steps { grid-template-columns: 1fr; }
-  .pf2-product-photos { gap: 8px; }
+  .pf2-product-photos { grid-template-columns: 1fr; gap: 12px; }
+  .pf2-product-photos img { height: 430px; }
 }
 
 /* Light competition workspace. Override visual tokens only: routes, layouts and actions unchanged. */
