@@ -84,3 +84,9 @@
   .pf-web-chart-frame,.pf-web-chart-placeholder { height:330px; min-height:330px; }
   .pf-web-chart-head { padding:16px; }
 }
+
+/* Keep exploration visible before wallet connection; wallet login still gates orders. */
+.app-shell .welcome { min-height: 0; padding: 55px 12px 50px; }
+.app-shell .welcome h1 { max-width: 800px; }
+.app-shell .enter-card { margin-bottom: 18px; }
+.app-shell .pf-web-chart + .enter-card { margin-top: 16px; }
