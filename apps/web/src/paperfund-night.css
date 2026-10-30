@@ -205,3 +205,28 @@ body { background: var(--pf-night); }
 .pf2-extension-concept { display:block; width:100%; height:auto; border-radius:9px; border:1px solid #413750; background:#10121e; margin-top:18px; }
 .pf2-product-proof { overflow:hidden; }
 .pf2-hero-art img { max-width:100%; }
+
+/* Desktop leaderboard layout: new navigation only, existing React route components preserved. */
+.pf-night-workspace { display:grid; grid-template-columns:220px minmax(0,1fr); gap:0; min-height:66vh; }
+.pf-night-side { display:flex; flex-direction:column; gap:6px; padding:29px 16px 22px; background:#10111d; border-right:1px solid #373146; }
+.pf-night-side-label { padding:0 15px 15px; font-size:10px; font-weight:800; letter-spacing:.14em; color:#aa96c6; }
+.pf-night-side-link { display:flex; align-items:center; gap:15px; padding:14px 15px; border-radius:9px; color:#c2b8d1; font-size:13px; font-weight:620; text-decoration:none; border:1px solid transparent; }
+.pf-night-side-link:hover { color:#fff; background:#251e36; }
+.pf-night-side-link.active { color:#f9f5ff; background:linear-gradient(110deg,#3e275c,#251a38); border-color:#8055b7; box-shadow:inset 3px 0 #bc91ff; }
+.pf-night-side-foot { display:grid; gap:12px; margin-top:auto; padding:18px 16px; border-radius:12px; border:1px solid #45345d; background:linear-gradient(125deg,#2d2245,#161522); }
+.pf-night-side-foot strong { font-size:17px; color:#f3edfd; letter-spacing:-.04em; }
+.pf-night-side-foot span { font-size:12px; color:#b2a5bf; line-height:1.6; }
+.pf-night-page { min-width:0; }
+.pf-night-page > .page { max-width:1540px; padding:38px clamp(20px,3vw,52px) 60px; }
+.app-shell .pf-night-page .page-title { padding:20px 0 10px; }
+.app-shell .pf-night-page .page-title:before { content:"PAPERFUND  /  COMPETITIONS"; display:block; color:#b48bfc; font-size:10px; letter-spacing:.13em; font-weight:700; padding-bottom:7px; }
+@media(max-width:1050px) {
+  .pf-night-workspace { grid-template-columns:170px minmax(0,1fr); }
+  .pf-night-side { padding-inline:9px; }
+  .pf-night-side-link { padding:12px 10px; }
+}
+@media(max-width:800px) {
+  .pf-night-workspace { display:block; }
+  .pf-night-side { display:none; }
+  .pf-night-page > .page { padding:30px 4% 50px; }
+}
