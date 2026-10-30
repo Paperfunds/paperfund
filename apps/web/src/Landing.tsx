@@ -72,7 +72,12 @@ export function LandingPage() {
             <div><strong>Top 10 / 25</strong><span>Hourly / daily funded places</span></div>
           </div>
         </div>
-        <div className="pf2-hero-form" aria-hidden="true"><span /><span /><span /></div>
+        <div className="pf2-container">
+          <div className="pf2-hero-art">
+            <img src="/paperfund-leaderboard-illustration.svg" alt="Illustration of the Paperfund competition leaderboard in its new dark-purple theme" />
+            <span className="pf2-art-caption">Design illustration · Not live leaderboard data</span>
+          </div>
+        </div>
       </section>
 
       <section className="pf2-section" id="how-it-works">
@@ -93,21 +98,13 @@ export function LandingPage() {
           <div>
             <span className="pf2-label">BUILT FOR YOUR TERMINAL</span>
             <h2>The same markets.<br />A different stake.</h2>
-            <p className="pf2-subtitle">Paperfund works alongside Axiom, GMGN.ai and Terminal / Padre. Trade and manage positions directly from the terminal with the Paperfund extension.</p>
+            <p className="pf2-subtitle">Paperfund works alongside Axiom, GMGN.ai and Terminal / Padre. Use the same trading controls and positions with a refreshed interface.</p>
             <a className="pf2-text-link" href={siteConfig.extensionUrl} target="_blank" rel="noreferrer">View the Chrome extension ↗</a>
           </div>
           <div className="pf2-product-proof">
-            <div className="pf2-proof-head"><span>PAPERFUND IN THE TERMINAL</span><small>Actual extension screenshots</small></div>
-            <div className="pf2-product-photos">
-              <figure>
-                <img src="/extension-axiom-hq.webp" alt="Actual Paperfund extension overlay on Axiom trading terminal" loading="lazy" width="600" height="746" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.classList.add('pf2-original-shot'); event.currentTarget.src = '/extension-axiom-real.webp'; }} />
-                <figcaption>Axiom</figcaption>
-              </figure>
-              <figure>
-                <img src="/extension-gmgn-hq.webp" alt="Actual Paperfund extension overlay on GMGN trading terminal" loading="lazy" width="616" height="760" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.classList.add('pf2-original-shot'); event.currentTarget.src = '/extension-gmgn-real.webp'; }} />
-                <figcaption>GMGN.ai</figcaption>
-              </figure>
-            </div>
+            <div className="pf2-proof-head"><span>PAPERFUND EXTENSION</span><small>Dark violet visual concept</small></div>
+            <img className="pf2-extension-concept" src="/paperfund-extension-illustration.svg" alt="Design illustration showing the purple Paperfund paper-trading panel over a Solana terminal" loading="lazy" />
+            <p>Design illustration. The installed extension retains its existing BUY/SELL controls, positions and terminal behavior.</p>
           </div>
         </div>
       </section>
