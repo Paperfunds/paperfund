@@ -83,7 +83,7 @@ export function LandingPage() {
           <div className="pf2-steps">
             <article><span>01 / TRADE</span><h3>Use Paper SOL.</h3><p>Trade with a simulated balance using current-market pricing through supported terminals.</p></article>
             <article><span>02 / COMPETE</span><h3>Your P&amp;L sets the rank.</h3><p>Hourly results settle at the UTC cutoff and contribute to daily scores.</p></article>
-            <article><span>03 / REWARDS</span><h3>Verified fees fund prizes.</h3><p>Once qualified and activated, real-SOL payouts go to eligible winners—not to paper balances.</p></article>
+            <article><span>03 / REWARDS</span><h3>Verified fees fund prizes.</h3><p>Verified creator fees fund the real-SOL reward pool, with payouts made to eligible winners when payments are available.</p></article>
           </div>
         </div>
       </section>
@@ -93,16 +93,21 @@ export function LandingPage() {
           <div>
             <span className="pf2-label">BUILT FOR YOUR TERMINAL</span>
             <h2>The same markets.<br />A different stake.</h2>
-            <p className="pf2-subtitle">Paperfund works alongside Axiom, GMGN.ai and Terminal / Padre. The extension stays familiar: only the visual identity changes.</p>
+            <p className="pf2-subtitle">Paperfund works alongside Axiom, GMGN.ai and Terminal / Padre. Trade and manage positions directly from the terminal with the Paperfund extension.</p>
             <a className="pf2-text-link" href={siteConfig.extensionUrl} target="_blank" rel="noreferrer">View the Chrome extension ↗</a>
           </div>
           <div className="pf2-product-proof">
-            <div className="pf2-proof-head"><span>REAL PAPERFUND EXTENSION</span><small>Axiom · GMGN.ai</small></div>
+            <div className="pf2-proof-head"><span>PAPERFUND IN THE TERMINAL</span><small>Actual extension screenshots</small></div>
             <div className="pf2-product-photos">
-              <img src="/extension-axiom-real.webp" alt="Real Paperfund paper-trading panel on Axiom" loading="lazy" />
-              <img src="/extension-gmgn-real.webp" alt="Real Paperfund paper-trading panel on GMGN.ai" loading="lazy" />
+              <figure>
+                <img src="/extension-axiom-hq.webp" alt="Actual Paperfund extension overlay on Axiom trading terminal" loading="lazy" width="540" height="672" />
+                <figcaption>Axiom</figcaption>
+              </figure>
+              <figure>
+                <img src="/extension-gmgn-hq.webp" alt="Actual Paperfund extension overlay on GMGN trading terminal" loading="lazy" width="540" height="666" />
+                <figcaption>GMGN.ai</figcaption>
+              </figure>
             </div>
-            <p>Existing product screenshots. Final styling will match the updated extension release.</p>
           </div>
         </div>
       </section>
@@ -145,14 +150,14 @@ export function LandingPage() {
         <div className="pf2-container">
           <span className="pf2-label">04 / PAYOUTS</span>
           <h2>From fees to your wallet.</h2>
-          <p className="pf2-subtitle">Payouts follow actual collected revenue—not projections. Every winner plan requires final results, qualified funding and authorization.</p>
+          <p className="pf2-subtitle">Payouts come from collected creator fees, after competition results and reward funding have been verified.</p>
           <div className="pf2-payout-steps">
             <div><span>01</span><strong>Creator fees claimed</strong><p>Real earned fees become collectable revenue.</p></div>
             <div><span>02</span><strong>Funding verified</strong><p>Accepted receipts are reconciled to competition periods.</p></div>
             <div><span>03</span><strong>Winners finalized</strong><p>Hourly top 10 and daily top 25 are calculated.</p></div>
-            <div><span>04</span><strong>Payment verified</strong><p>Authorized SOL transfers are recorded on-chain.</p></div>
+            <div><span>04</span><strong>Payment verified</strong><p>Completed SOL transfers are recorded on-chain.</p></div>
           </div>
-          <div className="pf2-financial-notice"><span aria-hidden="true"/> <strong>Real-SOL payouts currently on hold.</strong> <span>See the Rewards page for verified financial status; simulated trading is separate.</span> <a href={siteConfig.appUrl+'/rewards'}>Live status ↗</a></div>
+          <div className="pf2-financial-notice"><span aria-hidden="true"/> <strong>Reward transparency.</strong> <span>Track verified funding, allocations and the current payout status on the Rewards page.</span> <a href={siteConfig.appUrl+'/rewards'}>View rewards ↗</a></div>
         </div>
       </section>
     </div>
