@@ -73,6 +73,65 @@ style.textContent = `
   .pf-resize-handle{position:sticky;float:right;right:0;bottom:0;width:18px;height:18px;margin-top:-18px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 45%,#a49aad 46%,#a49aad 54%,transparent 55%,transparent 68%,#847b89 69%,#847b89 77%,transparent 78%)}
 `;
 style.textContent += `.pf-token-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:9px 0;border-bottom:1px solid #e8e3eb;margin-bottom:10px}.pf-token-summary>div{display:grid;gap:4px;min-width:0}.pf-token-summary small{font-size:10px;color:#8b969c;text-transform:uppercase}.pf-token-summary b{font:600 11px ui-monospace,monospace;overflow-wrap:anywhere}`;
+style.textContent += `
+  /* Paperfund Night brand palette. Existing layout, control markup and trading handlers unchanged. */
+  :host { color-scheme:dark; }
+  .pf-panel { background:#10121d;color:#f3effb;border:1px solid #504365;
+    border-radius:11px;box-shadow:0 19px 62px #000c,0 0 27px #7550bb1e;
+    scrollbar-color:#5f4b75 #151523; }
+  .pf-header { background:#141522fb;border-bottom:1px solid #393047; }
+  .pf-brand>img { background:#171222;border-radius:7px; }
+  .pf-brand strong { color:#f9f6ff;letter-spacing:.016em;font-weight:750; }
+  .pf-brand small,.pf-section-title,small { color:#ab9dbb; }
+  .pf-terminal { color:#c8a8ff;border-color:#4c3a63;background:#292039; }
+  .pf-head-actions button,.pf-wallet-row button { color:#b2a7bf; }
+  .pf-head-actions button:hover,.pf-wallet-row button:hover { color:#fff; }
+  .pf-refresh-status { color:#a99cb8; }
+  .pf-collapsed { background:#161827; }
+  .pf-collapsed span { color:#bf9dff; }
+  .pf-round,.pf-round>div+div,.pf-wallet-row,.pf-metrics,.pf-ticket,.pf-position,
+  .pf-market,.pf-empty-position,.pf-token-summary { border-color:#353046; }
+  .pf-round b,.pf-metrics b,.pf-position-grid b,.pf-max b { color:#eee8f9; }
+  .pf-notice { background:#201d29;border-left-color:#b993e8;color:#c6b8cb; }
+  .pf-notice.success { border-color:#2dbd8d; }
+  .pf-notice.error { border-color:#e76c7b;color:#f7a8b2; }
+  .pf-auth p,.pf-enter p { color:#b4a8bf; }
+  .primary { background:linear-gradient(120deg,#bc97ff,#9261ed);border:1px solid #b899f2;
+    color:#171024;border-radius:7px;font-weight:800;letter-spacing:.025em; }
+  .primary:hover:not(:disabled) { background:linear-gradient(120deg,#d1b4ff,#a477f7); }
+  .pf-wallet,.pf-wallet-row,.pf-market b { color:#d4c9df; }
+  .dot { background:#32cf9a; }
+  .pf-previous,.pf-average-entry,.pf-trade-summary { background:#1c2928;
+    border-color:#325e4f;color:#b1e6cf; }
+  .pf-previous b,.pf-average-entry,.pf-average-entry b { color:#6ce0ab; }
+  .pf-metrics { background:#141725; }
+  .pf-metrics>div { border-color:#353046; }
+  .pf-market { color:#ad9fb8; }
+  .pf-market.error { color:#f19caa; }
+  .pf-ticket-meta,.pf-ticket label { color:#ae9fbf; }
+  .pf-ticket-meta b { color:#e6dded; }
+  .pf-input input { background:#11131e;color:#fff;border:1px solid #514763;
+    border-radius:7px; }
+  .pf-input input:focus { border-color:#a67fff;box-shadow:0 0 0 2px #9165df30; }
+  .pf-input span { color:#aea3c3; }
+  .pf-quick button,.pf-sells button { background:#1c1d2c;border:1px solid #4a425b;
+    color:#e0d6ef;border-radius:6px; }
+  .pf-quick button:hover:not(:disabled),.pf-sells button:hover:not(:disabled) {
+    color:#d9bfff;border-color:#a47ce1; }
+  .pf-sells .danger { background:#232435;color:#eee9f7;border-color:#575068; }
+  .pf-sells .danger:hover:not(:disabled) { background:#353348;border-color:#8e7caa; }
+  .pf-max { border-color:#353046;color:#ad9ebc; }
+  .pf-inline-error { color:#f38d9d; }
+  .pf-position-grid span,.pf-empty-position { color:#aea2b9; }
+  .pf-open { color:#c2a5ed; }
+  .pf-open:hover { color:#e0ceff; }
+  .pf-resize-handle { filter:brightness(1.7); }
+  .green { color:#37d5a1!important; }
+  .red { color:#f37e92!important; }
+  .sell,.neutral { color:#bcb3cb!important; }
+  .urgent { color:#e9b67c!important; }
+  button:focus-visible,input:focus-visible,a:focus-visible { outline-color:#c9acff; }
+`;
 shadow.append(style);
 const mount = document.createElement('div');
 shadow.append(mount);
