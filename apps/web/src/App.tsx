@@ -341,14 +341,15 @@ function SupportPage() {
       <PageTitle
         eyebrow="SUPPORT"
         title="Paperfund support"
-        subtitle="Help for the Paperfund web app and multi-terminal extension."
+        subtitle="Help for the Paperfund web trading platform."
       />
       <article className="policy-copy">
         <h2>Before reporting a problem</h2>
         <p>
-          Confirm that the extension is enabled, the current page is a supported Solana token route,
-          and the Paperfund API is available. Reload the terminal tab after an extension update.
-          Signing in requires only an explicit wallet message signature.
+          Connect your Solana wallet, enter the current UTC round, and search for a valid Solana
+          token mint on the trading page. Check that the Paperfund market route and API are
+          available before placing a paper order. Signing in requires only a wallet message
+          signature; paper trading never requires a deposit.
         </p>
         <h2>Report an issue</h2>
         <p>
@@ -522,6 +523,8 @@ function TradePage({
     return (
       <PageFrame>
         <WelcomePanel />
+        <WebsiteMarketPicker selectedMint={selectedMint} onSelect={selectMint} />
+        <WebsiteMarketChart mint={selectedMint} />
       </PageFrame>
     );
   if (accountLoading)
