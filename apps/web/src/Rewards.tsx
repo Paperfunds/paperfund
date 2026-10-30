@@ -137,18 +137,18 @@ export function RewardsPage({ user }: { user: User | null }) {
         <div>
           <strong>
             {payoutsEnabled
-              ? 'Real-SOL payout channel enabled'
+              ? 'SOL payouts available'
               : evidence.data
-                ? 'Real-SOL payouts on hold · Financial authorization required'
-                : 'Real-SOL payout status unavailable'}
+                ? 'SOL payouts currently unavailable'
+                : 'Payout status unavailable'}
           </strong>
           <p>
             {payoutsEnabled
-              ? 'Only finalized, funded and authorized winner allocations can be paid. Verify payments in the on-chain history below.'
-              : 'PAPER competitions are separate from financial payouts. Observed revenue and REVIEW allocations are not qualified, reserved or paid rewards.'}
+              ? 'Winner payments are recorded below after results, funding and on-chain settlement are verified.'
+              : 'Only confirmed on-chain transfers count as paid rewards. Funding observations and preliminary allocations are not payments.'}
           </p>
         </div>
-        <span className="badge">{evidence.data?.stop ?? 'STATUS UNAVAILABLE'}</span>
+        <span className="badge">{payoutsEnabled ? 'PAYMENTS AVAILABLE' : evidence.data ? 'PAYMENTS PAUSED' : 'STATUS UNAVAILABLE'}</span>
       </div>
       {evidence.error && (
         <p role="alert" className="error-inline">
