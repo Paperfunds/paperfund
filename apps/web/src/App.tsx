@@ -554,6 +554,8 @@ function TradePage({
         />
         {previousResult.data && <RoundComplete result={previousResult.data} />}
         <EnterRound round={round} pending={enter.isPending} onEnter={() => enter.mutate()} />
+        <WebsiteMarketPicker selectedMint={selectedMint} onSelect={selectMint} />
+        <WebsiteMarketChart mint={selectedMint} />
       </PageFrame>
     );
   if (!account)
@@ -562,6 +564,8 @@ function TradePage({
         {previousResult.data && <RoundComplete result={previousResult.data} />}
         <EnterRound round={round} pending={enter.isPending} onEnter={() => enter.mutate()} />
         {notice && <NoticeCard notice={notice} />}
+        <WebsiteMarketPicker selectedMint={selectedMint} onSelect={selectMint} />
+        <WebsiteMarketChart mint={selectedMint} />
       </PageFrame>
     );
 
@@ -902,9 +906,7 @@ function MarketCard({ market }: { market: MarketSupport }) {
         <strong>{market.supported ? 'Supported market' : 'Unsupported market'}</strong>
         <small>
           {market.supported
-            ? market.status === 'MIGRATED_POOL'
-              ? 'PumpSwap migrated'
-              : 'Pump.fun bonding curve'
+            ? 'Verified by Paperfund execution preflight'
             : market.reason}
         </small>
       </div>
