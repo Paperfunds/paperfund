@@ -15,7 +15,7 @@ export function PublicHeader() {
         {siteConfig.xUrl && <a href={siteConfig.xUrl} target="_blank" rel="noreferrer">X ↗</a>}
         <a href={siteConfig.githubUrl} target="_blank" rel="noreferrer">GitHub ↗</a>
       </nav>
-      <a className="public-enter" href={siteConfig.appUrl}>
+      <a className="public-enter" href={siteConfig.appUrl + '/trade'}>
         Enter Paperfund <span>↗</span>
       </a>
     </header>
@@ -47,7 +47,7 @@ export function PublicFooter() {
         )}
       </div>
       <p className="footer-disclosure">
-        © {new Date().getFullYear()} Paperfund. Independent of Axiom, GMGN.ai and Padre. Simulated
+        © {new Date().getFullYear()} Paperfund. Trading simulations are independent of live order execution. Simulated
         trading only.
       </p>
     </footer>
@@ -63,7 +63,7 @@ export function LandingPage() {
           <h1>Trade on paper.<span>Compete for SOL.</span></h1>
           <p className="pf2-lead">Real markets. Simulated trades. Hourly and daily competitions with a creator-fee-funded reward model.</p>
           <div className="pf2-actions">
-            <a className="pf2-button pf2-primary" href={siteConfig.appUrl}>Enter Paperfund <span aria-hidden="true">↗</span></a>
+            <a className="pf2-button pf2-primary" href={siteConfig.appUrl + '/trade'}>Enter Paperfund <span aria-hidden="true">↗</span></a>
             <a className="pf2-button pf2-secondary" href="#how-it-works">How it works</a>
           </div>
           <div className="pf2-hero-facts" aria-label="Competition format">
@@ -84,27 +84,32 @@ export function LandingPage() {
         <div className="pf2-container">
           <span className="pf2-label">01 / THE IDEA</span>
           <h2>Trade. Compete. Rank.</h2>
-          <p className="pf2-subtitle">Paperfund adds a paper-trading competition to supported Solana terminals. Your own SOL is not used to execute paper trades.</p>
+          <p className="pf2-subtitle">Trade Solana tokens directly on the Paperfund website. Explore public charts, place simulated orders, and compete without installing a browser extension.</p>
           <div className="pf2-steps">
-            <article><span>01 / TRADE</span><h3>Use Paper SOL.</h3><p>Trade with a simulated balance using current-market pricing through supported terminals.</p></article>
+            <article><span>01 / TRADE</span><h3>Use Paper SOL.</h3><p>Search a Solana token by name or mint, inspect its live market chart, and trade with Paper SOL using server-verified quotes.</p></article>
             <article><span>02 / COMPETE</span><h3>Your P&amp;L sets the rank.</h3><p>Hourly results settle at the UTC cutoff and contribute to daily scores.</p></article>
             <article><span>03 / REWARDS</span><h3>Verified fees fund prizes.</h3><p>Verified creator fees fund the real-SOL reward pool, with payouts made to eligible winners when payments are available.</p></article>
           </div>
         </div>
       </section>
 
-      <section className="pf2-section pf2-product" aria-label="Paperfund extension">
+      <section className="pf2-section pf2-product" aria-label="Paperfund website trading">
         <div className="pf2-container pf2-product-grid">
           <div>
-            <span className="pf2-label">BUILT FOR YOUR TERMINAL</span>
-            <h2>The same markets.<br />A different stake.</h2>
-            <p className="pf2-subtitle">Paperfund works alongside Axiom, GMGN.ai and Terminal / Padre. Use the same trading controls and positions with a refreshed interface.</p>
-            <a className="pf2-text-link" href={siteConfig.extensionUrl} target="_blank" rel="noreferrer">View the Chrome extension ↗</a>
+            <span className="pf2-label">THE TRADING WORKSPACE</span>
+            <h2>One website.<br />Every competition.</h2>
+            <p className="pf2-subtitle">Discover markets, view charts, paper trade, track positions and follow hourly or daily rankings in one place. No extension required.</p>
+            <a className="pf2-text-link" href={siteConfig.appUrl + '/trade'}>Open the trading workspace ↗</a>
           </div>
-          <div className="pf2-product-proof">
-            <div className="pf2-proof-head"><span>PAPERFUND EXTENSION</span><small>Dark violet visual concept</small></div>
-            <img className="pf2-extension-concept" src="/paperfund-extension-illustration.svg" alt="Design illustration showing the purple Paperfund paper-trading panel over a Solana terminal" loading="lazy" />
-            <p>Design illustration. The installed extension retains its existing BUY/SELL controls, positions and terminal behavior.</p>
+          <div className="pf2-product-proof pf-web-preview">
+            <div className="pf2-proof-head"><span>PAPERFUND WEB TRADING</span><small>Simple workflow</small></div>
+            <div className="pf-web-preview-steps">
+              <div><span>01</span><strong>Find a market</strong><small>Search by name, symbol or Solana mint</small></div>
+              <div><span>02</span><strong>Inspect its chart</strong><small>Public price history, independent of order pricing</small></div>
+              <div><span>03</span><strong>Buy or sell Paper SOL</strong><small>Realistic execution simulation with backend limits</small></div>
+              <div><span>04</span><strong>Climb the leaderboard</strong><small>Hourly results also contribute to daily ranking</small></div>
+            </div>
+            <p>Paper SOL trades are simulated. Reward availability is shown separately on the Rewards page.</p>
           </div>
         </div>
       </section>
